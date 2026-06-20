@@ -39,3 +39,6 @@ Thumbs.db
 
 # local scratch (large/throwaway artifacts)
 scratch/
+
+# Flutter SDK must not live inside the repo (use the one at C:\Users\PronHublutter)
+/flutter/
