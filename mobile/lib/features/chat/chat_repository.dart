@@ -19,6 +19,12 @@ class ChatRepository {
     final res = await _dio.post('/chat', data: {'message': message});
     return ChatMessage.fromJson((res.data as Map<String, dynamic>)['message'] as Map<String, dynamic>);
   }
+
+  /// ส่งรูป (data URL) ให้ backend OCR ด้วย Typhoon OCR → คืนข้อความที่อ่านได้
+  Future<String> ocrImage(String dataUrl) async {
+    final res = await _dio.post('/chat/ocr', data: {'imageBase64': dataUrl});
+    return ((res.data as Map<String, dynamic>)['text'] as String?) ?? '';
+  }
 }
 
 final chatRepoProvider =

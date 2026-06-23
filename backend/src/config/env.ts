@@ -15,6 +15,7 @@ export const env = {
   // AI Coach providers (ใส่ตัวไหน ตัวนั้นถูกใช้; ลำดับ Typhoon → Groq → OpenAI → fallback)
   typhoonApiKey: process.env.TYPHOON_API_KEY,
   typhoonModel: process.env.TYPHOON_MODEL ?? 'typhoon-v2.5-30b-a3b-instruct',
+  typhoonOcrModel: process.env.TYPHOON_OCR_MODEL ?? 'typhoon-ocr-v1.5',
   groqApiKey: process.env.GROQ_API_KEY,
   groqModel: process.env.GROQ_MODEL ?? 'llama-3.3-70b-versatile',
   openaiApiKey: process.env.OPENAI_API_KEY,

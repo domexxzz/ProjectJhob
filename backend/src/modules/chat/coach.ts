@@ -49,7 +49,7 @@ export async function generateReply(
       const resp = await client.chat.completions.create({
         model: p.model,
         temperature: 0.6,
-        max_tokens: 350,
+        max_tokens: 1500, // ไทยกินโทเค็นเยอะ — เผื่อให้ตอบจบไม่ขาด (persona คุมความยาว ~200 คำ)
         messages,
       });
       const reply = resp.choices[0]?.message?.content?.trim();
@@ -59,6 +59,29 @@ export async function generateReply(
     }
   }
   return { reply: fallbackReply(context, question), source: 'fallback' };
+}
+
+/** OCR รูป (สลิป/เอกสาร) ด้วย Typhoon OCR — รับ data URL ("data:image/...;base64,xxx") คืนข้อความ */
+export async function ocrImage(imageDataUrl: string): Promise<string> {
+  if (!env.typhoonApiKey) throw new Error('no TYPHOON_API_KEY for OCR');
+  const client = new OpenAI({ apiKey: env.typhoonApiKey, baseURL: 'https://api.opentyphoon.ai/v1' });
+  const resp = await client.chat.completions.create({
+    model: env.typhoonOcrModel,
+    max_tokens: 1000,
+    messages: [
+      {
+        role: 'user',
+        content: [
+          {
+            type: 'text',
+            text: 'อ่านข้อความทั้งหมดในรูปนี้ออกมาเป็นข้อความล้วน เน้น จำนวนเงิน วันที่ ร้านค้า/ผู้รับ และเลขอ้างอิง',
+          },
+          { type: 'image_url', image_url: { url: imageDataUrl } },
+        ] as never,
+      },
+    ],
+  });
+  return resp.choices[0]?.message?.content?.trim() ?? '';
 }
 
 /** โค้ชแบบ rule-based — ตอบ grounded จาก context จริง (ใช้ตอนยังไม่ใส่ API key) */

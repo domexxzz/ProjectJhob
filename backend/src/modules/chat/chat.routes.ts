@@ -5,7 +5,7 @@ import { requireAuth } from '../../lib/auth';
 import { prisma } from '../../lib/prisma';
 import { cache } from '../../lib/cache';
 import { buildContext } from './context_builder';
-import { generateReply, ChatTurn } from './coach';
+import { generateReply, ChatTurn, ocrImage } from './coach';
 
 export const chatRouter = Router();
 chatRouter.use(requireAuth);
@@ -60,5 +60,21 @@ chatRouter.post(
     });
 
     res.status(201).json({ message: saved, source });
+  }),
+);
+
+// POST /api/v1/chat/ocr -> อ่านข้อความจากรูป (สลิป/เอกสาร) ด้วย Typhoon OCR
+chatRouter.post(
+  '/ocr',
+  asyncHandler(async (req, res) => {
+    const { imageBase64 } = req.body as { imageBase64?: string };
+    if (!imageBase64) throw new HttpError(400, 'ต้องแนบรูป (imageBase64 เป็น data URL)');
+    try {
+      const text = await ocrImage(imageBase64);
+      res.json({ text });
+    } catch (e) {
+      console.error('[chat/ocr] failed:', (e as Error).message);
+      throw new HttpError(503, 'อ่านรูปไม่สำเร็จ — ตรวจว่าตั้ง TYPHOON_API_KEY และรุ่น OCR ถูกต้อง');
+    }
   }),
 );

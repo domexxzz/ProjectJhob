@@ -19,35 +19,25 @@ class DashboardScreen extends ConsumerWidget {
     final period = ref.watch(dashboardPeriodProvider);
 
     return Scaffold(
-      body: SafeArea(
-        child: RefreshIndicator(
-          onRefresh: () async {
-            await ref.read(transactionsRepoProvider).syncPending();
-            ref.invalidate(dashboardProvider);
-            ref.invalidate(budgetsListProvider);
-            await ref.read(dashboardProvider.future);
-          },
-          child: ListView(
-            padding: const EdgeInsets.all(20),
-            children: [
-              Row(
+      body: Column(
+        children: [
+          _GradientHeader(
+            name: user?.displayName ?? 'เพื่อน',
+            streak: user?.streak ?? 0,
+          ),
+          Expanded(
+            child: RefreshIndicator(
+              onRefresh: () async {
+                await ref.read(transactionsRepoProvider).syncPending();
+                ref.invalidate(dashboardProvider);
+                ref.invalidate(budgetsListProvider);
+                await ref.read(dashboardProvider.future);
+              },
+              child: ListView(
+                padding: const EdgeInsets.fromLTRB(16, 16, 16, 96),
                 children: [
-                  Expanded(
-                    child: Text('สวัสดี ${user?.displayName ?? 'เพื่อน'}! 👋',
-                        style: const TextStyle(fontSize: 22, fontWeight: FontWeight.bold)),
-                  ),
-                  _StreakChip(streak: user?.streak ?? 0),
-                  IconButton(
-                    tooltip: 'ออกจากระบบ',
-                    onPressed: () async {
-                      await ref.read(authControllerProvider.notifier).logout();
-                      if (context.mounted) context.go('/login');
-                    },
-                    icon: const Icon(Icons.logout, color: AppColors.textMuted),
-                  ),
-                ],
-              ),
-              const SizedBox(height: 16),
+                  const _QuickActions(),
+                  const SizedBox(height: 16),
               dashboard.when(
                 loading: () => const Padding(
                   padding: EdgeInsets.all(40),
@@ -149,9 +139,12 @@ class DashboardScreen extends ConsumerWidget {
                       const SizedBox(height: 16),
                       const _CoachTeaser(),
                       const SizedBox(height: 24),
-                      const Align(
-                        alignment: Alignment.centerLeft,
-                        child: Text('รายการในช่วงเวลา', style: TextStyle(fontSize: 16, fontWeight: FontWeight.bold)),
+                      const Row(
+                        children: [
+                          Icon(Icons.receipt_long_rounded, size: 18, color: AppColors.primary),
+                          SizedBox(width: 6),
+                          Text('รายการในช่วงเวลา', style: TextStyle(fontSize: 16, fontWeight: FontWeight.bold)),
+                        ],
                       ),
                       const SizedBox(height: 8),
                       if (filteredTxns.isEmpty)
@@ -166,32 +159,24 @@ class DashboardScreen extends ConsumerWidget {
                 },
               ),
             ],
+              ),
+            ),
           ),
-        ),
+        ],
       ),
-      floatingActionButton: FloatingActionButton.extended(
+      floatingActionButton: FloatingActionButton(
         onPressed: () async {
           await context.push('/add');
           ref.invalidate(dashboardProvider);
         },
         backgroundColor: AppColors.primary,
         foregroundColor: Colors.white,
-        icon: const Icon(Icons.add),
-        label: const Text('เพิ่มรายการ'),
+        shape: const CircleBorder(),
+        elevation: 4,
+        child: const Icon(Icons.add, size: 28),
       ),
-    );
-  }
-}
-
-class _StreakChip extends StatelessWidget {
-  const _StreakChip({required this.streak});
-  final int streak;
-  @override
-  Widget build(BuildContext context) {
-    return Container(
-      padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 6),
-      decoration: BoxDecoration(color: const Color(0xFFFFF0E6), borderRadius: BorderRadius.circular(20)),
-      child: Text('🔥 $streak วัน', style: const TextStyle(fontWeight: FontWeight.w600)),
+      floatingActionButtonLocation: FloatingActionButtonLocation.centerDocked,
+      bottomNavigationBar: const _DashboardNav(),
     );
   }
 }
@@ -214,12 +199,11 @@ class _BalanceCard extends StatelessWidget {
     return Container(
       padding: const EdgeInsets.all(20),
       decoration: BoxDecoration(
-        gradient: const LinearGradient(
-          colors: [AppColors.primary, AppColors.primaryDark],
-          begin: Alignment.topLeft,
-          end: Alignment.bottomRight,
-        ),
+        gradient: kBalanceGradient,
         borderRadius: BorderRadius.circular(24),
+        boxShadow: [
+          BoxShadow(color: AppColors.primary.withOpacity(0.35), blurRadius: 28, offset: const Offset(0, 14)),
+        ],
       ),
       child: Column(
         crossAxisAlignment: CrossAxisAlignment.start,
@@ -307,7 +291,7 @@ class _CategoryPieChart extends StatelessWidget {
   Widget build(BuildContext context) {
     return Container(
       padding: const EdgeInsets.all(16),
-      decoration: BoxDecoration(color: Colors.white, borderRadius: BorderRadius.circular(20)),
+      decoration: softCard(),
       child: Column(
         crossAxisAlignment: CrossAxisAlignment.start,
         children: [
@@ -388,7 +372,7 @@ class _BudgetsProgressSection extends ConsumerWidget {
 
     return Container(
       padding: const EdgeInsets.all(16),
-      decoration: BoxDecoration(color: Colors.white, borderRadius: BorderRadius.circular(20)),
+      decoration: softCard(),
       child: Column(
         crossAxisAlignment: CrossAxisAlignment.start,
         children: [
@@ -524,31 +508,41 @@ class _CoachTeaser extends StatelessWidget {
   const _CoachTeaser();
   @override
   Widget build(BuildContext context) {
-    return Material(
-      color: Colors.white,
-      borderRadius: BorderRadius.circular(20),
-      child: InkWell(
+    return Container(
+      decoration: BoxDecoration(
+        gradient: const LinearGradient(
+          colors: [Color(0xFFEDEBFF), Color(0xFFF3ECFF)],
+          begin: Alignment.centerLeft,
+          end: Alignment.centerRight,
+        ),
         borderRadius: BorderRadius.circular(20),
-        onTap: () => context.push('/chat'),
-        child: Padding(
-          padding: const EdgeInsets.all(16),
-          child: Row(
-            children: const [
-              CircleAvatar(backgroundColor: Color(0xFFEDEBFF), child: Text('🤖')),
-              SizedBox(width: 12),
-              Expanded(
-                child: Column(
-                  crossAxisAlignment: CrossAxisAlignment.start,
-                  children: [
-                    Text('คุยกับพี่เงิน',
-                        style: TextStyle(fontWeight: FontWeight.bold, color: AppColors.textDark)),
-                    Text('ถามเรื่องเงินได้เลย — แตะเพื่อเริ่มแชท 💬',
-                        style: TextStyle(color: AppColors.textMuted, fontSize: 12)),
-                  ],
+        boxShadow: kCardShadow,
+      ),
+      child: Material(
+        color: Colors.transparent,
+        child: InkWell(
+          borderRadius: BorderRadius.circular(20),
+          onTap: () => context.push('/chat'),
+          child: Padding(
+            padding: const EdgeInsets.all(16),
+            child: Row(
+              children: const [
+                CircleAvatar(backgroundColor: Colors.white, child: Text('🤖')),
+                SizedBox(width: 12),
+                Expanded(
+                  child: Column(
+                    crossAxisAlignment: CrossAxisAlignment.start,
+                    children: [
+                      Text('คุยกับพี่เงิน · ที่ปรึกษาการเงิน AI',
+                          style: TextStyle(fontWeight: FontWeight.bold, color: AppColors.textDark)),
+                      Text('ถามเรื่องออม/ลงทุน หรือส่งสลิป — แตะเพื่อเริ่มแชท 💬',
+                          style: TextStyle(color: AppColors.textMuted, fontSize: 12)),
+                    ],
+                  ),
                 ),
-              ),
-              Icon(Icons.chevron_right, color: AppColors.textMuted),
-            ],
+                Icon(Icons.chevron_right, color: AppColors.textMuted),
+              ],
+            ),
           ),
         ),
       ),
@@ -628,7 +622,9 @@ class _TxnTile extends ConsumerWidget {
     final c = txn.category;
     return Card(
       margin: const EdgeInsets.only(bottom: 10),
-      elevation: 0,
+      elevation: 2,
+      shadowColor: const Color(0x12000000),
+      surfaceTintColor: Colors.white,
       color: Colors.white,
       shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(16)),
       clipBehavior: Clip.antiAlias,
@@ -685,6 +681,257 @@ class _ErrorBox extends StatelessWidget {
         const Text('ตรวจว่า backend รันที่ API_BASE_URL หรือยัง',
             style: TextStyle(fontSize: 11, color: AppColors.textMuted)),
       ],
+    );
+  }
+}
+
+/// Header เต็มความกว้าง gradient + ภาพประกอบมุมขวา (สไตล์ fintech)
+class _GradientHeader extends StatelessWidget {
+  const _GradientHeader({required this.name, required this.streak});
+  final String name;
+  final int streak;
+
+  @override
+  Widget build(BuildContext context) {
+    final topPad = MediaQuery.of(context).padding.top;
+    return Container(
+      width: double.infinity,
+      padding: EdgeInsets.fromLTRB(20, topPad + 18, 20, 26),
+      decoration: const BoxDecoration(
+        gradient: LinearGradient(
+          colors: [Color(0xFF8273F2), Color(0xFF6C5CE7)],
+          begin: Alignment.topLeft,
+          end: Alignment.bottomRight,
+        ),
+        borderRadius: BorderRadius.only(
+          bottomLeft: Radius.circular(28),
+          bottomRight: Radius.circular(28),
+        ),
+        boxShadow: [BoxShadow(color: Color(0x336C5CE7), blurRadius: 20, offset: Offset(0, 8))],
+      ),
+      child: Stack(
+        clipBehavior: Clip.none,
+        children: [
+          const Positioned(right: 0, top: 2, child: _HeaderArt()),
+          Padding(
+            padding: const EdgeInsets.only(right: 96),
+            child: Column(
+              crossAxisAlignment: CrossAxisAlignment.start,
+              children: [
+                Text('สวัสดี $name 👋',
+                    style: const TextStyle(color: Colors.white, fontSize: 22, fontWeight: FontWeight.bold)),
+                const SizedBox(height: 2),
+                const Text('มาดูภาพรวมการเงินกันเถอะ',
+                    style: TextStyle(color: Colors.white70, fontSize: 13)),
+                const SizedBox(height: 12),
+                Container(
+                  padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 5),
+                  decoration: BoxDecoration(
+                    color: Colors.white.withOpacity(0.22),
+                    borderRadius: BorderRadius.circular(20),
+                  ),
+                  child: Text('🔥 streak $streak วัน',
+                      style: const TextStyle(color: Colors.white, fontWeight: FontWeight.w600, fontSize: 12)),
+                ),
+              ],
+            ),
+          ),
+        ],
+      ),
+    );
+  }
+}
+
+/// ภาพประกอบส่วนหัว (วาดด้วย widget — เหรียญ ฿ + กราฟแท่งเติบโต + วงกลมประดับ)
+class _HeaderArt extends StatelessWidget {
+  const _HeaderArt();
+
+  Widget _bar(double h) => Container(
+        width: 9,
+        height: h,
+        margin: const EdgeInsets.symmetric(horizontal: 2),
+        decoration: BoxDecoration(
+          color: Colors.white.withOpacity(0.85),
+          borderRadius: BorderRadius.circular(4),
+        ),
+      );
+
+  @override
+  Widget build(BuildContext context) {
+    return SizedBox(
+      width: 92,
+      height: 84,
+      child: Stack(
+        clipBehavior: Clip.none,
+        children: [
+          Positioned(
+            right: 40,
+            top: 4,
+            child: Container(
+              width: 30,
+              height: 30,
+              decoration: BoxDecoration(color: Colors.white.withOpacity(0.16), shape: BoxShape.circle),
+            ),
+          ),
+          Positioned(
+            right: 0,
+            top: 42,
+            child: Container(
+              width: 14,
+              height: 14,
+              decoration: BoxDecoration(color: Colors.white.withOpacity(0.14), shape: BoxShape.circle),
+            ),
+          ),
+          Positioned(
+            right: 4,
+            bottom: 2,
+            child: Row(
+              crossAxisAlignment: CrossAxisAlignment.end,
+              children: [_bar(12), _bar(20), _bar(30)],
+            ),
+          ),
+          Positioned(
+            right: 28,
+            top: 0,
+            child: Container(
+              width: 42,
+              height: 42,
+              decoration: const BoxDecoration(
+                color: Colors.white,
+                shape: BoxShape.circle,
+                boxShadow: [BoxShadow(color: Color(0x33000000), blurRadius: 8, offset: Offset(0, 3))],
+              ),
+              alignment: Alignment.center,
+              child: const Text('฿',
+                  style: TextStyle(color: AppColors.primary, fontWeight: FontWeight.bold, fontSize: 22)),
+            ),
+          ),
+        ],
+      ),
+    );
+  }
+}
+
+/// เมนูด่วน เลื่อนแนวนอน
+class _QuickActions extends StatelessWidget {
+  const _QuickActions();
+  @override
+  Widget build(BuildContext context) {
+    final items = <({IconData icon, String label, Color color, VoidCallback onTap})>[
+      (icon: Icons.add_rounded, label: 'เพิ่มรายการ', color: AppColors.primary, onTap: () => context.push('/add')),
+      (icon: Icons.camera_alt_rounded, label: 'สแกนสลิป', color: AppColors.accent, onTap: () => context.push('/add')),
+      (icon: Icons.chat_bubble_rounded, label: 'คุยพี่เงิน', color: const Color(0xFFFFA94D), onTap: () => context.push('/chat')),
+      (icon: Icons.flag_rounded, label: 'เป้าหมาย', color: AppColors.income, onTap: () => context.push('/chat')),
+    ];
+    return SizedBox(
+      height: 94,
+      child: ListView.separated(
+        scrollDirection: Axis.horizontal,
+        padding: EdgeInsets.zero,
+        physics: const BouncingScrollPhysics(),
+        itemCount: items.length,
+        separatorBuilder: (_, __) => const SizedBox(width: 12),
+        itemBuilder: (context, i) {
+          final it = items[i];
+          return GestureDetector(
+            onTap: it.onTap,
+            child: Container(
+              width: 88,
+              decoration: softCard(radius: 18),
+              child: Column(
+                mainAxisAlignment: MainAxisAlignment.center,
+                children: [
+                  CircleAvatar(
+                    radius: 20,
+                    backgroundColor: it.color.withOpacity(0.15),
+                    child: Icon(it.icon, color: it.color, size: 20),
+                  ),
+                  const SizedBox(height: 8),
+                  Text(it.label,
+                      style: const TextStyle(fontSize: 11, fontWeight: FontWeight.w600, color: AppColors.textDark)),
+                ],
+              ),
+            ),
+          );
+        },
+      ),
+    );
+  }
+}
+
+/// Bottom navigation bar + center FAB notch
+class _DashboardNav extends StatelessWidget {
+  const _DashboardNav();
+  @override
+  Widget build(BuildContext context) {
+    return BottomAppBar(
+      color: Colors.white,
+      elevation: 12,
+      shape: const CircularNotchedRectangle(),
+      notchMargin: 8,
+      height: 66,
+      padding: EdgeInsets.zero,
+      child: Row(
+        mainAxisAlignment: MainAxisAlignment.spaceAround,
+        children: [
+          const _NavItem(icon: Icons.home_rounded, label: 'หน้าหลัก', active: true),
+          _NavItem(icon: Icons.pie_chart_rounded, label: 'งบ', onTap: () => context.push('/budgets')),
+          const SizedBox(width: 40),
+          _NavItem(icon: Icons.chat_bubble_rounded, label: 'พี่เงิน', onTap: () => context.push('/chat')),
+          _NavItem(icon: Icons.person_rounded, label: 'ฉัน', onTap: () => context.push('/profile')),
+        ],
+      ),
+    );
+  }
+}
+
+class _NavItem extends StatelessWidget {
+  const _NavItem({required this.icon, required this.label, this.active = false, this.onTap});
+  final IconData icon;
+  final String label;
+  final bool active;
+  final VoidCallback? onTap;
+  @override
+  Widget build(BuildContext context) {
+    final color = active ? AppColors.primary : AppColors.textMuted;
+    return InkWell(
+      onTap: onTap,
+      borderRadius: BorderRadius.circular(12),
+      child: Padding(
+        padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 6),
+        child: Column(
+          mainAxisSize: MainAxisSize.min,
+          children: [
+            Icon(icon, color: color, size: 22),
+            const SizedBox(height: 2),
+            Text(label,
+                style: TextStyle(color: color, fontSize: 10, fontWeight: active ? FontWeight.w700 : FontWeight.w500)),
+          ],
+        ),
+      ),
+    );
+  }
+}
+
+/// หน้า "งบประมาณ" (เปิดจาก bottom nav) — ใช้ section งบจาก dashboard ซ้ำ
+class BudgetScreen extends StatelessWidget {
+  const BudgetScreen({super.key});
+  @override
+  Widget build(BuildContext context) {
+    return Scaffold(
+      appBar: AppBar(title: const Text('งบประมาณ', style: TextStyle(fontWeight: FontWeight.bold))),
+      body: ListView(
+        padding: const EdgeInsets.all(16),
+        children: const [
+          _BudgetsProgressSection(),
+          SizedBox(height: 16),
+          Text(
+            '💡 ตั้งงบรายหมวด แล้วพี่เงินจะเตือนเมื่อใกล้/เกินงบให้อัตโนมัติ',
+            style: TextStyle(color: AppColors.textMuted, fontSize: 13),
+            textAlign: TextAlign.center,
+          ),
+        ],
+      ),
     );
   }
 }

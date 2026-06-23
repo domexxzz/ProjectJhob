@@ -1,9 +1,16 @@
+import 'dart:convert';
+
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
+import 'package:image_picker/image_picker.dart';
+import 'package:speech_to_text/speech_to_text.dart';
+import 'package:flutter_markdown_plus/flutter_markdown_plus.dart';
 
 import '../../app/theme.dart';
 import 'chat_message.dart';
 import 'chat_repository.dart';
+
+enum CoachMood { idle, listening, thinking }
 
 class ChatScreen extends ConsumerStatefulWidget {
   const ChatScreen({super.key});
@@ -15,25 +22,45 @@ class _ChatScreenState extends ConsumerState<ChatScreen> {
   final _controller = TextEditingController();
   final _scroll = ScrollController();
   final List<ChatMessage> _messages = [];
+  final SpeechToText _speech = SpeechToText();
+  final ImagePicker _picker = ImagePicker();
+
   bool _loading = true;
   bool _sending = false;
+  bool _listening = false;
+  bool _attaching = false;
+  bool _sttAvailable = false;
 
   static const _suggestions = [
     'เดือนนี้ใช้เงินยังไงบ้าง?',
-    'อยากออมเงิน ทำยังไงดี?',
-    'เกินงบหมวดไหนบ้าง?',
+    'อยากเริ่มลงทุน ควรเริ่มยังไง?',
+    'จะออมเงินให้ถึงเป้าต้องทำไง?',
   ];
+
+  CoachMood get _mood => _listening
+      ? CoachMood.listening
+      : (_sending || _attaching ? CoachMood.thinking : CoachMood.idle);
 
   @override
   void initState() {
     super.initState();
-    _loadHistory();
+    _init();
+  }
+
+  Future<void> _init() async {
+    try {
+      _sttAvailable = await _speech.initialize();
+    } catch (_) {
+      _sttAvailable = false;
+    }
+    await _loadHistory();
   }
 
   @override
   void dispose() {
     _controller.dispose();
     _scroll.dispose();
+    _speech.stop();
     super.dispose();
   }
 
@@ -56,6 +83,7 @@ class _ChatScreenState extends ConsumerState<ChatScreen> {
   Future<void> _send(String text) async {
     final msg = text.trim();
     if (msg.isEmpty || _sending) return;
+    if (_listening) await _stopListening();
     _controller.clear();
     setState(() {
       _messages.add(ChatMessage(id: 'local', role: 'user', content: msg, createdAt: DateTime.now()));
@@ -84,14 +112,59 @@ class _ChatScreenState extends ConsumerState<ChatScreen> {
     _scrollToBottom();
   }
 
+  Future<void> _toggleMic() async {
+    if (!_sttAvailable) {
+      _snack('อุปกรณ์/เบราว์เซอร์นี้ยังไม่รองรับการรับเสียง');
+      return;
+    }
+    if (_listening) {
+      await _stopListening();
+    } else {
+      setState(() => _listening = true);
+      await _speech.listen(
+        localeId: 'th_TH',
+        onResult: (r) => setState(() => _controller.text = r.recognizedWords),
+      );
+    }
+  }
+
+  Future<void> _stopListening() async {
+    await _speech.stop();
+    if (mounted) setState(() => _listening = false);
+  }
+
+  Future<void> _attachImage() async {
+    if (_attaching) return;
+    try {
+      final XFile? file = await _picker.pickImage(source: ImageSource.gallery, imageQuality: 70);
+      if (file == null) return;
+      setState(() => _attaching = true);
+      final bytes = await file.readAsBytes();
+      final dataUrl = 'data:image/jpeg;base64,${base64Encode(bytes)}';
+      final text = await ref.read(chatRepoProvider).ocrImage(dataUrl);
+      if (!mounted) return;
+      setState(() {
+        _attaching = false;
+        if (text.trim().isNotEmpty) {
+          _controller.text = 'จากรูปที่ส่งมา:\n$text\n\nช่วยวิเคราะห์/แนะนำหน่อย';
+        }
+      });
+      if (text.trim().isEmpty) _snack('อ่านรูปไม่ได้ ลองพิมพ์ข้อมูลจากรูปแทนนะ');
+    } catch (e) {
+      if (mounted) setState(() => _attaching = false);
+      _snack('แนบรูปไม่สำเร็จ: $e');
+    }
+  }
+
+  void _snack(String m) {
+    if (mounted) ScaffoldMessenger.of(context).showSnackBar(SnackBar(content: Text(m)));
+  }
+
   void _scrollToBottom() {
     WidgetsBinding.instance.addPostFrameCallback((_) {
       if (_scroll.hasClients) {
-        _scroll.animateTo(
-          _scroll.position.maxScrollExtent,
-          duration: const Duration(milliseconds: 250),
-          curve: Curves.easeOut,
-        );
+        _scroll.animateTo(_scroll.position.maxScrollExtent,
+            duration: const Duration(milliseconds: 250), curve: Curves.easeOut);
       }
     });
   }
@@ -100,30 +173,19 @@ class _ChatScreenState extends ConsumerState<ChatScreen> {
   Widget build(BuildContext context) {
     return Scaffold(
       appBar: AppBar(
-        title: Row(
-          children: const [
-            CircleAvatar(radius: 16, backgroundColor: Color(0xFFEDEBFF), child: Text('🤖')),
-            SizedBox(width: 8),
-            Column(
-              crossAxisAlignment: CrossAxisAlignment.start,
-              mainAxisSize: MainAxisSize.min,
-              children: [
-                Text('พี่เงิน', style: TextStyle(fontSize: 16, fontWeight: FontWeight.bold)),
-                Text('ผู้ช่วยการเงิน AI', style: TextStyle(fontSize: 11, color: AppColors.textMuted)),
-              ],
-            ),
-          ],
-        ),
+        title: const Text('พี่เงิน · ที่ปรึกษาการเงิน AI',
+            style: TextStyle(fontSize: 16, fontWeight: FontWeight.bold)),
       ),
       body: SafeArea(
         child: Column(
           children: [
+            _AvatarHeader(mood: _mood),
             Expanded(
               child: _loading
                   ? const Center(child: CircularProgressIndicator())
                   : ListView(
                       controller: _scroll,
-                      padding: const EdgeInsets.all(16),
+                      padding: const EdgeInsets.fromLTRB(16, 4, 16, 16),
                       children: [
                         if (_messages.isEmpty) const _Welcome(),
                         ..._messages.map((m) => _Bubble(message: m)),
@@ -142,9 +204,98 @@ class _ChatScreenState extends ConsumerState<ChatScreen> {
                       .toList(),
                 ),
               ),
-            _InputBar(controller: _controller, enabled: !_sending, onSend: () => _send(_controller.text)),
+            _InputBar(
+              controller: _controller,
+              listening: _listening,
+              attaching: _attaching,
+              busy: _sending,
+              onMic: _toggleMic,
+              onImage: _attachImage,
+              onSend: () => _send(_controller.text),
+            ),
           ],
         ),
+      ),
+    );
+  }
+}
+
+/// Avatar อนิเมชันของพี่เงิน — หายใจ/เรืองแสง + เปลี่ยนสีหน้า/สถานะตามอารมณ์
+class _AvatarHeader extends StatefulWidget {
+  const _AvatarHeader({required this.mood});
+  final CoachMood mood;
+  @override
+  State<_AvatarHeader> createState() => _AvatarHeaderState();
+}
+
+class _AvatarHeaderState extends State<_AvatarHeader> with SingleTickerProviderStateMixin {
+  late final AnimationController _c =
+      AnimationController(vsync: this, duration: const Duration(milliseconds: 1600))..repeat(reverse: true);
+
+  @override
+  void dispose() {
+    _c.dispose();
+    super.dispose();
+  }
+
+  @override
+  Widget build(BuildContext context) {
+    final mood = widget.mood;
+    final color = mood == CoachMood.listening
+        ? AppColors.accent
+        : mood == CoachMood.thinking
+            ? const Color(0xFFFFA94D)
+            : AppColors.primary;
+    final label = mood == CoachMood.listening
+        ? 'กำลังฟัง... พูดได้เลย'
+        : mood == CoachMood.thinking
+            ? 'กำลังคิด...'
+            : 'พร้อมให้คำปรึกษา';
+    final face = mood == CoachMood.listening
+        ? '👂'
+        : mood == CoachMood.thinking
+            ? '💭'
+            : '🤖';
+
+    return Padding(
+      padding: const EdgeInsets.symmetric(vertical: 12),
+      child: Column(
+        children: [
+          AnimatedBuilder(
+            animation: _c,
+            builder: (context, child) {
+              final t = _c.value;
+              final pulse = mood == CoachMood.idle ? 0.04 : 0.10;
+              final scale = 1.0 + pulse * t;
+              final glow = (mood == CoachMood.idle ? 8.0 : 16.0) + 10 * t;
+              return Transform.scale(
+                scale: scale,
+                child: Container(
+                  width: 84,
+                  height: 84,
+                  alignment: Alignment.center,
+                  decoration: BoxDecoration(
+                    shape: BoxShape.circle,
+                    gradient: LinearGradient(
+                      colors: [color, color.withOpacity(0.7)],
+                      begin: Alignment.topLeft,
+                      end: Alignment.bottomRight,
+                    ),
+                    boxShadow: [BoxShadow(color: color.withOpacity(0.45), blurRadius: glow, spreadRadius: 1)],
+                  ),
+                  child: Text(face, style: const TextStyle(fontSize: 38)),
+                ),
+              );
+            },
+          ),
+          const SizedBox(height: 8),
+          AnimatedSwitcher(
+            duration: const Duration(milliseconds: 250),
+            child: Text(label,
+                key: ValueKey(label),
+                style: const TextStyle(color: AppColors.textMuted, fontSize: 13, fontWeight: FontWeight.w600)),
+          ),
+        ],
       ),
     );
   }
@@ -161,11 +312,12 @@ class _Welcome extends StatelessWidget {
       child: const Column(
         crossAxisAlignment: CrossAxisAlignment.start,
         children: [
-          Text('สวัสดี! ผมพี่เงิน 🤖', style: TextStyle(fontWeight: FontWeight.bold, fontSize: 16)),
+          Text('สวัสดีครับ ผมพี่เงิน ที่ปรึกษาการเงินของคุณ 🤝',
+              style: TextStyle(fontWeight: FontWeight.bold, fontSize: 16)),
           SizedBox(height: 6),
           Text(
-            'ถามผมเรื่องเงินได้เลย — ผมเห็นรายรับรายจ่ายของคุณ เลยช่วยวิเคราะห์ + แนะนำได้ 💪\nลองเลือกคำถามด้านล่าง หรือพิมพ์เองได้นะ',
-            style: TextStyle(color: AppColors.textMuted, height: 1.4),
+            'ถามเรื่องออม ลงทุน ปลดหนี้ หรือวางแผนการเงินได้เลย — ผมเห็นรายรับรายจ่ายของคุณ เลยแนะนำได้ตรงจุด\nพิมพ์ พูด (กดไมค์) หรือส่งรูปสลิป (กดรูป) ก็ได้นะ 💬🎤🖼️',
+            style: TextStyle(color: AppColors.textMuted, height: 1.45),
           ),
         ],
       ),
@@ -182,17 +334,27 @@ class _Bubble extends StatelessWidget {
     return Align(
       alignment: isUser ? Alignment.centerRight : Alignment.centerLeft,
       child: Container(
-        constraints: BoxConstraints(maxWidth: MediaQuery.of(context).size.width * 0.78),
+        constraints: BoxConstraints(maxWidth: MediaQuery.of(context).size.width * 0.8),
         margin: const EdgeInsets.only(bottom: 10),
         padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 10),
         decoration: BoxDecoration(
           color: isUser ? AppColors.primary : Colors.white,
           borderRadius: BorderRadius.circular(16),
         ),
-        child: Text(
-          message.content,
-          style: TextStyle(color: isUser ? Colors.white : AppColors.textDark, height: 1.35),
-        ),
+        child: isUser
+            ? Text(message.content, style: const TextStyle(color: Colors.white, height: 1.4))
+            : MarkdownBody(
+                data: message.content,
+                selectable: true,
+                styleSheet: MarkdownStyleSheet(
+                  p: const TextStyle(color: AppColors.textDark, height: 1.45, fontSize: 14),
+                  strong: const TextStyle(color: AppColors.textDark, fontWeight: FontWeight.bold),
+                  listBullet: const TextStyle(color: AppColors.textDark, height: 1.45, fontSize: 14),
+                  h3: const TextStyle(color: AppColors.textDark, fontSize: 15, fontWeight: FontWeight.bold),
+                  blockquote: const TextStyle(color: AppColors.textMuted, fontSize: 13),
+                  blockSpacing: 8,
+                ),
+              ),
       ),
     );
   }
@@ -208,51 +370,79 @@ class _TypingBubble extends StatelessWidget {
         margin: const EdgeInsets.only(bottom: 10),
         padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 12),
         decoration: BoxDecoration(color: Colors.white, borderRadius: BorderRadius.circular(16)),
-        child: const Text('พี่เงินกำลังพิมพ์… 💬', style: TextStyle(color: AppColors.textMuted)),
+        child: const Text('พี่เงินกำลังคิด... 💭', style: TextStyle(color: AppColors.textMuted)),
       ),
     );
   }
 }
 
 class _InputBar extends StatelessWidget {
-  const _InputBar({required this.controller, required this.enabled, required this.onSend});
+  const _InputBar({
+    required this.controller,
+    required this.listening,
+    required this.attaching,
+    required this.busy,
+    required this.onMic,
+    required this.onImage,
+    required this.onSend,
+  });
   final TextEditingController controller;
-  final bool enabled;
+  final bool listening;
+  final bool attaching;
+  final bool busy;
+  final VoidCallback onMic;
+  final VoidCallback onImage;
   final VoidCallback onSend;
+
   @override
   Widget build(BuildContext context) {
     return Padding(
-      padding: const EdgeInsets.fromLTRB(12, 8, 12, 12),
+      padding: const EdgeInsets.fromLTRB(8, 6, 8, 10),
       child: Column(
         children: [
           Row(
             children: [
+              IconButton(
+                tooltip: 'แนบรูป/สลิป',
+                onPressed: attaching ? null : onImage,
+                icon: attaching
+                    ? const SizedBox(width: 22, height: 22, child: CircularProgressIndicator(strokeWidth: 2))
+                    : const Icon(Icons.image_outlined, color: AppColors.primary),
+              ),
+              IconButton(
+                tooltip: 'พูด',
+                onPressed: onMic,
+                icon: Icon(listening ? Icons.mic : Icons.mic_none,
+                    color: listening ? AppColors.expense : AppColors.primary),
+              ),
               Expanded(
                 child: TextField(
                   controller: controller,
-                  enabled: enabled,
                   minLines: 1,
                   maxLines: 4,
                   textInputAction: TextInputAction.send,
                   onSubmitted: (_) => onSend(),
-                  decoration: const InputDecoration(hintText: 'พิมพ์ถามพี่เงิน...'),
+                  decoration: InputDecoration(
+                    hintText: listening ? 'กำลังฟัง... พูดได้เลย' : 'พิมพ์ หรือกดไมค์ 🎤 / รูป 🖼️',
+                  ),
                 ),
               ),
-              const SizedBox(width: 8),
+              const SizedBox(width: 6),
               CircleAvatar(
-                radius: 24,
+                radius: 22,
                 backgroundColor: AppColors.primary,
                 child: IconButton(
-                  icon: const Icon(Icons.send, color: Colors.white),
-                  onPressed: enabled ? onSend : null,
+                  icon: const Icon(Icons.send, color: Colors.white, size: 20),
+                  onPressed: busy ? null : onSend,
                 ),
               ),
             ],
           ),
-          const SizedBox(height: 4),
+          const SizedBox(height: 2),
           const Text(
-            'พี่เงินเป็น AI • เป็นข้อมูลทั่วไป ไม่ใช่คำแนะนำการลงทุน',
+            'พี่เงินเป็น AI • ข้อมูลทั่วไปเพื่อการศึกษา ไม่ใช่คำแนะนำการลงทุนเฉพาะบุคคล',
             style: TextStyle(fontSize: 10, color: AppColors.textMuted),
+            textAlign: TextAlign.center,
           ),
         ],
       ),

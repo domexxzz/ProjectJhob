@@ -8,6 +8,7 @@ import '../features/dashboard/dashboard_screen.dart';
 import '../features/transactions/add_transaction_screen.dart';
 import '../features/transactions/transaction.dart';
 import '../features/chat/chat_screen.dart';
+import '../features/profile/profile_screen.dart';
 
 final routerProvider = Provider<GoRouter>((ref) {
   return GoRouter(
@@ -29,6 +30,8 @@ final routerProvider = Provider<GoRouter>((ref) {
         builder: (context, state) => AddTransactionScreen(transaction: state.extra as Txn?),
       ),
       GoRoute(path: '/chat', builder: (_, __) => const ChatScreen()),
+      GoRoute(path: '/budgets', builder: (_, __) => const BudgetScreen()),
+      GoRoute(path: '/profile', builder: (_, __) => const ProfileScreen()),
     ],
   );
 });
