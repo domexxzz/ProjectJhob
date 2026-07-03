@@ -6,6 +6,7 @@ import { authRouter } from './modules/auth/auth.routes';
 import { transactionsRouter } from './modules/transactions/transactions.routes';
 import { categoriesRouter } from './modules/categories/categories.routes';
 import { budgetsRouter } from './modules/budgets/budgets.routes';
+import { goalsRouter } from './modules/goals/goals.routes';
 import { chatRouter } from './modules/chat/chat.routes';
 import { notFound, errorHandler } from './middleware/error';
 
@@ -20,6 +21,7 @@ export function createApp() {
   app.use('/api/v1/transactions', transactionsRouter);
   app.use('/api/v1/categories', categoriesRouter);
   app.use('/api/v1/budgets', budgetsRouter);
+  app.use('/api/v1/goals', goalsRouter);
   app.use('/api/v1/chat', chatRouter);
 
   app.use(notFound);

@@ -60,6 +60,12 @@ Base: `http://localhost:4000` · auth = `Authorization: Bearer <token>` · **จ
 | GET  | `/api/v1/transactions?month=YYYY-MM&type=expense` | ✓ | รายการ + `summary {income,expense,balance}` |
 | POST | `/api/v1/transactions` | ✓ | `{ type, amount, categoryId?, note?, source? }` |
 | GET/PATCH/DELETE | `/api/v1/transactions/:id` | ✓ | อ่าน/แก้/ลบ |
+| GET  | `/api/v1/goals` | ✓ | รายการเป้าหมายออม + `percentage` (0–100) |
+| POST | `/api/v1/goals` | ✓ | `{ name, target, deadline?, current? }` (เงินเป็นสตางค์) |
+| PATCH | `/api/v1/goals/:id` | ✓ | แก้ชื่อ/เป้า/current/เดดไลน์ |
+| POST | `/api/v1/goals/:id/deposit` | ✓ | `{ amount }` → `current += amount` (เติมเงินเข้าเป้า) |
+| POST | `/api/v1/goals/:id/plan` | ✓ | แผนออม AI (ออม/เดือน + ไมล์สโตน 25/50/75% + คำแนะนำพี่เงิน) |
+| DELETE | `/api/v1/goals/:id` | ✓ | ลบเป้าหมาย |
 
 ## 🧭 Tech Decisions (Sprint 1)
 - **เงินเก็บเป็นสตางค์ (Int)** ไม่ใช่ float — กัน floating-point error (มาตรฐานแอปการเงิน). UI หารด้วย 100 ตอนแสดงผล.
