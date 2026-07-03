@@ -66,6 +66,11 @@ Base: `http://localhost:4000` · auth = `Authorization: Bearer <token>` · **จ
 | POST | `/api/v1/goals/:id/deposit` | ✓ | `{ amount }` → `current += amount` (เติมเงินเข้าเป้า) |
 | POST | `/api/v1/goals/:id/plan` | ✓ | แผนออม AI (ออม/เดือน + ไมล์สโตน 25/50/75% + คำแนะนำพี่เงิน) |
 | DELETE | `/api/v1/goals/:id` | ✓ | ลบเป้าหมาย |
+| GET  | `/api/v1/notifications` | ✓ | รายการแจ้งเตือน + `unreadCount` |
+| PATCH | `/api/v1/notifications/:id/read` | ✓ | ทำเป็นอ่านแล้ว |
+| POST | `/api/v1/notifications/read-all` | ✓ | อ่านทั้งหมด |
+| POST | `/api/v1/notifications/token` | ✓ | `{ token }` ลงทะเบียน FCM device token |
+| POST | `/api/v1/notifications/run-triggers` | ✓ | ตรวจงบเดี๋ยวนี้ → สร้างแจ้งเตือน (ใกล้/เกินงบ) |
 
 ## 🧭 Tech Decisions (Sprint 1)
 - **เงินเก็บเป็นสตางค์ (Int)** ไม่ใช่ float — กัน floating-point error (มาตรฐานแอปการเงิน). UI หารด้วย 100 ตอนแสดงผล.

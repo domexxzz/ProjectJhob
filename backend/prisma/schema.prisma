@@ -20,14 +20,16 @@ model User {
   monthlyIncome Int      @default(0) // satang
   level         Int      @default(1)
   streak        Int      @default(0)
+  deviceToken   String? // FCM device token (สำหรับ push)
   createdAt     DateTime @default(now())
   updatedAt     DateTime @updatedAt
 
-  transactions Transaction[]
-  budgets      Budget[]
-  goals        Goal[]
-  chatMessages ChatMessage[]
-  achievements Achievement[]
+  transactions  Transaction[]
+  budgets       Budget[]
+  goals         Goal[]
+  chatMessages  ChatMessage[]
+  achievements  Achievement[]
+  notifications Notification[]
 }
 
 model Category {
@@ -106,4 +108,19 @@ model Achievement {
   unlockedAt DateTime @default(now())
 
   user User @relation(fields: [userId], references: [id], onDelete: Cascade)
+}
+
+model Notification {
+  id        String   @id @default(cuid())
+  userId    String
+  type      String // budget_near | budget_over | daily_summary | goal | subscription
+  title     String
+  body      String
+  read      Boolean  @default(false)
+  data      String? // JSON meta (เช่น categoryId, goalId) — optional
+  createdAt DateTime @default(now())
+
+  user User @relation(fields: [userId], references: [id], onDelete: Cascade)
+
+  @@index([userId, createdAt])
 }
