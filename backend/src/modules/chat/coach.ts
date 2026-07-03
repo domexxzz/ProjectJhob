@@ -31,33 +31,51 @@ function configuredProviders(): LlmProvider[] {
   return list;
 }
 
-/** เรียก LLM ตามลำดับ provider ที่ตั้ง key ไว้; ถ้าไม่มี key หรือทุกตัวล้มเหลว → fallback rule-based */
-export async function generateReply(
-  context: CoachContext,
-  question: string,
-  history: ChatTurn[],
-): Promise<CoachReply> {
-  const messages = [
-    { role: 'system' as const, content: buildSystemPrompt(context) },
-    ...history.slice(-6),
-    { role: 'user' as const, content: question },
-  ];
+export interface LlmMessage {
+  role: 'system' | 'user' | 'assistant';
+  content: string;
+}
 
+/**
+ * เรียก LLM ระดับล่าง (low-level) ตามลำดับ provider ที่ตั้ง key ไว้.
+ * คืน null ถ้าไม่มี key เลย หรือทุกตัวล้มเหลว — ผู้เรียกไปตัดสินใจ fallback เอง.
+ * ใช้ร่วมกันทั้ง chat (generateReply) และ savings plan (goals/plan.ts)
+ */
+export async function chatComplete(
+  messages: LlmMessage[],
+  opts: { temperature?: number; maxTokens?: number } = {},
+): Promise<{ text: string; source: string } | null> {
   for (const p of configuredProviders()) {
     try {
       const client = new OpenAI({ apiKey: p.apiKey, baseURL: p.baseURL });
       const resp = await client.chat.completions.create({
         model: p.model,
-        temperature: 0.6,
-        max_tokens: 1500, // ไทยกินโทเค็นเยอะ — เผื่อให้ตอบจบไม่ขาด (persona คุมความยาว ~200 คำ)
-        messages,
+        temperature: opts.temperature ?? 0.6,
+        max_tokens: opts.maxTokens ?? 1500, // ไทยกินโทเค็นเยอะ
+        messages: messages as never,
       });
-      const reply = resp.choices[0]?.message?.content?.trim();
-      if (reply) return { reply, source: `${p.name}:${p.model}` };
+      const text = resp.choices[0]?.message?.content?.trim();
+      if (text) return { text, source: `${p.name}:${p.model}` };
     } catch (e) {
       console.error(`[coach] ${p.name} ล้มเหลว, ลอง provider ถัดไป:`, (e as Error).message);
     }
   }
+  return null;
+}
+
+/** โค้ชตอบแชท; ถ้าไม่มี key หรือทุกตัวล้มเหลว → fallback rule-based */
+export async function generateReply(
+  context: CoachContext,
+  question: string,
+  history: ChatTurn[],
+): Promise<CoachReply> {
+  const messages: LlmMessage[] = [
+    { role: 'system', content: buildSystemPrompt(context) },
+    ...history.slice(-6),
+    { role: 'user', content: question },
+  ];
+  const out = await chatComplete(messages);
+  if (out) return { reply: out.text, source: out.source };
   return { reply: fallbackReply(context, question), source: 'fallback' };
 }
 

@@ -5,6 +5,8 @@ import { requireAuth } from '../../lib/auth';
 import { z } from 'zod';
 import { cache } from '../../lib/cache';
 import type { Goal } from '@prisma/client';
+import { buildContext } from '../chat/context_builder';
+import { generateSavingsPlan } from './plan';
 
 export const goalsRouter = Router();
 goalsRouter.use(requireAuth);
@@ -116,6 +118,21 @@ goalsRouter.post(
 
     await cache.delPattern(`user:${req.userId!}:*`);
     res.json({ goal: withProgress(goal) });
+  }),
+);
+
+// POST /api/v1/goals/:id/plan — แผนออม AI (DM-3): คำนวณตัวเลข + พี่เงิน (Typhoon) เรียบเรียง + heuristic fallback
+goalsRouter.post(
+  '/:id/plan',
+  asyncHandler(async (req, res) => {
+    const goal = await prisma.goal.findFirst({
+      where: { id: req.params.id, userId: req.userId! },
+    });
+    if (!goal) throw new HttpError(404, 'ไม่พบเป้าหมาย');
+
+    const ctx = await buildContext(req.userId!);
+    const plan = await generateSavingsPlan(goal, ctx);
+    res.json({ plan });
   }),
 );
 

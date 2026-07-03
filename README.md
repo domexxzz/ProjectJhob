@@ -64,6 +64,7 @@ Base: `http://localhost:4000` · auth = `Authorization: Bearer <token>` · **จ
 | POST | `/api/v1/goals` | ✓ | `{ name, target, deadline?, current? }` (เงินเป็นสตางค์) |
 | PATCH | `/api/v1/goals/:id` | ✓ | แก้ชื่อ/เป้า/current/เดดไลน์ |
 | POST | `/api/v1/goals/:id/deposit` | ✓ | `{ amount }` → `current += amount` (เติมเงินเข้าเป้า) |
+| POST | `/api/v1/goals/:id/plan` | ✓ | แผนออม AI (ออม/เดือน + ไมล์สโตน 25/50/75% + คำแนะนำพี่เงิน) |
 | DELETE | `/api/v1/goals/:id` | ✓ | ลบเป้าหมาย |
 
 ## 🧭 Tech Decisions (Sprint 1)
