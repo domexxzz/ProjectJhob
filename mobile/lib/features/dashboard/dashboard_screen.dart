@@ -821,7 +821,7 @@ class _QuickActions extends StatelessWidget {
       (icon: Icons.add_rounded, label: 'เพิ่มรายการ', color: AppColors.primary, onTap: () => context.push('/add')),
       (icon: Icons.camera_alt_rounded, label: 'สแกนสลิป', color: AppColors.accent, onTap: () => context.push('/add')),
       (icon: Icons.chat_bubble_rounded, label: 'คุยพี่เงิน', color: const Color(0xFFFFA94D), onTap: () => context.push('/chat')),
-      (icon: Icons.flag_rounded, label: 'เป้าหมาย', color: AppColors.income, onTap: () => context.push('/chat')),
+      (icon: Icons.flag_rounded, label: 'เป้าหมาย', color: AppColors.income, onTap: () => context.push('/goals')),
     ];
     return SizedBox(
       height: 94,
