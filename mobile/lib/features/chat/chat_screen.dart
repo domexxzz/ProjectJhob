@@ -308,12 +308,16 @@ class _Welcome extends StatelessWidget {
     return Container(
       margin: const EdgeInsets.only(bottom: 16),
       padding: const EdgeInsets.all(16),
-      decoration: BoxDecoration(color: Colors.white, borderRadius: BorderRadius.circular(16)),
+      decoration: BoxDecoration(
+        color: AppColors.surface,
+        borderRadius: BorderRadius.circular(16),
+        border: Border.all(color: Colors.white.withOpacity(0.06)),
+      ),
       child: const Column(
         crossAxisAlignment: CrossAxisAlignment.start,
         children: [
           Text('สวัสดีครับ ผมพี่เงิน ที่ปรึกษาการเงินของคุณ 🤝',
-              style: TextStyle(fontWeight: FontWeight.bold, fontSize: 16)),
+              style: TextStyle(color: AppColors.textDark, fontWeight: FontWeight.bold, fontSize: 16)),
           SizedBox(height: 6),
           Text(
             'ถามเรื่องออม ลงทุน ปลดหนี้ หรือวางแผนการเงินได้เลย — ผมเห็นรายรับรายจ่ายของคุณ เลยแนะนำได้ตรงจุด\nพิมพ์ พูด (กดไมค์) หรือส่งรูปสลิป (กดรูป) ก็ได้นะ 💬🎤🖼️',
@@ -338,8 +342,9 @@ class _Bubble extends StatelessWidget {
         margin: const EdgeInsets.only(bottom: 10),
         padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 10),
         decoration: BoxDecoration(
-          color: isUser ? AppColors.primary : Colors.white,
+          color: isUser ? AppColors.primary : AppColors.surface,
           borderRadius: BorderRadius.circular(16),
+          border: isUser ? null : Border.all(color: Colors.white.withOpacity(0.06)),
         ),
         child: isUser
             ? Text(message.content, style: const TextStyle(color: Colors.white, height: 1.4))
@@ -369,7 +374,11 @@ class _TypingBubble extends StatelessWidget {
       child: Container(
         margin: const EdgeInsets.only(bottom: 10),
         padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 12),
-        decoration: BoxDecoration(color: Colors.white, borderRadius: BorderRadius.circular(16)),
+        decoration: BoxDecoration(
+          color: AppColors.surface,
+          borderRadius: BorderRadius.circular(16),
+          border: Border.all(color: Colors.white.withOpacity(0.06)),
+        ),
         child: const Text('พี่เงินกำลังคิด... 💭', style: TextStyle(color: AppColors.textMuted)),
       ),
     );
