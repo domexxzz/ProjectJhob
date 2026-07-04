@@ -30,6 +30,7 @@ model User {
   chatMessages  ChatMessage[]
   achievements  Achievement[]
   notifications Notification[]
+  subscriptions Subscription[]
 }
 
 model Category {
@@ -123,4 +124,20 @@ model Notification {
   user User @relation(fields: [userId], references: [id], onDelete: Cascade)
 
   @@index([userId, createdAt])
+}
+
+model Subscription {
+  id          String   @id @default(cuid())
+  userId      String
+  name        String
+  amount      Int // satang ต่อรอบ
+  cycle       String   @default("monthly") // monthly | yearly
+  nextBilling DateTime
+  logo        String? // emoji หรือ url (optional)
+  createdAt   DateTime @default(now())
+  updatedAt   DateTime @updatedAt
+
+  user User @relation(fields: [userId], references: [id], onDelete: Cascade)
+
+  @@index([userId, nextBilling])
 }

@@ -9,6 +9,7 @@ import { budgetsRouter } from './modules/budgets/budgets.routes';
 import { goalsRouter } from './modules/goals/goals.routes';
 import { notificationsRouter } from './modules/notifications/notifications.routes';
 import { recommendationsRouter } from './modules/recommendations/recommendations.routes';
+import { subscriptionsRouter } from './modules/subscriptions/subscriptions.routes';
 import { chatRouter } from './modules/chat/chat.routes';
 import { notFound, errorHandler } from './middleware/error';
 
@@ -26,6 +27,7 @@ export function createApp() {
   app.use('/api/v1/goals', goalsRouter);
   app.use('/api/v1/notifications', notificationsRouter);
   app.use('/api/v1/recommendations', recommendationsRouter);
+  app.use('/api/v1/subscriptions', subscriptionsRouter);
   app.use('/api/v1/chat', chatRouter);
 
   app.use(notFound);
