@@ -61,12 +61,37 @@ export function parseRef(text: string): string | null {
   return null;
 }
 
+/** ทำความสะอาดชื่อ: ตัดคำต่อท้ายที่ไม่ใช่ชื่อ + ปฏิเสธถ้าเป็นเลขบัญชี/รหัสล้วน */
+function cleanName(raw: string): string | null {
+  let v = raw
+    // ตัดตรงจุดที่ขึ้นต้นด้วยเลขบัญชี/จำนวน/คีย์เวิร์ดอื่น
+    .split(/\s+(?:x{2,}|X{2,}|\*{2,}|[0-9]{3,}|[0-9]-|จำนวน|บาท|เลขที่|รหัส|อ้างอิง|Ref|โอนเงิน|ธนาคาร|บันทึกช่วยจำ|วันที่|เวลา)/)[0]
+    .trim();
+  // ตัดเลขบัญชีแบบปิดบัง x-xxxx-x หรือเลขยาว ๆ ที่ติดมา
+  v = v.replace(/[xX*]{1,}[-\dxX*]*/g, '').replace(/\b\d{4,}\b/g, '').replace(/\s{2,}/g, ' ').trim();
+  if (v.length < 2) return null;
+  const nonSpace = v.replace(/\s/g, '');
+  const digits = (nonSpace.match(/\d/g) || []).length;
+  if (digits >= nonSpace.length * 0.5) return null; // ส่วนใหญ่เป็นตัวเลข = น่าจะเป็นรหัส/เลขบัญชี ไม่เอา
+  return v;
+}
+
+/**
+ * ชื่อสำหรับโน้ต — เรียงความสำคัญ: บันทึกช่วยจำ (ผู้ใช้พิมพ์เอง) → ชื่อผู้รับเงิน → ชื่อบัญชีปลายทาง
+ * ไม่เอารหัสใบเสร็จ/เลขอ้างอิง/เลขบัญชี
+ */
 export function parseMerchant(text: string): string | null {
-  const m = text.match(/(?:ไปยัง|โอนไปยัง|เข้าบัญชี|โอนเข้าบัญชี|ร้านค้า|บริษัท)\s*(?::|：)?\s*(.+)/);
-  if (m) {
-    const val = m[1].trim();
-    const splitTokens = val.split(/\s+(?:xxx-|[0-9]{3}-|จำนวน|บาท|โอนเงิน|ธนาคาร|เข้าบัญชี|ไปยัง)/);
-    return splitTokens[0].trim();
+  const patterns = [
+    /(?:บันทึกช่วยจำ|memo|note)\s*(?::|：)?\s*(.+)/i,
+    /(?:ชื่อผู้รับเงิน|ผู้รับเงิน|ชื่อผู้รับ|ผู้รับ|ไปยัง|โอนไปยัง|ถึง)\s*(?::|：)?\s*(.+)/,
+    /(?:เข้าบัญชี|โอนเข้าบัญชี|ร้านค้า|บริษัท)\s*(?::|：)?\s*(.+)/,
+  ];
+  for (const re of patterns) {
+    const m = text.match(re);
+    if (m) {
+      const name = cleanName(m[1]);
+      if (name) return name;
+    }
   }
   return null;
 }

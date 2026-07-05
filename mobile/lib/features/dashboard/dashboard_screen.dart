@@ -103,7 +103,7 @@ class DashboardScreen extends ConsumerWidget {
       ),
       floatingActionButton: FloatingActionButton(
         onPressed: () async {
-          await context.push('/add');
+          await context.push('/slip');
           ref.invalidate(dashboardProvider);
         },
         backgroundColor: AppColors.primary,
@@ -578,7 +578,7 @@ class _QuickActionsGrid extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     final items = <({IconData icon, String label, VoidCallback onTap})>[
-      (icon: Icons.camera_alt_rounded, label: 'สแกนสลิป', onTap: () => context.push('/add')),
+      (icon: Icons.document_scanner_outlined, label: 'สแกนสลิป', onTap: () => context.push('/slip')),
       (icon: Icons.smart_toy_rounded, label: 'ปรึกษาพี่เงิน', onTap: () => context.push('/chat')),
       (icon: Icons.flag_rounded, label: 'เป้าหมาย', onTap: () => context.push('/goals')),
       (icon: Icons.add_circle_outline_rounded, label: 'เพิ่มรายการ', onTap: () => context.push('/add')),
