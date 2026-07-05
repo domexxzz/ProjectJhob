@@ -1,3 +1,4 @@
+import 'dart:async';
 import 'dart:convert';
 
 import 'package:flutter/material.dart';
@@ -30,6 +31,7 @@ class _ChatScreenState extends ConsumerState<ChatScreen> {
   bool _listening = false;
   bool _attaching = false;
   bool _sttAvailable = false;
+  String? _typingId; // id ข้อความพี่เงินที่กำลัง "พิมพ์ทีละตัว" (typewriter)
 
   static const _suggestions = [
     'เดือนนี้ใช้เงินยังไงบ้าง?',
@@ -95,6 +97,7 @@ class _ChatScreenState extends ConsumerState<ChatScreen> {
       if (!mounted) return;
       setState(() {
         _messages.add(reply);
+        _typingId = reply.id; // ให้ค่อย ๆ พิมพ์ออกมา
         _sending = false;
       });
     } catch (_) {
@@ -136,7 +139,11 @@ class _ChatScreenState extends ConsumerState<ChatScreen> {
   Future<void> _attachImage() async {
     if (_attaching) return;
     try {
-      final XFile? file = await _picker.pickImage(source: ImageSource.gallery, imageQuality: 70);
+      final XFile? file = await _picker.pickImage(
+        source: ImageSource.gallery,
+        imageQuality: 70,
+        maxWidth: 1600, // ย่อรูปให้เบา OCR เร็วขึ้น + ไม่เกิน body limit
+      );
       if (file == null) return;
       setState(() => _attaching = true);
       final bytes = await file.readAsBytes();
@@ -188,7 +195,12 @@ class _ChatScreenState extends ConsumerState<ChatScreen> {
                       padding: const EdgeInsets.fromLTRB(16, 4, 16, 16),
                       children: [
                         if (_messages.isEmpty) const _Welcome(),
-                        ..._messages.map((m) => _Bubble(message: m)),
+                        ..._messages.map((m) => _Bubble(
+                              key: ValueKey(m.id),
+                              message: m,
+                              animate: !m.isUser && m.id == _typingId,
+                              onGrow: _scrollToBottom,
+                            )),
                         if (_sending) const _TypingBubble(),
                       ],
                     ),
@@ -308,12 +320,16 @@ class _Welcome extends StatelessWidget {
     return Container(
       margin: const EdgeInsets.only(bottom: 16),
       padding: const EdgeInsets.all(16),
-      decoration: BoxDecoration(color: Colors.white, borderRadius: BorderRadius.circular(16)),
+      decoration: BoxDecoration(
+        color: AppColors.surface,
+        borderRadius: BorderRadius.circular(16),
+        border: Border.all(color: Colors.white.withOpacity(0.06)),
+      ),
       child: const Column(
         crossAxisAlignment: CrossAxisAlignment.start,
         children: [
           Text('สวัสดีครับ ผมพี่เงิน ที่ปรึกษาการเงินของคุณ 🤝',
-              style: TextStyle(fontWeight: FontWeight.bold, fontSize: 16)),
+              style: TextStyle(color: AppColors.textDark, fontWeight: FontWeight.bold, fontSize: 16)),
           SizedBox(height: 6),
           Text(
             'ถามเรื่องออม ลงทุน ปลดหนี้ หรือวางแผนการเงินได้เลย — ผมเห็นรายรับรายจ่ายของคุณ เลยแนะนำได้ตรงจุด\nพิมพ์ พูด (กดไมค์) หรือส่งรูปสลิป (กดรูป) ก็ได้นะ 💬🎤🖼️',
@@ -325,9 +341,22 @@ class _Welcome extends StatelessWidget {
   }
 }
 
+/// สไตล์ markdown ของบับเบิลพี่เงิน (ใช้ทั้งแบบนิ่งและแบบพิมพ์ทีละตัว)
+MarkdownStyleSheet _coachMdStyle() => MarkdownStyleSheet(
+      p: const TextStyle(color: AppColors.textDark, height: 1.45, fontSize: 14),
+      strong: const TextStyle(color: AppColors.textDark, fontWeight: FontWeight.bold),
+      listBullet: const TextStyle(color: AppColors.textDark, height: 1.45, fontSize: 14),
+      h3: const TextStyle(color: AppColors.textDark, fontSize: 15, fontWeight: FontWeight.bold),
+      blockquote: const TextStyle(color: AppColors.textMuted, fontSize: 13),
+      blockSpacing: 8,
+    );
+
 class _Bubble extends StatelessWidget {
-  const _Bubble({required this.message});
+  const _Bubble({super.key, required this.message, this.animate = false, this.onGrow});
   final ChatMessage message;
+  final bool animate; // true = ค่อย ๆ พิมพ์ออกมา (เฉพาะข้อความพี่เงินที่เพิ่งตอบ)
+  final VoidCallback? onGrow;
+
   @override
   Widget build(BuildContext context) {
     final isUser = message.isUser;
@@ -338,25 +367,65 @@ class _Bubble extends StatelessWidget {
         margin: const EdgeInsets.only(bottom: 10),
         padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 10),
         decoration: BoxDecoration(
-          color: isUser ? AppColors.primary : Colors.white,
+          color: isUser ? AppColors.primary : AppColors.surface,
           borderRadius: BorderRadius.circular(16),
+          border: isUser ? null : Border.all(color: Colors.white.withOpacity(0.06)),
         ),
         child: isUser
             ? Text(message.content, style: const TextStyle(color: Colors.white, height: 1.4))
-            : MarkdownBody(
-                data: message.content,
-                selectable: true,
-                styleSheet: MarkdownStyleSheet(
-                  p: const TextStyle(color: AppColors.textDark, height: 1.45, fontSize: 14),
-                  strong: const TextStyle(color: AppColors.textDark, fontWeight: FontWeight.bold),
-                  listBullet: const TextStyle(color: AppColors.textDark, height: 1.45, fontSize: 14),
-                  h3: const TextStyle(color: AppColors.textDark, fontSize: 15, fontWeight: FontWeight.bold),
-                  blockquote: const TextStyle(color: AppColors.textMuted, fontSize: 13),
-                  blockSpacing: 8,
-                ),
-              ),
+            : animate
+                ? _TypewriterMarkdown(text: message.content, onGrow: onGrow)
+                : MarkdownBody(data: message.content, selectable: true, styleSheet: _coachMdStyle()),
       ),
     );
+  }
+}
+
+/// ค่อย ๆ เผยข้อความทีละไม่กี่ตัวอักษร + เคอร์เซอร์กะพริบ จนครบแล้วโชว์ markdown เต็ม
+class _TypewriterMarkdown extends StatefulWidget {
+  const _TypewriterMarkdown({required this.text, this.onGrow});
+  final String text;
+  final VoidCallback? onGrow;
+
+  @override
+  State<_TypewriterMarkdown> createState() => _TypewriterMarkdownState();
+}
+
+class _TypewriterMarkdownState extends State<_TypewriterMarkdown> {
+  Timer? _timer;
+  int _shown = 0;
+  bool _done = false;
+
+  @override
+  void initState() {
+    super.initState();
+    // เร็วขึ้นตามความยาว: ข้อความยาวเผยทีละหลายตัว จะได้ไม่ช้าเกินไป
+    final step = (widget.text.length / 150).ceil().clamp(1, 8);
+    _timer = Timer.periodic(const Duration(milliseconds: 16), (t) {
+      if (!mounted) return;
+      setState(() {
+        _shown = (_shown + step).clamp(0, widget.text.length);
+        if (_shown >= widget.text.length) {
+          _done = true;
+          t.cancel();
+        }
+      });
+      // เลื่อนจอตามข้อความที่ยาวขึ้น (throttle ทุก ~6 tick)
+      if (widget.onGrow != null && (_done || _shown % (step * 6) < step)) widget.onGrow!();
+    });
+  }
+
+  @override
+  void dispose() {
+    _timer?.cancel();
+    super.dispose();
+  }
+
+  @override
+  Widget build(BuildContext context) {
+    // ระหว่างพิมพ์ต่อท้ายด้วยเคอร์เซอร์ "▍"; ครบแล้วเอาออก + selectable
+    final data = _done ? widget.text : '${widget.text.substring(0, _shown)}▍';
+    return MarkdownBody(data: data, selectable: _done, styleSheet: _coachMdStyle());
   }
 }
 
@@ -369,7 +438,11 @@ class _TypingBubble extends StatelessWidget {
       child: Container(
         margin: const EdgeInsets.only(bottom: 10),
         padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 12),
-        decoration: BoxDecoration(color: Colors.white, borderRadius: BorderRadius.circular(16)),
+        decoration: BoxDecoration(
+          color: AppColors.surface,
+          borderRadius: BorderRadius.circular(16),
+          border: Border.all(color: Colors.white.withOpacity(0.06)),
+        ),
         child: const Text('พี่เงินกำลังคิด... 💭', style: TextStyle(color: AppColors.textMuted)),
       ),
     );
