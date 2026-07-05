@@ -6,6 +6,7 @@ import { createTransactionSchema, updateTransactionSchema } from '../../lib/vali
 import { prisma } from '../../lib/prisma';
 import { parseAmount, parseDate, parseRef, parseMerchant, autoCategorize } from './parser';
 import { cache } from '../../lib/cache';
+import { ocrImage } from '../chat/coach';
 
 export const transactionsRouter = Router();
 transactionsRouter.use(requireAuth);
@@ -214,6 +215,38 @@ transactionsRouter.get(
 
     await cache.set(cacheKey, result, 300);
     res.json(result);
+  }),
+);
+
+// POST /api/v1/transactions/parse-slip — อัพสลิป → Typhoon OCR → ดึงยอด/วันที่/ร้าน/หมวด (รวมขั้นตอนให้เรียกครั้งเดียว)
+transactionsRouter.post(
+  '/parse-slip',
+  asyncHandler(async (req, res) => {
+    const { imageBase64 } = req.body as { imageBase64?: string };
+    if (!imageBase64) throw new HttpError(400, 'ต้องแนบรูปสลิป (imageBase64 เป็น data URL)');
+
+    let text: string;
+    try {
+      text = await ocrImage(imageBase64);
+    } catch (e) {
+      console.error('[parse-slip] OCR ล้มเหลว:', (e as Error).message);
+      throw new HttpError(503, 'อ่านสลิปไม่สำเร็จ — ตรวจว่าตั้ง TYPHOON_API_KEY และรุ่น OCR ถูกต้อง');
+    }
+
+    const amountSatang = parseAmount(text);
+    const date = parseDate(text);
+    const ref = parseRef(text);
+    const merchant = parseMerchant(text);
+    const categoryId = await autoCategorize(text, merchant || '', 'expense', req.userId);
+
+    res.json({
+      amount: amountSatang, // สตางค์ (0 = อ่านยอดไม่เจอ ให้ผู้ใช้กรอกเอง)
+      date: date ? date.toISOString().split('T')[0] : null,
+      ref,
+      merchant,
+      categoryId,
+      rawText: text,
+    });
   }),
 );
 

@@ -74,6 +74,7 @@ class TransactionsRepository {
     String? categoryId,
     String? note,
     String source = 'manual',
+    DateTime? occurredAt,
   }) async {
     final payload = {
       'type': type,
@@ -81,6 +82,7 @@ class TransactionsRepository {
       if (categoryId != null) 'categoryId': categoryId,
       if (note != null && note.isNotEmpty) 'note': note,
       'source': source,
+      if (occurredAt != null) 'occurredAt': occurredAt.toIso8601String(),
     };
 
     try {
@@ -191,6 +193,12 @@ class TransactionsRepository {
 
   Future<AnalyzedSlip> analyzeText(String text) async {
     final res = await _dio.post('/transactions/analyze-text', data: {'text': text});
+    return AnalyzedSlip.fromJson(res.data as Map<String, dynamic>);
+  }
+
+  /// อัพสลิป (data URL) → backend OCR + ดึงยอด/วันที่/ร้าน/หมวด (เรียกครั้งเดียว)
+  Future<AnalyzedSlip> parseSlip(String dataUrl) async {
+    final res = await _dio.post('/transactions/parse-slip', data: {'imageBase64': dataUrl});
     return AnalyzedSlip.fromJson(res.data as Map<String, dynamic>);
   }
 
