@@ -10,7 +10,7 @@ import '../transactions/transactions_repository.dart';
 import '../notifications/notif_bell.dart';
 
 // ─────────────────────────────────────────────────────────────────────────────
-// Dashboard Screen (Main)
+// Dashboard Screen (Main) - Premium Dark UI Redesign
 // ─────────────────────────────────────────────────────────────────────────────
 class DashboardScreen extends ConsumerWidget {
   const DashboardScreen({super.key});
@@ -24,15 +24,15 @@ class DashboardScreen extends ConsumerWidget {
       backgroundColor: const Color(0xFF121212),
       body: Column(
         children: [
-          // ── Header ─────────────────────────────────────────────────────────
+          // ── Header (Gradient Top Bar จากภาพ Home.png) ─────────────────────
           _GreenHeader(
-            name: user?.displayName ?? 'เพื่อน',
-            streak: user?.streak ?? 0,
+            name: user?.displayName ?? 'Fanta Inazuma',
+            streak: user?.streak ?? 20,
           ),
           // ── Scrollable content ─────────────────────────────────────────────
           Expanded(
             child: RefreshIndicator(
-              color: AppColors.primary,
+              color: const Color(0xFF3CAE63),
               onRefresh: () async {
                 await ref.read(transactionsRepoProvider).syncPending();
                 ref.invalidate(dashboardProvider);
@@ -40,60 +40,60 @@ class DashboardScreen extends ConsumerWidget {
                 await ref.read(dashboardProvider.future);
               },
               child: ListView(
-                padding: const EdgeInsets.fromLTRB(16, 16, 16, 100),
+                padding: const EdgeInsets.fromLTRB(16, 16, 16, 120),
                 children: [
                   dashboard.when(
                     loading: () => const Padding(
                       padding: EdgeInsets.all(40),
-                      child: Center(child: CircularProgressIndicator(color: AppColors.primary)),
+                      child: Center(child: CircularProgressIndicator(color: Color(0xFF3CAE63))),
                     ),
                     error: (e, _) => _ErrorBox(
                       message: '$e',
                       onRetry: () => ref.invalidate(dashboardProvider),
                     ),
                     data: (d) {
-                      // Calculate totals
-                      int totalIncome = 0;
-                      int totalExpense = 0;
-                      for (final t in d.items) {
-                        if (t.type == 'income') {
-                          totalIncome += t.amount;
-                        } else {
-                          totalExpense += t.amount;
-                        }
-                      }
-                      final balance = totalIncome - totalExpense;
+  int totalIncome = 0;
+  int totalExpense = 0;
+  
+  for (final t in d.items) {
+    if (t.type == 'income') {
+      totalIncome += t.amount;
+    } else {
+      totalExpense += t.amount;
+    }
+  }
+  
+  final balance = totalIncome - totalExpense;
 
-                      return Column(
-                        crossAxisAlignment: CrossAxisAlignment.start,
-                        children: [
-                          // 1. Balance Card
-                          _BalanceCard(
-                            balance: balance,
-                            income: totalIncome,
-                            expense: totalExpense,
-                          ),
-                          const SizedBox(height: 12),
+  return Column(
+    crossAxisAlignment: CrossAxisAlignment.start,
+    children: [
+      _BalanceCard(
+        balance: balance,
+        income: totalIncome,
+        expense: totalExpense,
+      ),
+      const SizedBox(height: 16),
 
-                          // 2. Goals Card
-                          const _GoalsCard(),
-                          const SizedBox(height: 12),
+      // 2. Goals Card (Left -> Right Gradient)
+      const _GoalsCard(),
+      const SizedBox(height: 16),
 
-                          // 3. Budgets Card
-                          const _BudgetsCard(),
-                          const SizedBox(height: 12),
+      // 3. Budgets Card (Top -> Bottom Gradient)
+      const _BudgetsCard(),
+      const SizedBox(height: 16),
 
-                          // 4. Recent Transactions (horizontal scroll)
-                          if (d.items.isNotEmpty) ...[
-                            _RecentTxnCards(txns: d.items.take(6).toList()),
-                            const SizedBox(height: 12),
-                          ],
+      // 4. Recent Transactions (Horizontal scroll)
+      if (d.items.isNotEmpty) ...[
+        _RecentTxnCards(txns: d.items.take(6).toList()),
+        const SizedBox(height: 16),
+      ],
 
-                          // 5. Quick Actions Grid
-                          const _QuickActionsGrid(),
-                        ],
-                      );
-                    },
+      // 5. Quick Actions Grid
+      const _QuickActionsGrid(),
+    ],
+  );
+},
                   ),
                 ],
               ),
@@ -101,16 +101,21 @@ class DashboardScreen extends ConsumerWidget {
           ),
         ],
       ),
-      floatingActionButton: FloatingActionButton(
-        onPressed: () async {
-          await context.push('/add');
-          ref.invalidate(dashboardProvider);
-        },
-        backgroundColor: AppColors.primary,
-        foregroundColor: Colors.white,
-        shape: const CircleBorder(),
-        elevation: 6,
-        child: const Icon(Icons.add, size: 28),
+      floatingActionButton: Container(
+        height: 64,
+        width: 64,
+        margin: const EdgeInsets.only(top: 10),
+        child: FloatingActionButton(
+          onPressed: () async {
+            await context.push('/add');
+            ref.invalidate(dashboardProvider);
+          },
+          backgroundColor: const Color(0xFF3CAE63),
+          foregroundColor: Colors.black,
+          shape: const CircleBorder(),
+          elevation: 4,
+          child: const Icon(Icons.add, size: 32),
+        ),
       ),
       floatingActionButtonLocation: FloatingActionButtonLocation.centerDocked,
       bottomNavigationBar: const _DashboardNav(),
@@ -119,7 +124,7 @@ class DashboardScreen extends ConsumerWidget {
 }
 
 // ─────────────────────────────────────────────────────────────────────────────
-// Header (Green gradient top bar — style matches mockup)
+// Header (ตามภาพ Home.png)
 // ─────────────────────────────────────────────────────────────────────────────
 class _GreenHeader extends StatelessWidget {
   const _GreenHeader({required this.name, required this.streak});
@@ -131,7 +136,7 @@ class _GreenHeader extends StatelessWidget {
     final topPad = MediaQuery.of(context).padding.top;
     return Container(
       width: double.infinity,
-      padding: EdgeInsets.fromLTRB(20, topPad + 14, 20, 20),
+      padding: EdgeInsets.fromLTRB(20, topPad + 16, 20, 24),
       decoration: const BoxDecoration(
         gradient: LinearGradient(
           colors: [Color(0xFF06120A), Color(0xFF334E3D), Color(0xFF3CAE63)],
@@ -139,25 +144,22 @@ class _GreenHeader extends StatelessWidget {
           end: Alignment.bottomCenter,
         ),
         borderRadius: BorderRadius.only(
-          bottomLeft: Radius.circular(0),
-          bottomRight: Radius.circular(0),
+          bottomLeft: Radius.circular(32),
+          bottomRight: Radius.circular(32),
         ),
       ),
       child: Row(
         children: [
-          // Avatar
           Container(
-            width: 44,
-            height: 44,
-            decoration: BoxDecoration(
+            width: 48,
+            height: 48,
+            decoration: const BoxDecoration(
               shape: BoxShape.circle,
-              color: Colors.grey.shade700,
-              border: Border.all(color: AppColors.primary.withOpacity(0.5), width: 2),
+              color: Color(0xFF5E6E85),
             ),
-            child: const Icon(Icons.person, color: Colors.white70, size: 26),
+            child: const Icon(Icons.person, color: Colors.white, size: 30),
           ),
-          const SizedBox(width: 12),
-          // Name + Streak badge
+          const SizedBox(width: 14),
           Expanded(
             child: Column(
               crossAxisAlignment: CrossAxisAlignment.start,
@@ -166,32 +168,33 @@ class _GreenHeader extends StatelessWidget {
                   name,
                   style: const TextStyle(
                     color: Colors.white,
-                    fontSize: 16,
-                    fontWeight: FontWeight.bold,
+                    fontSize: 18,
+                    fontWeight: FontWeight.w600,
                   ),
                 ),
-                const SizedBox(height: 4),
+                const SizedBox(height: 6),
                 Container(
-                  padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 3),
+                  padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 4),
                   decoration: BoxDecoration(
-                    color: AppColors.primary.withOpacity(0.25),
+                    color: Colors.white.withOpacity(0.2),
                     borderRadius: BorderRadius.circular(12),
-                    border: Border.all(color: AppColors.primary.withOpacity(0.4)),
                   ),
                   child: Text(
                     'ใช้งานต่อเนื่อง $streak วัน',
                     style: const TextStyle(
-                      color: AppColors.primary,
-                      fontSize: 11,
-                      fontWeight: FontWeight.w600,
+                      color: Colors.white,
+                      fontSize: 12,
+                      fontWeight: FontWeight.bold,
                     ),
                   ),
                 ),
               ],
             ),
           ),
-          // Notification bell → Notification Center (+ badge จำนวนยังไม่อ่าน)
-          const NotifBell(),
+          IconButton(
+            onPressed: () {},
+            icon: const Icon(Icons.notifications_none_rounded, color: Colors.white, size: 28),
+          ),
         ],
       ),
     );
@@ -199,9 +202,9 @@ class _GreenHeader extends StatelessWidget {
 }
 
 // ─────────────────────────────────────────────────────────────────────────────
-// Balance Card
+// Balance Card (ยอดคงเหลือ)
 // ─────────────────────────────────────────────────────────────────────────────
-class _BalanceCard extends StatelessWidget {
+class _BalanceCard extends ConsumerWidget {
   const _BalanceCard({
     required this.balance,
     required this.income,
@@ -212,7 +215,7 @@ class _BalanceCard extends StatelessWidget {
   final int expense;
 
   @override
-  Widget build(BuildContext context) {
+  Widget build(BuildContext context, WidgetRef ref) {
     return Container(
       padding: const EdgeInsets.all(20),
       decoration: BoxDecoration(
@@ -234,7 +237,13 @@ class _BalanceCard extends StatelessWidget {
                 'ยอดคงเหลือ',
                 style: TextStyle(color: Colors.white60, fontSize: 13),
               ),
-              Icon(Icons.edit_outlined, size: 16, color: Colors.white38),
+              GestureDetector(
+                onTap: () async {
+                  await context.push('/edit-balance');
+                  ref.invalidate(dashboardProvider); // ดึงยอดใหม่ทันทีที่กลับมา
+                },
+                child: const Icon(Icons.edit_outlined, size: 16, color: Colors.white38),
+              ),
             ],
           ),
           const SizedBox(height: 8),
@@ -287,16 +296,15 @@ class _MiniStatRow extends StatelessWidget {
 }
 
 // ─────────────────────────────────────────────────────────────────────────────
-// Goals Card (mock data — จะเชื่อมต่อ API จริงใน Sprint ถัดไป)
+// Goals Card (เป้าหมาย)
 // ─────────────────────────────────────────────────────────────────────────────
 class _GoalsCard extends ConsumerWidget {
   const _GoalsCard();
 
   @override
   Widget build(BuildContext context, WidgetRef ref) {
-    // Use real goals data if available
     return Container(
-      padding: const EdgeInsets.all(16),
+      padding: const EdgeInsets.all(18),
       decoration: BoxDecoration(
         gradient: const LinearGradient(
           colors: [Color(0xFF262626), Color(0xFF907116), Color(0xFFFBBC05)],
@@ -304,7 +312,10 @@ class _GoalsCard extends ConsumerWidget {
           end: Alignment.centerRight,
         ),
         borderRadius: BorderRadius.circular(20),
-        border: Border.all(color: Colors.amber.withOpacity(0.2)),
+        border: Border.all(color: Colors.white.withOpacity(0.05)),
+        boxShadow: [
+          BoxShadow(color: Colors.black.withOpacity(0.15), blurRadius: 8, offset: const Offset(0, 4))
+        ],
       ),
       child: Column(
         crossAxisAlignment: CrossAxisAlignment.start,
@@ -314,30 +325,30 @@ class _GoalsCard extends ConsumerWidget {
             children: [
               const Text(
                 'เป้าหมาย',
-                style: TextStyle(color: Colors.white70, fontSize: 13),
+                style: TextStyle(color: Colors.white70, fontSize: 14, fontWeight: FontWeight.w500),
               ),
               GestureDetector(
                 onTap: () => context.push('/goals'),
-                child: Icon(Icons.edit_outlined, size: 16, color: Colors.white38),
+                child: Icon(Icons.edit_note_rounded, size: 22, color: Colors.white.withOpacity(0.6)),
               ),
             ],
           ),
-          const SizedBox(height: 10),
+          const SizedBox(height: 12),
           const Row(
             mainAxisAlignment: MainAxisAlignment.spaceBetween,
             children: [
-              Text('ซื้อตู้เย็น', style: TextStyle(color: Colors.white, fontWeight: FontWeight.w600)),
-              Text('2,400 / 4000', style: TextStyle(color: Colors.white, fontWeight: FontWeight.bold)),
+              Text('ซื้อตู้เย็น', style: TextStyle(color: Colors.white, fontSize: 15, fontWeight: FontWeight.w600)),
+              Text('2,400 / 4000', style: TextStyle(color: Colors.white, fontSize: 14, fontWeight: FontWeight.bold)),
             ],
           ),
-          const SizedBox(height: 8),
+          const SizedBox(height: 10),
           ClipRRect(
-            borderRadius: BorderRadius.circular(6),
+            borderRadius: BorderRadius.circular(10),
             child: LinearProgressIndicator(
               value: 2400 / 4000,
-              minHeight: 8,
-              backgroundColor: Colors.white.withOpacity(0.15),
-              valueColor: const AlwaysStoppedAnimation<Color>(Color(0xFFFFC107)),
+              minHeight: 12,
+              backgroundColor: Colors.white.withOpacity(0.2),
+              valueColor: const AlwaysStoppedAnimation<Color>(Color(0xFFFBBC05)),
             ),
           ),
           const SizedBox(height: 6),
@@ -345,7 +356,7 @@ class _GoalsCard extends ConsumerWidget {
             alignment: Alignment.centerRight,
             child: Text(
               'เหลืออีก 1600 บาท',
-              style: TextStyle(color: Colors.amber, fontSize: 11),
+              style: TextStyle(color: Color(0xFFFBBC05), fontSize: 11, fontWeight: FontWeight.w500),
             ),
           ),
         ],
@@ -355,7 +366,7 @@ class _GoalsCard extends ConsumerWidget {
 }
 
 // ─────────────────────────────────────────────────────────────────────────────
-// Budgets Card (status badges: อันตราย / เสี่ยง / ปลอดภัย)
+// Budgets Card (งบประมาณ)
 // ─────────────────────────────────────────────────────────────────────────────
 class _BudgetsCard extends ConsumerWidget {
   const _BudgetsCard();
@@ -366,7 +377,7 @@ class _BudgetsCard extends ConsumerWidget {
     final budgetStatuses = ref.watch(budgetStatusProvider);
 
     return Container(
-      padding: const EdgeInsets.all(16),
+      padding: const EdgeInsets.all(18),
       decoration: BoxDecoration(
         gradient: const LinearGradient(
           colors: [Color(0xFF010F0C), Color(0xFF061E13)],
@@ -375,6 +386,9 @@ class _BudgetsCard extends ConsumerWidget {
         ),
         borderRadius: BorderRadius.circular(20),
         border: Border.all(color: Colors.white.withOpacity(0.08)),
+        boxShadow: [
+          BoxShadow(color: Colors.black.withOpacity(0.2), blurRadius: 8, offset: const Offset(0, 4))
+        ],
       ),
       child: Column(
         crossAxisAlignment: CrossAxisAlignment.start,
@@ -386,12 +400,12 @@ class _BudgetsCard extends ConsumerWidget {
                 'งบประมาณ',
                 style: TextStyle(color: Colors.white, fontSize: 15, fontWeight: FontWeight.bold),
               ),
-              Icon(Icons.edit_outlined, size: 16, color: Colors.white38),
+              Icon(Icons.edit_note_rounded, size: 22, color: Colors.white.withOpacity(0.6)),
             ],
           ),
-          const SizedBox(height: 12),
+          const SizedBox(height: 16),
           budgetsAsync.when(
-            loading: () => const Center(child: CircularProgressIndicator(color: AppColors.primary)),
+            loading: () => const Center(child: CircularProgressIndicator(color: Color(0xFF3CAE63))),
             error: (e, _) => Text('โหลดงบไม่ได้: $e', style: const TextStyle(color: Colors.red)),
             data: (budgets) {
               if (budgets.isEmpty) {
@@ -400,31 +414,26 @@ class _BudgetsCard extends ConsumerWidget {
                   child: Center(
                     child: Text(
                       'ยังไม่ได้ตั้งงบประมาณ — เริ่มใช้งานได้เลย',
-                      style: TextStyle(color: AppColors.textMuted, fontSize: 12),
+                      style: TextStyle(color: AppColors.textMuted, fontSize: 13),
                     ),
                   ),
                 );
               }
               return Column(
                 children: budgetStatuses.map((status) {
-                  // Determine status level
                   final pct = status.percentage;
                   String statusLabel;
                   Color statusColor;
-                  Color barColor;
 
                   if (pct >= 1.0) {
                     statusLabel = 'อันตราย';
-                    statusColor = AppColors.expense;
-                    barColor = AppColors.expense;
+                    statusColor = const Color(0xFFFF4B4B);
                   } else if (pct >= 0.8) {
                     statusLabel = 'เสี่ยง';
-                    statusColor = Colors.orange;
-                    barColor = Colors.orange;
+                    statusColor = const Color(0xFFFFB03A);
                   } else {
                     statusLabel = 'ปลอดภัย';
-                    statusColor = AppColors.income;
-                    barColor = AppColors.income;
+                    statusColor = const Color(0xFF3CAE63);
                   }
 
                   final cat = status.category;
@@ -432,7 +441,7 @@ class _BudgetsCard extends ConsumerWidget {
                   final overBy = status.spent - status.amount;
 
                   return Padding(
-                    padding: const EdgeInsets.only(bottom: 14),
+                    padding: const EdgeInsets.only(bottom: 16),
                     child: Column(
                       children: [
                         Row(
@@ -442,52 +451,40 @@ class _BudgetsCard extends ConsumerWidget {
                                 cat?.nameTh ?? 'งบรวม',
                                 style: const TextStyle(
                                   color: Colors.white,
-                                  fontWeight: FontWeight.w600,
+                                  fontWeight: FontWeight.w500,
                                   fontSize: 14,
                                 ),
                               ),
                             ),
-                            // Status badge
-                            Container(
-                              padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 2),
-                              decoration: BoxDecoration(
-                                color: statusColor.withOpacity(0.18),
-                                borderRadius: BorderRadius.circular(8),
-                              ),
-                              child: Text(
-                                statusLabel,
-                                style: TextStyle(
-                                  color: statusColor,
-                                  fontSize: 11,
-                                  fontWeight: FontWeight.bold,
-                                ),
-                              ),
+                            Text(
+                              statusLabel,
+                              style: TextStyle(color: statusColor, fontSize: 13, fontWeight: FontWeight.w600),
                             ),
-                            const SizedBox(width: 8),
+                            const SizedBox(width: 12),
                             Text(
                               '฿ ${Money.formatBaht(status.spent)} / ${Money.formatBaht(status.amount)}',
-                              style: const TextStyle(color: Colors.white, fontSize: 13, fontWeight: FontWeight.bold),
+                              style: const TextStyle(color: Colors.white, fontSize: 14, fontWeight: FontWeight.bold),
                             ),
                           ],
                         ),
-                        const SizedBox(height: 6),
+                        const SizedBox(height: 8),
                         ClipRRect(
-                          borderRadius: BorderRadius.circular(6),
+                          borderRadius: BorderRadius.circular(10),
                           child: LinearProgressIndicator(
                             value: pct.clamp(0.0, 1.0),
-                            minHeight: 7,
+                            minHeight: 10,
                             backgroundColor: Colors.white.withOpacity(0.12),
-                            valueColor: AlwaysStoppedAnimation<Color>(barColor),
+                            valueColor: AlwaysStoppedAnimation<Color>(statusColor),
                           ),
                         ),
-                        const SizedBox(height: 4),
+                        const SizedBox(height: 6),
                         Align(
                           alignment: Alignment.centerRight,
                           child: Text(
                             pct >= 1.0
                                 ? 'ใช้เกินไป ${Money.formatBaht(overBy)} บาท'
                                 : 'ใช้ได้อีก ${Money.formatBaht(remaining)} บาท',
-                            style: TextStyle(color: statusColor, fontSize: 11),
+                            style: TextStyle(color: Colors.white.withOpacity(0.5), fontSize: 11),
                           ),
                         ),
                       ],
@@ -504,7 +501,7 @@ class _BudgetsCard extends ConsumerWidget {
 }
 
 // ─────────────────────────────────────────────────────────────────────────────
-// Recent Transactions — horizontal scrollable cards
+// Recent Transactions
 // ─────────────────────────────────────────────────────────────────────────────
 class _RecentTxnCards extends StatelessWidget {
   const _RecentTxnCards({required this.txns});
@@ -513,52 +510,61 @@ class _RecentTxnCards extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     return SizedBox(
-      height: 110,
+      height: 135,
       child: ListView.separated(
         scrollDirection: Axis.horizontal,
         physics: const BouncingScrollPhysics(),
         itemCount: txns.length,
-        separatorBuilder: (_, __) => const SizedBox(width: 10),
+        separatorBuilder: (_, __) => const SizedBox(width: 12),
         itemBuilder: (context, i) {
           final t = txns[i];
           final cat = t.category;
           return Container(
-            width: 110,
+            width: 135,
             padding: const EdgeInsets.all(14),
             decoration: BoxDecoration(
-              color: const Color(0xFF1C1C1C),
-              borderRadius: BorderRadius.circular(16),
-              border: Border.all(color: Colors.white.withOpacity(0.08)),
+              gradient: const LinearGradient(
+                colors: [Color(0xFF041E14), Color(0xFF0A2B1D)],
+                begin: Alignment.topLeft,
+                end: Alignment.bottomRight,
+              ),
+              borderRadius: BorderRadius.circular(20),
+              border: Border.all(color: const Color(0xFF3CAE63).withOpacity(0.3)),
             ),
             child: Column(
               crossAxisAlignment: CrossAxisAlignment.start,
+              mainAxisAlignment: MainAxisAlignment.spaceBetween,
               children: [
                 Container(
-                  width: 36,
-                  height: 36,
+                  width: 44,
+                  height: 44,
                   decoration: BoxDecoration(
-                    color: AppColors.primary.withOpacity(0.15),
-                    borderRadius: BorderRadius.circular(10),
+                    color: Colors.white,
+                    borderRadius: BorderRadius.circular(14),
                   ),
                   child: Center(
                     child: Text(cat?.icon ?? (t.isIncome ? '💰' : '💸'),
-                        style: const TextStyle(fontSize: 18)),
+                        style: const TextStyle(fontSize: 22)),
                   ),
                 ),
-                const SizedBox(height: 8),
-                Text(
-                  '฿ ${Money.formatBaht(t.amount)}',
-                  style: const TextStyle(
-                    color: Colors.white,
-                    fontWeight: FontWeight.bold,
-                    fontSize: 13,
-                  ),
-                ),
-                const SizedBox(height: 2),
-                Text(
-                  cat?.nameTh ?? (t.isIncome ? 'รายรับ' : 'อื่นๆ'),
-                  style: const TextStyle(color: Colors.white54, fontSize: 11),
-                  overflow: TextOverflow.ellipsis,
+                Column(
+                  crossAxisAlignment: CrossAxisAlignment.start,
+                  children: [
+                    Text(
+                      '฿ ${Money.formatBaht(t.amount)}',
+                      style: const TextStyle(
+                        color: Colors.white,
+                        fontWeight: FontWeight.bold,
+                        fontSize: 15,
+                      ),
+                    ),
+                    const SizedBox(height: 2),
+                    Text(
+                      cat?.nameTh ?? (t.isIncome ? 'รายรับ' : 'อื่นๆ'),
+                      style: TextStyle(color: Colors.white.withOpacity(0.6), fontSize: 12),
+                      overflow: TextOverflow.ellipsis,
+                    ),
+                  ],
                 ),
               ],
             ),
@@ -570,7 +576,7 @@ class _RecentTxnCards extends StatelessWidget {
 }
 
 // ─────────────────────────────────────────────────────────────────────────────
-// Quick Actions Grid (4 items in a row — matches mockup)
+// Quick Actions Grid
 // ─────────────────────────────────────────────────────────────────────────────
 class _QuickActionsGrid extends StatelessWidget {
   const _QuickActionsGrid();
@@ -578,40 +584,39 @@ class _QuickActionsGrid extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     final items = <({IconData icon, String label, VoidCallback onTap})>[
-      (icon: Icons.camera_alt_rounded, label: 'สแกนสลิป', onTap: () => context.push('/add')),
-      (icon: Icons.smart_toy_rounded, label: 'ปรึกษาพี่เงิน', onTap: () => context.push('/chat')),
-      (icon: Icons.flag_rounded, label: 'เป้าหมาย', onTap: () => context.push('/goals')),
-      (icon: Icons.add_circle_outline_rounded, label: 'เพิ่มรายการ', onTap: () => context.push('/add')),
+      (icon: Icons.camera_alt_outlined, label: 'สแกนสลิป', onTap: () => context.push('/add')),
+      (icon: Icons.chat_bubble_outline_rounded, label: 'ปรึกษาพี่เงิน', onTap: () => context.push('/chat')),
+      (icon: Icons.flag_outlined, label: 'เป้าหมาย', onTap: () => context.push('/goals')),
+      (icon: Icons.add_outlined, label: 'เพิ่มรายการ', onTap: () => context.push('/add')),
     ];
 
     return Container(
-      padding: const EdgeInsets.all(16),
+      padding: const EdgeInsets.all(18),
       decoration: BoxDecoration(
-        color: const Color(0xFF1C1C1C),
+        color: const Color(0xFF061A13),
         borderRadius: BorderRadius.circular(20),
-        border: Border.all(color: Colors.white.withOpacity(0.08)),
+        border: Border.all(color: const Color(0xFF3CAE63).withOpacity(0.2)),
       ),
       child: Row(
-        mainAxisAlignment: MainAxisAlignment.spaceBetween,
+        mainAxisAlignment: MainAxisAlignment.spaceAround,
         children: items.map((it) {
           return GestureDetector(
             onTap: it.onTap,
             child: Column(
               children: [
                 Container(
-                  width: 56,
-                  height: 56,
+                  width: 60,
+                  height: 60,
                   decoration: BoxDecoration(
-                    color: Colors.white.withOpacity(0.07),
+                    color: Colors.white,
                     borderRadius: BorderRadius.circular(16),
-                    border: Border.all(color: Colors.white.withOpacity(0.1)),
                   ),
-                  child: Icon(it.icon, color: Colors.white70, size: 26),
+                  child: Icon(it.icon, color: Colors.black87, size: 28),
                 ),
                 const SizedBox(height: 8),
                 Text(
                   it.label,
-                  style: const TextStyle(color: Colors.white60, fontSize: 11, fontWeight: FontWeight.w500),
+                  style: const TextStyle(color: Color(0xFF4CD97B), fontSize: 12, fontWeight: FontWeight.w500),
                   textAlign: TextAlign.center,
                 ),
               ],
@@ -624,7 +629,7 @@ class _QuickActionsGrid extends StatelessWidget {
 }
 
 // ─────────────────────────────────────────────────────────────────────────────
-// Error Box
+// Error Box Widget
 // ─────────────────────────────────────────────────────────────────────────────
 class _ErrorBox extends StatelessWidget {
   const _ErrorBox({required this.message, required this.onRetry});
@@ -644,7 +649,7 @@ class _ErrorBox extends StatelessWidget {
         const SizedBox(height: 12),
         OutlinedButton(
           onPressed: onRetry,
-          style: OutlinedButton.styleFrom(foregroundColor: AppColors.primary),
+          style: OutlinedButton.styleFrom(foregroundColor: const Color(0xFF3CAE63)),
           child: const Text('ลองใหม่'),
         ),
       ],
@@ -660,22 +665,33 @@ class _DashboardNav extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
-    return BottomAppBar(
-      color: const Color(0xFF121212),
-      elevation: 12,
-      shape: const CircularNotchedRectangle(),
-      notchMargin: 8,
-      height: 66,
-      padding: EdgeInsets.zero,
-      child: Row(
-        mainAxisAlignment: MainAxisAlignment.spaceAround,
-        children: [
-          const _NavItem(icon: Icons.home_rounded, label: 'หน้าหลัก', active: true),
-          _NavItem(icon: Icons.bar_chart_rounded, label: 'งบ', onTap: () => context.push('/budgets')),
-          const SizedBox(width: 40),
-          _NavItem(icon: Icons.smart_toy_rounded, label: 'พี่เงิน', onTap: () => context.push('/chat')),
-          _NavItem(icon: Icons.grid_view_rounded, label: 'เมนู', onTap: () => context.push('/menu')),
+    return Container(
+      decoration: BoxDecoration(
+        color: const Color(0xFF1A1A1A),
+        borderRadius: const BorderRadius.only(
+          topLeft: Radius.circular(30),
+          topRight: Radius.circular(30),
+        ),
+        boxShadow: [
+          BoxShadow(color: Colors.black.withOpacity(0.3), blurRadius: 12, offset: const Offset(0, -2))
         ],
+      ),
+      child: BottomAppBar(
+        color: Colors.transparent,
+        elevation: 0,
+        notchMargin: 10,
+        height: 74,
+        padding: EdgeInsets.zero,
+        child: Row(
+          mainAxisAlignment: MainAxisAlignment.spaceAround,
+          children: [
+            const _NavItem(icon: Icons.home_outlined, label: 'หน้าหลัก', active: true),
+            _NavItem(icon: Icons.insert_chart_outlined_rounded, label: 'งบ', onTap: () => context.push('/budgets')),
+            const SizedBox(width: 48),
+            _NavItem(icon: Icons.chat_bubble_outline_rounded, label: 'พี่เงิน', onTap: () => context.push('/chat')),
+            _NavItem(icon: Icons.grid_view_rounded, label: 'เมนู', onTap: () => context.push('/menu')),
+          ],
+        ),
       ),
     );
   }
@@ -690,27 +706,28 @@ class _NavItem extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
-    final color = active ? AppColors.primary : Colors.white38;
+    final color = active ? const Color(0xFF4CD97B) : Colors.white60;
     return InkWell(
       onTap: onTap,
-      borderRadius: BorderRadius.circular(12),
+      borderRadius: BorderRadius.circular(16),
       child: Padding(
-        padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 6),
+        padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 8),
         child: Column(
           mainAxisSize: MainAxisSize.min,
           children: [
-            Icon(icon, color: color, size: 24),
-            const SizedBox(height: 2),
-            Text(label,
-                style: TextStyle(
-                  color: color,
-                  fontSize: 10,
-                  fontWeight: active ? FontWeight.w700 : FontWeight.w500,
-                )),
+            Icon(icon, color: color, size: 28),
+            const SizedBox(height: 4),
+            Text(
+              label,
+              style: TextStyle(
+                color: color,
+                fontSize: 11,
+                fontWeight: active ? FontWeight.bold : FontWeight.w500,
+              ),
+            ),
           ],
         ),
       ),
     );
   }
 }
-

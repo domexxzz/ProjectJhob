@@ -6,6 +6,7 @@ import '../../app/theme.dart';
 import 'auth_controller.dart';
 
 /// ปุ่มล็อกอินด้วย Google / Facebook — ใช้ทั้งหน้า Login และ Register
+/// สไตล์: divider "or continue with" + ปุ่มวงกลมพื้นขาว (ตาม mockup register)
 class SocialLoginButtons extends ConsumerWidget {
   const SocialLoginButtons({super.key});
 
@@ -20,64 +21,63 @@ class SocialLoginButtons extends ConsumerWidget {
 
     return Column(
       children: [
-        const Row(
+        Row(
           children: [
-            Expanded(child: Divider(color: Colors.white24)),
-            Padding(
-              padding: EdgeInsets.symmetric(horizontal: 12),
-              child: Text('หรือ', style: TextStyle(color: AppColors.textMuted)),
-            ),
-            Expanded(child: Divider(color: Colors.white24)),
+            
           ],
         ),
-        const SizedBox(height: 16),
-        _SocialButton(
-          label: 'เข้าสู่ระบบด้วย Google',
-          icon: Icons.g_mobiledata_rounded,
-          bg: Colors.white,
-          fg: Colors.black87,
-          onTap: loading ? null : () => run(() => ref.read(authControllerProvider.notifier).loginWithGoogle()),
-        ),
-        const SizedBox(height: 12),
-        _SocialButton(
-          label: 'เข้าสู่ระบบด้วย Facebook',
-          icon: Icons.facebook,
-          bg: const Color(0xFF1877F2),
-          fg: Colors.white,
-          onTap: loading ? null : () => run(() => ref.read(authControllerProvider.notifier).loginWithFacebook()),
+        const SizedBox(height: 24),
+        Row(
+          mainAxisAlignment: MainAxisAlignment.center,
+          children: [
+            _SocialCircleButton(
+              icon: Icons.facebook,
+              iconColor: const Color(0xFF1877F2),
+              onTap: loading ? null : () => run(() => ref.read(authControllerProvider.notifier).loginWithFacebook()),
+            ),
+            const SizedBox(width: 20),
+            _SocialCircleButton(
+              // 📌 Material ไม่มีโลโก้ Google หลายสีในตัว — ถ้าต้องการโลโก้จริง
+              // ให้ใช้ asset รูป (เช่น assets/images/google.png) แทน Icon นี้
+              icon: Icons.g_mobiledata_rounded,
+              iconColor: const Color(0xFFEA4335),
+              iconSize: 32,
+              onTap: loading ? null : () => run(() => ref.read(authControllerProvider.notifier).loginWithGoogle()),
+            ),
+          ],
         ),
       ],
     );
   }
 }
 
-class _SocialButton extends StatelessWidget {
-  const _SocialButton({
-    required this.label,
+class _SocialCircleButton extends StatelessWidget {
+  const _SocialCircleButton({
     required this.icon,
-    required this.bg,
-    required this.fg,
+    required this.iconColor,
     required this.onTap,
+    this.iconSize = 24,
   });
-  final String label;
+
   final IconData icon;
-  final Color bg;
-  final Color fg;
+  final Color iconColor;
   final VoidCallback? onTap;
+  final double iconSize;
 
   @override
   Widget build(BuildContext context) {
-    return SizedBox(
-      width: double.infinity,
-      child: ElevatedButton.icon(
-        onPressed: onTap,
-        icon: Icon(icon, color: fg, size: 26),
-        label: Text(label, style: TextStyle(color: fg, fontWeight: FontWeight.w600)),
-        style: ElevatedButton.styleFrom(
-          backgroundColor: bg,
-          padding: const EdgeInsets.symmetric(vertical: 14),
-          shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(12)),
+    return InkWell(
+      onTap: onTap,
+      borderRadius: BorderRadius.circular(16),
+      child: Container(
+        width: 64,
+        height: 64,
+        alignment: Alignment.center,
+        decoration: BoxDecoration(
+          color: Colors.white,
+          borderRadius: BorderRadius.circular(16),
         ),
+        child: Icon(icon, color: iconColor, size: iconSize),
       ),
     );
   }

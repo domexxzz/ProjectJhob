@@ -4,7 +4,6 @@ import 'package:go_router/go_router.dart';
 
 import '../../app/theme.dart';
 import '../auth/auth_controller.dart';
-import '../notifications/notif_bell.dart';
 
 /// หน้า เมนู (P15) — ทางเข้า บัญชี / การตั้งค่า / ความเป็นส่วนตัว / Subscription
 class MenuScreen extends ConsumerWidget {
@@ -146,7 +145,10 @@ class _MenuHeader extends StatelessWidget {
               ],
             ),
           ),
-          const NotifBell(),
+          IconButton(
+            onPressed: () {},
+            icon: const Icon(Icons.notifications_outlined, color: Colors.white, size: 26),
+          ),
         ],
       ),
     );
