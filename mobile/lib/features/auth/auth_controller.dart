@@ -1,5 +1,7 @@
 import 'package:dio/dio.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
+import 'package:google_sign_in/google_sign_in.dart';
+import 'package:flutter_facebook_auth/flutter_facebook_auth.dart';
 
 import '../../core/api/api_client.dart';
 
@@ -91,8 +93,55 @@ class AuthController extends StateNotifier<AuthState> {
     }
   }
 
+  /// ล็อกอินด้วย Google → ส่ง idToken ให้ backend verify
+  Future<bool> loginWithGoogle() async {
+    state = state.copyWith(loading: true, clearError: true);
+    try {
+      final account = await GoogleSignIn(scopes: const ['email']).signIn();
+      if (account == null) {
+        state = state.copyWith(loading: false); // ผู้ใช้ยกเลิก
+        return false;
+      }
+      final auth = await account.authentication;
+      final idToken = auth.idToken; // มือถือให้ idToken
+      final accessToken = auth.accessToken; // เว็บให้ accessToken (idToken เป็น null)
+      if (idToken == null && accessToken == null) {
+        state = state.copyWith(loading: false, error: 'ไม่ได้รับ Google token');
+        return false;
+      }
+      return _authRequest('/auth/google', {
+        if (idToken != null) 'idToken': idToken,
+        if (accessToken != null) 'accessToken': accessToken,
+      });
+    } catch (e) {
+      state = state.copyWith(loading: false, error: 'ล็อกอิน Google ไม่สำเร็จ ลองใหม่อีกครั้ง');
+      return false;
+    }
+  }
+
+  /// ล็อกอินด้วย Facebook → ส่ง accessToken ให้ backend verify
+  Future<bool> loginWithFacebook() async {
+    state = state.copyWith(loading: true, clearError: true);
+    try {
+      final result = await FacebookAuth.instance.login(permissions: const ['email', 'public_profile']);
+      final token = result.accessToken;
+      if (result.status != LoginStatus.success || token == null) {
+        state = state.copyWith(loading: false, error: result.message ?? 'ยกเลิก/ล็อกอิน Facebook ไม่สำเร็จ');
+        return false;
+      }
+      return _authRequest('/auth/facebook', {'accessToken': token.token});
+    } catch (e) {
+      state = state.copyWith(loading: false, error: 'ล็อกอิน Facebook ไม่สำเร็จ (ตรวจการตั้งค่า OAuth)');
+      return false;
+    }
+  }
+
   Future<void> logout() async {
     await _tokens.clear();
+    try {
+      await GoogleSignIn().signOut();
+      await FacebookAuth.instance.logOut();
+    } catch (_) {}
     state = const AuthState();
   }
 }

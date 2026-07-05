@@ -9,6 +9,8 @@ import { budgetsRouter } from './modules/budgets/budgets.routes';
 import { goalsRouter } from './modules/goals/goals.routes';
 import { notificationsRouter } from './modules/notifications/notifications.routes';
 import { recommendationsRouter } from './modules/recommendations/recommendations.routes';
+import { subscriptionsRouter } from './modules/subscriptions/subscriptions.routes';
+import { integrationsRouter } from './modules/integrations/integrations.routes';
 import { chatRouter } from './modules/chat/chat.routes';
 import { notFound, errorHandler } from './middleware/error';
 
@@ -16,7 +18,7 @@ export function createApp() {
   const app = express();
 
   app.use(cors({ origin: env.corsOrigin }));
-  app.use(express.json({ limit: '1mb' }));
+  app.use(express.json({ limit: '15mb' })); // รองรับรูป base64 (OCR สลิป/เอกสาร)
 
   app.use('/health', healthRouter);
   app.use('/api/v1/auth', authRouter);
@@ -26,6 +28,8 @@ export function createApp() {
   app.use('/api/v1/goals', goalsRouter);
   app.use('/api/v1/notifications', notificationsRouter);
   app.use('/api/v1/recommendations', recommendationsRouter);
+  app.use('/api/v1/subscriptions', subscriptionsRouter);
+  app.use('/api/v1/integrations', integrationsRouter);
   app.use('/api/v1/chat', chatRouter);
 
   app.use(notFound);

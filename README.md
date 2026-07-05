@@ -55,6 +55,8 @@ Base: `http://localhost:4000` · auth = `Authorization: Bearer <token>` · **จ
 | GET  | `/health` | | สถานะ + เช็ค DB |
 | POST | `/api/v1/auth/register` | | `{ email, password, displayName?, monthlyIncome? }` → `{ user, token }` |
 | POST | `/api/v1/auth/login` | | `{ email, password }` → `{ user, token }` |
+| POST | `/api/v1/auth/google` | | `{ idToken }` (จาก google_sign_in) → `{ user, token }` |
+| POST | `/api/v1/auth/facebook` | | `{ accessToken }` (จาก flutter_facebook_auth) → `{ user, token }` |
 | GET  | `/api/v1/auth/me` | ✓ | โปรไฟล์ผู้ใช้ปัจจุบัน |
 | GET  | `/api/v1/categories` | ✓ | หมวดหมู่ทั้งหมด |
 | GET  | `/api/v1/transactions?month=YYYY-MM&type=expense` | ✓ | รายการ + `summary {income,expense,balance}` |
@@ -72,6 +74,11 @@ Base: `http://localhost:4000` · auth = `Authorization: Bearer <token>` · **จ
 | POST | `/api/v1/notifications/token` | ✓ | `{ token }` ลงทะเบียน FCM device token |
 | POST | `/api/v1/notifications/run-triggers` | ✓ | ตรวจงบเดี๋ยวนี้ → สร้างแจ้งเตือน (ใกล้/เกินงบ) |
 | GET  | `/api/v1/recommendations?context=goal\|budget\|dashboard` | ✓ | การ์ด "แนะนำสำหรับคุณ" (AI + heuristic fallback) |
+| GET  | `/api/v1/subscriptions` | ✓ | รายการ subscription + `totalMonthly` (ยอดรวม/เดือน) |
+| POST | `/api/v1/subscriptions` | ✓ | `{ name, amount, cycle?, nextBilling, logo? }` |
+| PATCH/DELETE | `/api/v1/subscriptions/:id` | ✓ | แก้/ลบ |
+| POST | `/api/v1/subscriptions/run-reminders` | ✓ | เตือน subscription ที่ใกล้ตัดเงิน (≤2 วัน) |
+| POST | `/api/v1/subscriptions/import-gmail` | ✓ | `{ accessToken }` นำเข้า subscription จาก Gmail (scope `gmail.readonly`) |
 
 ## 🧭 Tech Decisions (Sprint 1)
 - **เงินเก็บเป็นสตางค์ (Int)** ไม่ใช่ float — กัน floating-point error (มาตรฐานแอปการเงิน). UI หารด้วย 100 ตอนแสดงผล.

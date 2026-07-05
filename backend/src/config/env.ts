@@ -21,4 +21,11 @@ export const env = {
   openaiApiKey: process.env.OPENAI_API_KEY,
   openaiModel: process.env.OPENAI_MODEL ?? 'gpt-3.5-turbo',
   openaiBaseUrl: process.env.OPENAI_BASE_URL, // custom OpenAI-compatible endpoint (optional)
+  // Social login (OAuth) — ตั้งค่าจาก Google Cloud / Facebook Developer
+  googleClientId: process.env.GOOGLE_CLIENT_ID, // ใช้ verify Google ID token (คั่นด้วย , ได้หลายตัว: web,android,ios)
+  facebookAppId: process.env.FACEBOOK_APP_ID,
+  facebookAppSecret: process.env.FACEBOOK_APP_SECRET,
+  googleClientSecret: process.env.GOOGLE_CLIENT_SECRET, // สำหรับ server-side OAuth (Gmail import)
+  gmailRedirectUri: process.env.GMAIL_REDIRECT_URI ?? 'http://localhost:4000/api/v1/integrations/gmail/callback',
+  webAppUrl: process.env.WEB_APP_URL ?? 'http://localhost:5000',
 };

@@ -10,7 +10,8 @@ import { generateReply, ChatTurn, ocrImage } from './coach';
 export const chatRouter = Router();
 chatRouter.use(requireAuth);
 
-const sendSchema = z.object({ message: z.string().min(1).max(500) });
+// เผื่อข้อความยาวจาก OCR (สลิป/ตาราง) — ปกติผู้ใช้พิมพ์สั้น แต่แนบรูปแล้ววิเคราะห์อาจยาว
+const sendSchema = z.object({ message: z.string().min(1).max(8000) });
 
 // GET /api/v1/chat -> ประวัติแชท
 chatRouter.get(

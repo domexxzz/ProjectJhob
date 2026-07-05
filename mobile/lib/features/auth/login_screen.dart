@@ -4,6 +4,7 @@ import 'package:go_router/go_router.dart';
 
 import '../../app/theme.dart';
 import 'auth_controller.dart';
+import 'social_login_buttons.dart';
 
 class LoginScreen extends ConsumerStatefulWidget {
   const LoginScreen({super.key});
@@ -70,6 +71,8 @@ class _LoginScreenState extends ConsumerState<LoginScreen> {
                         child: CircularProgressIndicator(strokeWidth: 2, color: Colors.white))
                     : const Text('เข้าสู่ระบบ'),
               ),
+              const SizedBox(height: 20),
+              const SocialLoginButtons(),
               const SizedBox(height: 12),
               Center(
                 child: TextButton(

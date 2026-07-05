@@ -676,7 +676,7 @@ class _DashboardNav extends StatelessWidget {
           _NavItem(icon: Icons.bar_chart_rounded, label: 'งบ', onTap: () => context.push('/budgets')),
           const SizedBox(width: 40),
           _NavItem(icon: Icons.smart_toy_rounded, label: 'พี่เงิน', onTap: () => context.push('/chat')),
-          _NavItem(icon: Icons.grid_view_rounded, label: 'เมนู', onTap: () => context.push('/profile')),
+          _NavItem(icon: Icons.grid_view_rounded, label: 'เมนู', onTap: () => context.push('/menu')),
         ],
       ),
     );

@@ -9,9 +9,10 @@ type UserRow = {
   monthlyIncome: number;
   level: number;
   streak: number;
+  avatarUrl?: string | null;
 };
 
-function publicUser(u: UserRow) {
+export function publicUser(u: UserRow) {
   return {
     id: u.id,
     email: u.email,
@@ -19,6 +20,7 @@ function publicUser(u: UserRow) {
     monthlyIncome: u.monthlyIncome,
     level: u.level,
     streak: u.streak,
+    avatarUrl: u.avatarUrl ?? null,
   };
 }
 
@@ -44,7 +46,8 @@ export async function registerUser(input: {
 
 export async function loginUser(input: { email: string; password: string }) {
   const user = await prisma.user.findUnique({ where: { email: input.email } });
-  if (!user || !(await verifyPassword(input.password, user.passwordHash))) {
+  if (!user || !user.passwordHash || !(await verifyPassword(input.password, user.passwordHash))) {
+    // ผู้ใช้ OAuth (passwordHash = null) ให้ตอบเหมือนรหัสผิด (ไม่บอกว่าเป็นบัญชี social)
     throw new HttpError(401, 'อีเมลหรือรหัสผ่านไม่ถูกต้อง');
   }
   return { user: publicUser(user), token: signToken(user.id) };

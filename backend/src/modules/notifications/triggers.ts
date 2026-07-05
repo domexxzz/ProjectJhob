@@ -1,25 +1,7 @@
 import { prisma } from '../../lib/prisma';
 import { baht } from '../chat/persona';
-import { sendPush } from './fcm';
-
-/** สร้าง notification (บันทึก DB + ยิง push) แบบกันซ้ำ — type+title เดิมภายใน ~20 ชม. จะไม่สร้างซ้ำ */
-async function createNotification(
-  userId: string,
-  type: string,
-  title: string,
-  body: string,
-  data?: Record<string, unknown>,
-) {
-  const since = new Date(Date.now() - 20 * 60 * 60 * 1000);
-  const dup = await prisma.notification.findFirst({ where: { userId, type, title, createdAt: { gte: since } } });
-  if (dup) return null;
-
-  const n = await prisma.notification.create({
-    data: { userId, type, title, body, data: data ? JSON.stringify(data) : null },
-  });
-  await sendPush(userId, title, body); // no-op ถ้ายังไม่ตั้ง FCM
-  return n;
-}
+import { createNotification } from './create';
+import { runAllUsersSubscriptionReminders } from '../subscriptions/reminders';
 
 /** ตรวจงบรายเดือน → แจ้งเตือน "ใกล้เต็มงบ (≥80%)" / "เกินงบ" */
 export async function runBudgetTriggers(userId: string) {
@@ -107,6 +89,7 @@ export function startNotificationScheduler() {
   if (timer) clearInterval(timer);
   timer = setInterval(() => {
     runAllUsersBudgetTriggers().catch(() => {});
+    runAllUsersSubscriptionReminders().catch(() => {}); // เตือน subscription ที่ใกล้ตัดเงิน
   }, everyMs);
   console.log(`[notif] scheduler เปิด (ทุก ~${Math.round(everyMs / 60000)} นาที)`);
 }
