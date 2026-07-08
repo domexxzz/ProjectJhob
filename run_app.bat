@@ -1,0 +1,6 @@
+@echo off
+echo Starting Backend...
+start cmd /k "cd backend && if not exist .env copy .env.example .env && npm install && npm run db:push && npm run db:seed && npm run dev"
+
+echo Starting Mobile (Web)...
+start cmd /k "cd mobile && C:\src\flutter\bin\flutter.bat run -d chrome --dart-define=API_BASE_URL=http://localhost:4000"

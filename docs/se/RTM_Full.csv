@@ -1,0 +1,11 @@
+﻿Req ID,Module / Feature,User Story / Description,Design (Screen / Diagram),Code File (Implementation),Test Case ID
+REQ-001,Account & Profile,สมัครสมาชิก เข้าสู่ระบบ และจัดการข้อมูลโปรไฟล์,Login UI / Profile Screen,"lib/features/auth/, backend/src/modules/auth/",TC-Auth-01
+REQ-002,Transaction,บันทึกรายรับ-รายจ่ายด้วยตนเอง (Manual Input),Add Transaction UI,lib/features/transactions/add_txn.dart,TC-Txn-01
+REQ-003,OCR Scanner,บันทึกรายจ่ายอัตโนมัติจากการสแกนสลิป/ใบเสร็จ,Scan Slip UI,"lib/features/transactions/ocr_view.dart, backend/src/ocr.ts","TC-01, TC-02"
+REQ-004,SMS Reader,เชื่อมต่อและอ่านข้อความ SMS ของธนาคารเพื่อบันทึกออโต้,background_sms_receiver,lib/features/transactions/sms_receiver.dart,TC-SMS-01
+REQ-005,AI Chat Coach,แชทโต้ตอบถามคำถามการเงินกับ "พี่เงิน" ได้ 24 ชม.,Chat UI,"lib/features/chat/chat_view.dart, backend/src/modules/chat/",TC-03
+REQ-006,Spending Analysis,AI วิเคราะห์พฤติกรรมการใช้เงินส่วนบุคคล,Chat Context View,backend/src/modules/chat/context_builder.ts,TC-AI-01
+REQ-007,Dashboard,แสดงผลกราฟวงกลม/กราฟแท่งสรุปสัดส่วนรายจ่าย,Dashboard UI,"lib/features/dashboard/pie_chart.dart, backend/src/aggregate.ts",TC-Dash-01
+REQ-008,Prediction,ระบบคาดการณ์รายจ่ายล่วงหน้าเพื่อแจ้งเตือนเงินหมด,Prediction Chart UI,python_service/prophet_predict.py,TC-Pred-01
+REQ-009,Goals,กำหนดเป้าหมายการออมเงินพร้อมแถบ Progress Bar,Goal Dashboard,lib/features/goals/goals_view.dart,TC-Goal-01
+REQ-010,Gamification,ระบบสตรีคและเลเวลเพื่อกระตุ้นให้ผู้ใช้ออมเงินสม่ำเสมอ,Profile / Streak Badge UI,"lib/features/profile/streak_badge.dart, backend/src/streak.ts",TC-Game-01
