@@ -191,10 +191,7 @@ class _GreenHeader extends StatelessWidget {
               ],
             ),
           ),
-          IconButton(
-            onPressed: () {},
-            icon: const Icon(Icons.notifications_none_rounded, color: Colors.white, size: 28),
-          ),
+          const NotifBell(),
         ],
       ),
     );

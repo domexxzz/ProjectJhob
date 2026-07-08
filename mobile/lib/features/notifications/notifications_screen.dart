@@ -175,6 +175,8 @@ class _NotifCard extends StatelessWidget {
         return (Icons.warning_amber_rounded, AppColors.warning);
       case 'subscription':
         return (Icons.receipt_long, AppColors.primary);
+      case 'prediction':
+        return (Icons.auto_graph, AppColors.warning);
       case 'goal':
         return (Icons.flag_rounded, AppColors.primary);
       case 'daily_summary':
