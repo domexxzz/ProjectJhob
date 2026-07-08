@@ -48,7 +48,6 @@ class _DepositGoalScreenState extends ConsumerState<DepositGoalScreen> {
         padding: const EdgeInsets.all(24),
         child: Column(
           children: [
-            // Target Goal Icon circle with glow
             Container(
               width: 100,
               height: 100,
@@ -77,7 +76,6 @@ class _DepositGoalScreenState extends ConsumerState<DepositGoalScreen> {
             ),
             const SizedBox(height: 32),
 
-            // Large Amount Input card
             Container(
               padding: const EdgeInsets.symmetric(horizontal: 20, vertical: 16),
               decoration: BoxDecoration(
@@ -113,7 +111,6 @@ class _DepositGoalScreenState extends ConsumerState<DepositGoalScreen> {
             ),
             const SizedBox(height: 24),
 
-            // Preset Amount Grid (3 columns)
             GridView.builder(
               shrinkWrap: true,
               physics: const NeverScrollableScrollPhysics(),
@@ -163,6 +160,7 @@ class _DepositGoalScreenState extends ConsumerState<DepositGoalScreen> {
     final baht = double.tryParse(text) ?? 0;
     if (baht > 0) {
       final satang = Money.toSatang(baht);
+      // ตรงนี้ทำการเชื่อมโยงและส่งข้อมูลเข้า State Notifier ของคุณทันที ทำให้หน้าแรกเปลี่ยนตาม
       ref.read(goalsProvider.notifier).addSavings(widget.goalId, satang);
       context.pop();
       ScaffoldMessenger.of(context).showSnackBar(

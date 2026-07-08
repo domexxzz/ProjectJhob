@@ -84,6 +84,19 @@ class GoalsScreen extends ConsumerWidget {
           ),
         ],
       ),
+      floatingActionButton: FloatingActionButton(
+        onPressed: () async {
+          await context.push('/slip');
+          ref.invalidate(goalsProvider);
+        },
+        backgroundColor: AppColors.primary,
+        foregroundColor: Colors.white,
+        shape: const CircleBorder(),
+        elevation: 6,
+        child: const Icon(Icons.add, size: 28),
+      ),
+      floatingActionButtonLocation: FloatingActionButtonLocation.centerDocked,
+      bottomNavigationBar: const _GoalsNav(),
     );
   }
 }
@@ -450,6 +463,81 @@ class _RecommendationCard extends StatelessWidget {
           ),
           const Icon(Icons.chevron_right_rounded, color: Colors.white54, size: 24),
         ],
+      ),
+    );
+  }
+}
+
+// ─────────────────────────────────────────────────────────────────────────────
+// Bottom Navigation Bar (เหมือนหน้า Dashboard)
+// ─────────────────────────────────────────────────────────────────────────────
+class _GoalsNav extends StatelessWidget {
+  const _GoalsNav();
+
+  @override
+  Widget build(BuildContext context) {
+    return Container(
+      decoration: BoxDecoration(
+        color: const Color(0xFF1A1A1A),
+        borderRadius: const BorderRadius.only(
+          topLeft: Radius.circular(30),
+          topRight: Radius.circular(30),
+        ),
+        boxShadow: [
+          BoxShadow(color: Colors.black.withOpacity(0.3), blurRadius: 12, offset: const Offset(0, -2))
+        ],
+      ),
+      child: BottomAppBar(
+        color: Colors.transparent,
+        elevation: 0,
+        notchMargin: 10,
+        height: 74,
+        padding: EdgeInsets.zero,
+        child: Row(
+          mainAxisAlignment: MainAxisAlignment.spaceAround,
+          children: [
+            _NavItem(icon: Icons.home_outlined, label: 'หน้าหลัก', onTap: () => context.go('/')),
+            _NavItem(icon: Icons.insert_chart_outlined_rounded, label: 'งบ', onTap: () => context.push('/budgets')),
+            const SizedBox(width: 48),
+            _NavItem(icon: Icons.chat_bubble_outline_rounded, label: 'พี่เงิน', onTap: () => context.push('/chat')),
+            _NavItem(icon: Icons.grid_view_rounded, label: 'เมนู', onTap: () => context.push('/menu')),
+          ],
+        ),
+      ),
+    );
+  }
+}
+
+class _NavItem extends StatelessWidget {
+  const _NavItem({required this.icon, required this.label, this.active = false, this.onTap});
+  final IconData icon;
+  final String label;
+  final bool active;
+  final VoidCallback? onTap;
+
+  @override
+  Widget build(BuildContext context) {
+    final color = active ? const Color(0xFF4CD97B) : Colors.white60;
+    return InkWell(
+      onTap: onTap,
+      borderRadius: BorderRadius.circular(16),
+      child: Padding(
+        padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 8),
+        child: Column(
+          mainAxisSize: MainAxisSize.min,
+          children: [
+            Icon(icon, color: color, size: 28),
+            const SizedBox(height: 4),
+            Text(
+              label,
+              style: TextStyle(
+                color: color,
+                fontSize: 11,
+                fontWeight: active ? FontWeight.bold : FontWeight.w500,
+              ),
+            ),
+          ],
+        ),
       ),
     );
   }

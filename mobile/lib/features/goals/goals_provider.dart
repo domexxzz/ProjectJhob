@@ -1,4 +1,5 @@
 import 'package:flutter_riverpod/flutter_riverpod.dart';
+import 'package:hive/hive.dart';
 
 class GoalModel {
   GoalModel({
@@ -47,10 +48,52 @@ class GoalModel {
       createdAt: createdAt ?? this.createdAt,
     );
   }
+
+  Map<String, dynamic> toJson() => {
+        'id': id,
+        'name': name,
+        'target': target,
+        'current': current,
+        'deadline': deadline?.toIso8601String(),
+        'type': type,
+        'emoji': emoji,
+        'createdAt': createdAt.toIso8601String(),
+      };
+
+  factory GoalModel.fromJson(Map<String, dynamic> j) => GoalModel(
+        id: j['id'] as String,
+        name: j['name'] as String,
+        target: j['target'] as int,
+        current: (j['current'] ?? 0) as int,
+        deadline: j['deadline'] != null ? DateTime.parse(j['deadline'] as String) : null,
+        type: (j['type'] ?? 'short') as String,
+        emoji: (j['emoji'] ?? '🎯') as String,
+        createdAt: DateTime.parse(j['createdAt'] as String),
+      );
 }
 
 class GoalsNotifier extends StateNotifier<List<GoalModel>> {
-  GoalsNotifier() : super(_initialGoals());
+  GoalsNotifier() : super([]) {
+    _loadGoals();
+  }
+
+  static const _boxName = 'goals_box';
+
+  Future<void> _loadGoals() async {
+    final box = await Hive.openBox(_boxName);
+    final List? cached = box.get('goals');
+    if (cached != null) {
+      state = cached.map((item) => GoalModel.fromJson(Map<String, dynamic>.from(item as Map))).toList();
+    } else {
+      state = _initialGoals();
+      await _saveToHive();
+    }
+  }
+
+  Future<void> _saveToHive() async {
+    final box = await Hive.openBox(_boxName);
+    await box.put('goals', state.map((g) => g.toJson()).toList());
+  }
 
   static List<GoalModel> _initialGoals() {
     return [
@@ -99,6 +142,7 @@ class GoalsNotifier extends StateNotifier<List<GoalModel>> {
       createdAt: DateTime.now(),
     );
     state = [...state, newGoal];
+    _saveToHive();
   }
 
   void updateGoal(String id, String name, int target, DateTime? deadline, String type, String emoji) {
@@ -114,10 +158,12 @@ class GoalsNotifier extends StateNotifier<List<GoalModel>> {
       }
       return g;
     }).toList();
+    _saveToHive();
   }
 
   void deleteGoal(String id) {
     state = state.where((g) => g.id != id).toList();
+    _saveToHive();
   }
 
   void addSavings(String goalId, int amount) {
@@ -127,6 +173,7 @@ class GoalsNotifier extends StateNotifier<List<GoalModel>> {
       }
       return g;
     }).toList();
+    _saveToHive();
   }
 }
 

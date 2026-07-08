@@ -1,5 +1,7 @@
+import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:go_router/go_router.dart';
+
 import '../features/auth/auth_controller.dart';
 import '../features/auth/login_screen.dart';
 import '../features/auth/register_screen.dart';
@@ -25,7 +27,7 @@ import '../features/subscriptions/subscriptions_screen.dart';
 import '../features/notifications/notifications_screen.dart';
 import '../features/menu/menu_screen.dart';
 import '../features/predictions/predictions_screen.dart';
-
+import '../features/goals/set_deadline_screen.dart';
 /// Set เป็น true หลังจากผ่าน Welcome3 แล้วกด "เริ่มต้นใช้งาน"
 /// ใช้ควบคุม redirect ไม่ให้ข้าม Login page เมื่อมี token เดิมค้างอยู่
 final onboardingDoneProvider = StateProvider<bool>((ref) => false);
@@ -110,6 +112,16 @@ final routerProvider = Provider<GoRouter>((ref) {
           return DepositGoalScreen(goalId: id ?? '');
         },
       ),
+      GoRoute(
+  path: '/goals/duration',
+  builder: (context, state) {
+    final extra = state.extra as Map<String, DateTime?>?;
+    return SetDeadlineScreen(
+      initialStartDate: extra?['startDate'],
+      initialEndDate: extra?['endDate'],
+    );
+  },
+),
     ],
   );
 });

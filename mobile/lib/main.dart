@@ -1,6 +1,7 @@
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:hive_flutter/hive_flutter.dart';
+import 'package:intl/date_symbol_data_local.dart';
 
 import 'app/router.dart';
 import 'app/theme.dart';
@@ -25,6 +26,8 @@ Future<void> main() async {
     await Hive.initFlutter();
     debugPrint('Opening Hive box...');
     await Hive.openBox('cache');
+    // เริ่มต้นข้อมูล locale สำหรับ DateFormat ภาษาไทย
+    await initializeDateFormatting('th');
     debugPrint('Running app...');
     runApp(const ProviderScope(child: FinanceCoachApp()));
   } catch (e, stack) {
