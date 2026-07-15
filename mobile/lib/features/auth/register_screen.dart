@@ -144,27 +144,7 @@ class _RegisterScreenState extends ConsumerState<RegisterScreen> {
                 ),
               ),
 
-              const SizedBox(height: 28),
-              // ตัวคั่น "or continue with" ดีไซน์แบบเดียวกับหน้า Login
-              Row(
-                children: [
-                  const Expanded(child: Divider(color: _kFieldBorder)),
-                  Padding(
-                    padding: const EdgeInsets.symmetric(horizontal: 12),
-                    child: Text(
-                      'or continue with',
-                      style: TextStyle(color: _kHint, fontSize: 13),
-                    ),
-                  ),
-                  const Expanded(child: Divider(color: _kFieldBorder)),
-                ],
-              ),
-              const SizedBox(height: 20),
-
-              // ดึงแถบปุ่ม SocialLoginButtons ตัวเดียวกับหน้า Login มาแสดงเพื่อความเหมือนเป๊ะ
-              Center(
-                child: const SocialLoginButtons(),
-              ),
+         
 
               const SizedBox(height: 24),
               // ลิงก์สลับกลับไปหน้าล็อกอินดีไซน์ RichText ตัวเดียวกับหน้า Login
