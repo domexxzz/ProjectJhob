@@ -84,18 +84,24 @@ class _ChatScreenState extends ConsumerState<ChatScreen> {
     }
   }
 
-  Future<void> _send(String text) async {
+  Future<void> _send(String text, {String? imageBase64}) async {
     final msg = text.trim();
     if (msg.isEmpty || _sending) return;
     if (_listening) await _stopListening();
     _controller.clear();
     setState(() {
-      _messages.add(ChatMessage(id: 'local', role: 'user', content: msg, createdAt: DateTime.now()));
+      _messages.add(ChatMessage(
+        id: 'local',
+        role: 'user',
+        content: msg,
+        createdAt: DateTime.now(),
+        hasImage: imageBase64 != null,
+      ));
       _sending = true;
     });
     _scrollToBottom();
     try {
-      final reply = await ref.read(chatRepoProvider).send(msg);
+      final reply = await ref.read(chatRepoProvider).send(msg, imageBase64: imageBase64);
       if (!mounted) return;
       setState(() {
         _messages.add(reply);
@@ -144,21 +150,23 @@ class _ChatScreenState extends ConsumerState<ChatScreen> {
       final XFile? file = await _picker.pickImage(
         source: ImageSource.gallery,
         imageQuality: 70,
-        maxWidth: 1600, // ย่อรูปให้เบา OCR เร็วขึ้น + ไม่เกิน body limit
+        maxWidth: 1600,
       );
       if (file == null) return;
       setState(() => _attaching = true);
       final bytes = await file.readAsBytes();
       final dataUrl = 'data:image/jpeg;base64,${base64Encode(bytes)}';
-      final text = await ref.read(chatRepoProvider).ocrImage(dataUrl);
+      
       if (!mounted) return;
-      setState(() {
-        _attaching = false;
-        if (text.trim().isNotEmpty) {
-          _controller.text = 'จากรูปที่ส่งมา:\n$text\n\nช่วยวิเคราะห์/แนะนำหน่อย';
-        }
-      });
-      if (text.trim().isEmpty) _snack('อ่านรูปไม่ได้ ลองพิมพ์ข้อมูลจากรูปแทนนะ');
+      setState(() => _attaching = false);
+      
+      // ดึงข้อความในช่องพิมพ์มาส่งร่วมด้วย หากไม่มีจะใช้ข้อความเริ่มต้น
+      final textToSend = _controller.text.trim().isNotEmpty
+          ? _controller.text.trim()
+          : 'ช่วยวิเคราะห์รูปภาพนี้ให้หน่อยครับ';
+          
+      _controller.clear();
+      _send(textToSend, imageBase64: dataUrl);
     } catch (e) {
       if (mounted) setState(() => _attaching = false);
       _snack('แนบรูปไม่สำเร็จ: $e');
@@ -377,6 +385,17 @@ class _Bubble extends StatelessWidget {
           crossAxisAlignment: CrossAxisAlignment.start,
           mainAxisSize: MainAxisSize.min,
           children: [
+            if (isUser && message.hasImage) ...[
+              const Row(
+                mainAxisSize: MainAxisSize.min,
+                children: [
+                  Icon(Icons.image_outlined, color: Colors.white70, size: 16),
+                  SizedBox(width: 6),
+                  Text('ส่งรูปภาพแล้ว', style: TextStyle(color: Colors.white70, fontSize: 12, fontWeight: FontWeight.w500)),
+                ],
+              ),
+              const SizedBox(height: 6),
+            ],
             isUser
                 ? Text(message.content, style: const TextStyle(color: Colors.white, height: 1.4))
                 : animate

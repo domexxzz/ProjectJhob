@@ -8,6 +8,7 @@ import type { Subscription } from '@prisma/client';
 import { runSubscriptionReminders } from './reminders';
 import { importSubscriptionsFromGmail } from './gmail_import';
 import { buildGmailAuthUrl } from './gmail_oauth';
+import { runPredictionTriggers } from '../predictions/prediction_triggers';
 
 // 💡 DM-5 — Subscription Tracker (Netflix/Spotify/YouTube รายเดือน) · จำนวนเงินเป็นสตางค์
 
@@ -58,6 +59,13 @@ subscriptionsRouter.post(
       data: { userId: req.userId!, ...data },
     });
     await cache.delPattern(`user:${req.userId!}:*`);
+
+    // รันการคำนวณเตือนบิลล่วงหน้าและประมวลผลทำนายเงินใหม่ทันทีเมื่อมีการบันทึก Subscription ใหม่
+    Promise.all([
+      runSubscriptionReminders(req.userId!),
+      runPredictionTriggers(req.userId!),
+    ]).catch((err) => console.error('[Background Subscription Triggers] Failed:', err));
+
     res.status(201).json({ subscription });
   }),
 );
@@ -72,6 +80,13 @@ subscriptionsRouter.patch(
 
     const subscription = await prisma.subscription.update({ where: { id: req.params.id }, data });
     await cache.delPattern(`user:${req.userId!}:*`);
+
+    // รันแจ้งเตือนบิลและทำนายใหม่เมื่อมีการแก้ไขรอบบิล/ยอดเงิน Subscription
+    Promise.all([
+      runSubscriptionReminders(req.userId!),
+      runPredictionTriggers(req.userId!),
+    ]).catch((err) => console.error('[Background Subscription Triggers] Failed:', err));
+
     res.json({ subscription });
   }),
 );
@@ -85,6 +100,13 @@ subscriptionsRouter.delete(
 
     await prisma.subscription.delete({ where: { id: req.params.id } });
     await cache.delPattern(`user:${req.userId!}:*`);
+
+    // รันทำนายใหม่และอัปเดตสถานะแจ้งเตือนเมื่อลบรายการ Subscription ออก
+    Promise.all([
+      runSubscriptionReminders(req.userId!),
+      runPredictionTriggers(req.userId!),
+    ]).catch((err) => console.error('[Background Subscription Triggers] Failed:', err));
+
     res.json({ ok: true });
   }),
 );

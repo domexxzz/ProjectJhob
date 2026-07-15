@@ -116,3 +116,23 @@ Color hexColor(String hex) {
   return Color(int.parse(h, radix: 16));
 }
 
+/// ➕ คลาสตำแหน่งปุ่มบวก (FAB) พิเศษสำหรับเดโม — ล็อกไม่ให้ปุ่มโดนดันขึ้นโดย SnackBar
+class FixedCenterDockedFabLocation extends FloatingActionButtonLocation {
+  const FixedCenterDockedFabLocation();
+
+  @override
+  Offset getOffset(ScaffoldPrelayoutGeometry geometry) {
+    final double buttonX = (geometry.scaffoldSize.width - geometry.floatingActionButtonSize.width) / 2.0;
+    
+    // contentBottom คือพิกัด Y ของจุดเริ่มต้นแถบเมนูด้านล่างพอดี (ไม่ได้รับผลกระทบจาก SnackBar)
+    final double contentBottom = geometry.contentBottom;
+    final double buttonHeight = geometry.floatingActionButtonSize.height;
+    
+    final double buttonY = contentBottom - (buttonHeight / 2.0);
+    return Offset(buttonX, buttonY);
+  }
+}
+
+const kFixedCenterDockedFabLocation = FixedCenterDockedFabLocation();
+
+

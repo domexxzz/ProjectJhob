@@ -15,8 +15,11 @@ class ChatRepository {
         .toList();
   }
 
-  Future<ChatMessage> send(String message) async {
-    final res = await _dio.post('/chat', data: {'message': message});
+  Future<ChatMessage> send(String message, {String? imageBase64}) async {
+    final res = await _dio.post('/chat', data: {
+      'message': message,
+      if (imageBase64 != null) 'imageBase64': imageBase64,
+    });
     return ChatMessage.fromJson((res.data as Map<String, dynamic>)['message'] as Map<String, dynamic>);
   }
 

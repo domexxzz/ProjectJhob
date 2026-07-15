@@ -32,6 +32,7 @@ class ChatMessage {
     required this.content,
     required this.createdAt,
     this.attachment,
+    this.hasImage = false,
   });
 
   final String id;
@@ -39,18 +40,25 @@ class ChatMessage {
   final String content;
   final DateTime createdAt;
   final ChatAttachment? attachment;
+  final bool hasImage;
 
   bool get isUser => role == 'user';
 
   factory ChatMessage.fromJson(Map<String, dynamic> j) {
     // attachment ฝังมาใน context (JSON: {source, attachment}) — ใช้ได้ทั้งข้อความใหม่และประวัติ
     ChatAttachment? att;
+    bool hasImg = false;
     final ctx = j['context'];
     if (ctx is String && ctx.isNotEmpty) {
       try {
         final parsed = jsonDecode(ctx);
-        if (parsed is Map && parsed['attachment'] is Map) {
-          att = ChatAttachment.fromJson(Map<String, dynamic>.from(parsed['attachment'] as Map));
+        if (parsed is Map) {
+          if (parsed['attachment'] is Map) {
+            att = ChatAttachment.fromJson(Map<String, dynamic>.from(parsed['attachment'] as Map));
+          }
+          if (parsed['hasImage'] == true) {
+            hasImg = true;
+          }
         }
       } catch (_) {}
     }
@@ -60,6 +68,7 @@ class ChatMessage {
       content: j['content'] as String,
       createdAt: DateTime.parse(j['createdAt'] as String),
       attachment: att,
+      hasImage: hasImg,
     );
   }
 }

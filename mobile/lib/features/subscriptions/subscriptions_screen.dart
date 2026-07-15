@@ -7,6 +7,9 @@ import 'package:url_launcher/url_launcher.dart';
 import '../../app/theme.dart';
 import '../../core/money.dart';
 import 'subscriptions_repository.dart';
+import '../notifications/notifications_repository.dart';
+import '../predictions/predictions_service.dart';
+import '../transactions/transactions_repository.dart';
 
 class SubscriptionsScreen extends ConsumerWidget {
   const SubscriptionsScreen({super.key});
@@ -108,31 +111,138 @@ class SubscriptionsScreen extends ConsumerWidget {
     );
   }
 
-  /// นำเข้า subscription จาก Gmail — server-side OAuth (robust)
-  /// ขอ URL จาก backend → เปิดหน้ายินยอม Google เต็มหน้า → backend จัดการ callback + import เอง
+  /// นำเข้า subscription จาก Gmail — รองรับทั้ง Mockup (สำหรับนำเสนอ) และ OAuth จริง
   Future<void> _importGmail(BuildContext context, WidgetRef ref) async {
-    final messenger = ScaffoldMessenger.of(context);
-    try {
-      final url = await ref.read(subscriptionsRepoProvider).gmailAuthUrl();
-      final ok = await launchUrl(
-        Uri.parse(url),
-        webOnlyWindowName: '_blank', // เปิดแท็บใหม่บนเว็บ
-        mode: LaunchMode.externalApplication,
-      );
-      if (!ok) {
-        messenger.showSnackBar(const SnackBar(content: Text('เปิดหน้ายินยอม Google ไม่ได้')));
-        return;
-      }
-      messenger.showSnackBar(const SnackBar(
-        content: Text('เปิดหน้ายินยอม Google แล้ว 📧 · เสร็จแล้วกลับมาที่นี่ ลากลงเพื่อรีเฟรช'),
-        duration: Duration(seconds: 5),
-      ));
-    } catch (e) {
-      final msg = e is DioException
-          ? (e.response?.data is Map ? (e.response!.data['message'] ?? e.message) : e.message)
-          : e;
-      messenger.showSnackBar(SnackBar(content: Text('นำเข้าไม่สำเร็จ: $msg')));
-    }
+    showModalBottomSheet(
+      context: context,
+      backgroundColor: const Color(0xFF1C1C1C),
+      shape: const RoundedRectangleBorder(
+        borderRadius: BorderRadius.vertical(top: Radius.circular(24)),
+      ),
+      builder: (sheetContext) => _GmailSyncMockup(
+        onMockSelected: (email) async {
+          Navigator.pop(sheetContext); // ปิดแผ่นตัวเลือกโดยใช้ sheetContext
+          
+          // แสดง Loading สเต็ปแรก (ใช้ context หลักของหน้าจอเพื่อให้ปลอดภัยหลัง sheet ปิดตัว)
+          showDialog(
+            context: context,
+            barrierDismissible: false,
+            builder: (_) => const _LoadingDialog(
+              message: 'กำลังตรวจสอบการยินยอมสิทธิ์กับบัญชี Google...',
+            ),
+          );
+
+          await Future.delayed(const Duration(seconds: 1));
+          if (!context.mounted) return;
+          Navigator.pop(context); // ปิด Loading แรก
+
+          // แสดง Loading สเต็ปสอง
+          showDialog(
+            context: context,
+            barrierDismissible: false,
+            builder: (_) => const _LoadingDialog(
+              message: 'เข้าสู่ระบบสำเร็จ! กำลังสแกนหาจดหมายใบเสร็จค่าบริการรายเดือน (Subscription)...',
+            ),
+          );
+
+          await Future.delayed(const Duration(seconds: 2));
+
+          try {
+            final repo = ref.read(subscriptionsRepoProvider);
+            // บันทึกรายการจำลอง 3 ตัวเข้าระบบฐานข้อมูลจริง
+            await repo.create(
+              name: 'Netflix Premium',
+              amount: 41900, // 419 บาท
+              cycle: 'monthly',
+              nextBilling: DateTime.now().add(const Duration(days: 14)),
+              logo: '🎬',
+            );
+            await repo.create(
+              name: 'Spotify Family',
+              amount: 20900, // 209 บาท
+              cycle: 'monthly',
+              nextBilling: DateTime.now().add(const Duration(days: 22)),
+              logo: '🎵',
+            );
+            await repo.create(
+              name: 'YouTube Premium',
+              amount: 15900, // 159 บาท
+              cycle: 'monthly',
+              nextBilling: DateTime.now().add(const Duration(days: 5)),
+              logo: '📺',
+            );
+
+            // เคลียร์และโหลดข้อมูล Providers ใหม่ทั้งหมดเพื่อให้หน้าจออื่นๆ อัปเดตทันที
+            ref.invalidate(subscriptionsProvider);
+            ref.invalidate(dashboardProvider);
+            ref.invalidate(predictionsProvider);
+            ref.invalidate(notificationsProvider);
+
+            if (!context.mounted) return;
+            Navigator.pop(context); // ปิด Loading สแกน
+
+            // โชว์กล่องสำเร็จ
+            showDialog(
+              context: context,
+              builder: (context) => AlertDialog(
+                backgroundColor: const Color(0xFF1E1E1E),
+                shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(16)),
+                title: const Row(
+                  children: [
+                    Icon(Icons.check_circle_outline, color: AppColors.primary),
+                    SizedBox(width: 8),
+                    Text('ซิงค์ข้อมูลสำเร็จ', style: TextStyle(color: Colors.white, fontSize: 16)),
+                  ],
+                ),
+                content: const Text(
+                  'เชื่อมต่อ Gmail บัญชีจำลองสำเร็จ! ตรวจพบค่าบริการรายเดือน (Subscription) ทั้งหมด 3 รายการ:\n\n- Netflix Premium\n- Spotify Family\n- YouTube Premium\n\nระบบสแกนและนำเข้าสรุปยอดเป็นรายจ่ายคงที่ให้อัตโนมัติแล้วครับ 💳',
+                  style: TextStyle(color: Colors.white70, fontSize: 13, height: 1.4),
+                ),
+                actions: [
+                  TextButton(
+                    onPressed: () => Navigator.pop(context),
+                    child: const Text('ตกลง', style: TextStyle(color: AppColors.primary, fontWeight: FontWeight.bold)),
+                  )
+                ],
+              ),
+            );
+          } catch (e) {
+            if (context.mounted) {
+              Navigator.pop(context);
+              ScaffoldMessenger.of(context).showSnackBar(
+                SnackBar(content: Text('ซิงค์จำลองล้มเหลว: $e')),
+              );
+            }
+          }
+        },
+        onRealAuthSelected: () async {
+          Navigator.pop(sheetContext); // ปิดแผ่นตัวเลือกโดยใช้ sheetContext
+          
+          final messenger = ScaffoldMessenger.of(context);
+          try {
+            final url = await ref.read(subscriptionsRepoProvider).gmailAuthUrl();
+            final ok = await launchUrl(
+              Uri.parse(url),
+              webOnlyWindowName: '_blank', // เปิดแท็บใหม่บนเว็บ
+              mode: LaunchMode.externalApplication,
+            );
+            if (!ok) {
+              messenger.showSnackBar(const SnackBar(content: Text('เปิดหน้ายินยอม Google ไม่ได้')));
+              return;
+            }
+            messenger.showSnackBar(const SnackBar(
+              content: Text('เปิดหน้ายินยอม Google แล้ว 📧 · เสร็จแล้วกลับมาที่นี่ ลากลงเพื่อรีเฟรช'),
+              duration: Duration(seconds: 5),
+            ));
+          } catch (e) {
+            final msg = e is DioException
+                ? (e.response?.data is Map ? (e.response!.data['message'] ?? e.message) : e.message)
+                : e;
+            messenger.showSnackBar(SnackBar(content: Text('นำเข้าไม่สำเร็จ: $msg')));
+          }
+        },
+      ),
+    );
   }
 }
 
@@ -440,6 +550,180 @@ class _CycleChip extends StatelessWidget {
           borderRadius: BorderRadius.circular(20),
         ),
         child: Text(label, style: TextStyle(color: selected ? Colors.white : Colors.white54, fontWeight: FontWeight.w600)),
+      ),
+    );
+  }
+}
+
+/// ➕ วิดเจ็ตแผ่น Mockup เชื่อมต่อ Gmail สำหรับเดโมเสนอผลงาน
+class _GmailSyncMockup extends StatelessWidget {
+  const _GmailSyncMockup({
+    required this.onMockSelected,
+    required this.onRealAuthSelected,
+  });
+
+  final Function(String) onMockSelected;
+  final VoidCallback onRealAuthSelected;
+
+  @override
+  Widget build(BuildContext context) {
+    return SafeArea(
+      child: Padding(
+        padding: const EdgeInsets.fromLTRB(20, 24, 20, 28),
+        child: Column(
+          mainAxisSize: MainAxisSize.min,
+          crossAxisAlignment: CrossAxisAlignment.start,
+          children: [
+            Row(
+              children: [
+                const Icon(Icons.mail_outline, color: AppColors.primary, size: 24),
+                const SizedBox(width: 10),
+                const Text(
+                  'เชื่อมต่อ Gmail เพื่อวิเคราะห์บิล',
+                  style: TextStyle(color: Colors.white, fontSize: 18, fontWeight: FontWeight.bold),
+                ),
+              ],
+            ),
+            const SizedBox(height: 8),
+            const Text(
+              'เลือกซิงค์กับบัญชี Gmail จำลองเพื่อการนำเสนอผลงาน (จะได้รับข้อมูล Subscription 3 รายการทันที) หรือเลือกเชื่อมต่อด้วย OAuth 2.0 จริง',
+              style: TextStyle(color: Colors.white54, fontSize: 12, height: 1.45),
+            ),
+            const SizedBox(height: 20),
+            // บัญชีจำลอง 1
+            _AccountTile(
+              name: 'Dome Teenlek (Mockup)',
+              email: 'dometeenlek@gmail.com',
+              avatarText: 'D',
+              onTap: () => onMockSelected('dometeenlek@gmail.com'),
+            ),
+            const SizedBox(height: 8),
+            // บัญชีจำลอง 2
+            _AccountTile(
+              name: 'Demo Account (Mockup)',
+              email: 'demo@bestimove.ai',
+              avatarText: 'D',
+              onTap: () => onMockSelected('demo@bestimove.ai'),
+            ),
+            const SizedBox(height: 12),
+            const Divider(color: Colors.white12),
+            const SizedBox(height: 8),
+            // เชื่อมจริง
+            InkWell(
+              onTap: onRealAuthSelected,
+              borderRadius: BorderRadius.circular(12),
+              child: Container(
+                padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 14),
+                decoration: BoxDecoration(
+                  border: Border.all(color: AppColors.primary.withOpacity(0.4)),
+                  borderRadius: BorderRadius.circular(12),
+                  color: const Color(0xFF142B1A),
+                ),
+                child: const Row(
+                  children: [
+                    Icon(Icons.lock_outline, color: AppColors.primary, size: 18),
+                    SizedBox(width: 12),
+                    Expanded(
+                      child: Text(
+                        'ใช้บัญชีอื่น (เชื่อมต่อ OAuth 2.0 จริง)',
+                        style: TextStyle(color: AppColors.primary, fontWeight: FontWeight.bold, fontSize: 13),
+                      ),
+                    ),
+                    Icon(Icons.chevron_right, color: AppColors.primary, size: 18),
+                  ],
+                ),
+              ),
+            ),
+          ],
+        ),
+      ),
+    );
+  }
+}
+
+/// วิดเจ็ตรายการบัญชี Gmail
+class _AccountTile extends StatelessWidget {
+  const _AccountTile({
+    required this.name,
+    required this.email,
+    required this.avatarText,
+    required this.onTap,
+  });
+
+  final String name;
+  final String email;
+  final String avatarText;
+  final VoidCallback onTap;
+
+  @override
+  Widget build(BuildContext context) {
+    return InkWell(
+      onTap: onTap,
+      borderRadius: BorderRadius.circular(12),
+      child: Container(
+        padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 12),
+        decoration: BoxDecoration(
+          color: Colors.white.withOpacity(0.04),
+          borderRadius: BorderRadius.circular(12),
+          border: Border.all(color: Colors.white.withOpacity(0.06)),
+        ),
+        child: Row(
+          children: [
+            CircleAvatar(
+              backgroundColor: const Color(0xFF333333),
+              radius: 18,
+              child: Text(
+                avatarText,
+                style: const TextStyle(color: Colors.white, fontSize: 14, fontWeight: FontWeight.bold),
+              ),
+            ),
+            const SizedBox(width: 14),
+            Expanded(
+              child: Column(
+                crossAxisAlignment: CrossAxisAlignment.start,
+                children: [
+                  Text(name, style: const TextStyle(color: Colors.white, fontWeight: FontWeight.w600, fontSize: 13)),
+                  const SizedBox(height: 2),
+                  Text(email, style: const TextStyle(color: Colors.white38, fontSize: 11)),
+                ],
+              ),
+            ),
+            const Icon(Icons.arrow_forward_ios_rounded, color: Colors.white24, size: 14),
+          ],
+        ),
+      ),
+    );
+  }
+}
+
+/// วิดเจ็ต Dialog โหลดจำลองขั้นตอนทำงานของระบบ
+class _LoadingDialog extends StatelessWidget {
+  const _LoadingDialog({required this.message});
+  final String message;
+
+  @override
+  Widget build(BuildContext context) {
+    return AlertDialog(
+      backgroundColor: const Color(0xFF1E1E1E),
+      shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(16)),
+      content: Padding(
+        padding: const EdgeInsets.symmetric(vertical: 8),
+        child: Row(
+          children: [
+            const SizedBox(
+              width: 24,
+              height: 24,
+              child: CircularProgressIndicator(color: AppColors.primary, strokeWidth: 3),
+            ),
+            const SizedBox(width: 20),
+            Expanded(
+              child: Text(
+                message,
+                style: const TextStyle(color: Colors.white70, fontSize: 12, height: 1.45),
+              ),
+            ),
+          ],
+        ),
       ),
     );
   }

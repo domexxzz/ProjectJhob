@@ -7,6 +7,8 @@ import { prisma } from '../../lib/prisma';
 import { parseAmount, parseDate, parseRef, parseMerchant, autoCategorize } from './parser';
 import { cache } from '../../lib/cache';
 import { ocrImage } from '../chat/coach';
+import { runBudgetTriggers } from '../notifications/triggers';
+import { runPredictionTriggers } from '../predictions/prediction_triggers';
 
 export const transactionsRouter = Router();
 transactionsRouter.use(requireAuth);
@@ -97,7 +99,14 @@ transactionsRouter.get(
 transactionsRouter.post(
   '/',
   asyncHandler(async (req, res) => {
-    const data = createTransactionSchema.parse(req.body);
+    console.log('[DEBUG] Incoming POST /transactions body:', req.body);
+    let data;
+    try {
+      data = createTransactionSchema.parse(req.body);
+    } catch (err) {
+      console.error('[DEBUG] Zod validation error details:', err);
+      throw err;
+    }
 
     const anomalyAlert = await checkAnomaly(
       req.userId!,
@@ -120,6 +129,12 @@ transactionsRouter.post(
     });
 
     await cache.delPattern(`user:${req.userId!}:*`);
+
+    // รันการคำนวณทำนายเงินคงเหลือและการเตือนงบแบบ background ทันทีที่มีรายการใหม่
+    Promise.all([
+      runBudgetTriggers(req.userId!),
+      runPredictionTriggers(req.userId!),
+    ]).catch((err) => console.error('[Background Triggers] Failed:', err));
 
     res.status(201).json({
       transaction,
@@ -320,6 +335,12 @@ transactionsRouter.patch(
 
     await cache.delPattern(`user:${req.userId!}:*`);
 
+    // รันทำนายและเตือนงบใหม่เมื่อมีการแก้ไขรายการธุรกรรม
+    Promise.all([
+      runBudgetTriggers(req.userId!),
+      runPredictionTriggers(req.userId!),
+    ]).catch((err) => console.error('[Background Triggers] Failed:', err));
+
     res.json({
       transaction,
       ...(anomalyAlert ? { anomalyAlert } : {}),
@@ -339,6 +360,12 @@ transactionsRouter.delete(
     await prisma.transaction.delete({ where: { id: req.params.id } });
 
     await cache.delPattern(`user:${req.userId!}:*`);
+
+    // รันทำนายและเตือนงบใหม่เมื่อมีการลบรายการธุรกรรม
+    Promise.all([
+      runBudgetTriggers(req.userId!),
+      runPredictionTriggers(req.userId!),
+    ]).catch((err) => console.error('[Background Triggers] Failed:', err));
 
     res.json({ ok: true });
   }),

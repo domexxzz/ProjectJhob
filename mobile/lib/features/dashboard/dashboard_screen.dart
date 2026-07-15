@@ -8,6 +8,8 @@ import '../auth/auth_controller.dart';
 import '../transactions/transaction.dart';
 import '../transactions/transactions_repository.dart';
 import '../notifications/notif_bell.dart';
+import '../goals/goals_provider.dart';
+
 
 // ─────────────────────────────────────────────────────────────────────────────
 // Dashboard Screen (Main) - Premium Dark UI Redesign
@@ -52,26 +54,15 @@ class DashboardScreen extends ConsumerWidget {
                       onRetry: () => ref.invalidate(dashboardProvider),
                     ),
                     data: (d) {
-  int totalIncome = 0;
-  int totalExpense = 0;
-  
-  for (final t in d.items) {
-    if (t.type == 'income') {
-      totalIncome += t.amount;
-    } else {
-      totalExpense += t.amount;
-    }
-  }
-  
-  final balance = totalIncome - totalExpense;
+  final summary = ref.watch(balanceSummaryProvider);
 
   return Column(
     crossAxisAlignment: CrossAxisAlignment.start,
     children: [
       _BalanceCard(
-        balance: balance,
-        income: totalIncome,
-        expense: totalExpense,
+        balance: summary.balance,
+        income: summary.income,
+        expense: summary.expense,
       ),
       const SizedBox(height: 16),
 
@@ -109,6 +100,7 @@ class DashboardScreen extends ConsumerWidget {
           onPressed: () async {
             await context.push('/slip'); // ปุ่ม + → หน้าเลือกสลิป
             ref.invalidate(dashboardProvider);
+            await ref.read(dashboardProvider.future); // รอโหลดเสร็จให้ balance อัปเดตทันที
           },
           backgroundColor: const Color(0xFF3CAE63),
           foregroundColor: Colors.black,
@@ -117,7 +109,7 @@ class DashboardScreen extends ConsumerWidget {
           child: const Icon(Icons.add, size: 32),
         ),
       ),
-      floatingActionButtonLocation: FloatingActionButtonLocation.centerDocked,
+      floatingActionButtonLocation: kFixedCenterDockedFabLocation,
       bottomNavigationBar: const _DashboardNav(),
     );
   }
@@ -238,6 +230,7 @@ class _BalanceCard extends ConsumerWidget {
                 onTap: () async {
                   await context.push('/edit-balance');
                   ref.invalidate(dashboardProvider); // ดึงยอดใหม่ทันทีที่กลับมา
+                  await ref.read(dashboardProvider.future);
                 },
                 child: const Icon(Icons.edit_outlined, size: 16, color: Colors.white38),
               ),
@@ -249,7 +242,7 @@ class _BalanceCard extends ConsumerWidget {
             mainAxisAlignment: MainAxisAlignment.spaceBetween,
             children: [
               Text(
-                '${Money.formatBaht(balance)} ฿',
+                Money.formatBaht(balance),
                 style: const TextStyle(
                   color: Colors.white,
                   fontSize: 30,
@@ -292,72 +285,204 @@ class _MiniStatRow extends StatelessWidget {
   }
 }
 
+
 // ─────────────────────────────────────────────────────────────────────────────
-// Goals Card (เป้าหมาย)
+// Goals Card (เป้าหมาย) — สไลด์เปลี่ยนดูเป้าหมายอื่นได้ พร้อมอัปเดตข้อมูลจริงเรียลไทม์
 // ─────────────────────────────────────────────────────────────────────────────
-class _GoalsCard extends ConsumerWidget {
+class _GoalsCard extends ConsumerStatefulWidget {
   const _GoalsCard();
 
   @override
-  Widget build(BuildContext context, WidgetRef ref) {
-    return Container(
-      padding: const EdgeInsets.all(18),
-      decoration: BoxDecoration(
-        gradient: const LinearGradient(
-          colors: [Color(0xFF262626), Color(0xFF907116), Color(0xFFFBBC05)],
-          begin: Alignment.centerLeft,
-          end: Alignment.centerRight,
+  ConsumerState<_GoalsCard> createState() => _GoalsCardState();
+}
+
+class _GoalsCardState extends ConsumerState<_GoalsCard> {
+  int _currentPage = 0;
+  late final PageController _pageController;
+
+  @override
+  void initState() {
+    super.initState();
+    _pageController = PageController();
+  }
+
+  @override
+  void dispose() {
+    _pageController.dispose();
+    super.dispose();
+  }
+
+  @override
+  Widget build(BuildContext context) {
+    final goals = ref.watch(goalsProvider);
+
+    if (goals.isEmpty) {
+      return GestureDetector(
+        onTap: () => context.push('/goals'),
+        child: Container(
+          width: double.infinity,
+          padding: const EdgeInsets.all(20),
+          decoration: BoxDecoration(
+            borderRadius: BorderRadius.circular(20),
+            gradient: const LinearGradient(
+              colors: [Color(0xFF262626), Color(0xFF1E293B)],
+              begin: Alignment.topLeft,
+              end: Alignment.bottomRight,
+            ),
+            border: Border.all(color: Colors.white.withOpacity(0.08)),
+          ),
+          child: const Column(
+            children: [
+              Row(
+                mainAxisAlignment: MainAxisAlignment.spaceBetween,
+                children: [
+                  Text('เป้าหมาย', style: TextStyle(color: Colors.white70, fontSize: 14, fontWeight: FontWeight.w500)),
+                  Icon(Icons.add_circle_outline, color: AppColors.primary, size: 20),
+                ],
+              ),
+              SizedBox(height: 24),
+              Icon(Icons.track_changes_rounded, color: Colors.white24, size: 40),
+              SizedBox(height: 12),
+              Text(
+                'ยังไม่มีเป้าหมายการเงินในขณะนี้',
+                style: TextStyle(color: Colors.white70, fontSize: 14, fontWeight: FontWeight.bold),
+              ),
+              SizedBox(height: 4),
+              Text(
+                'แตะที่นี่เพื่อตั้งเป้าหมายแรกและเริ่มจดเงินออม 🎯',
+                style: TextStyle(color: Colors.white54, fontSize: 11),
+              ),
+            ],
+          ),
         ),
-        borderRadius: BorderRadius.circular(20),
-        border: Border.all(color: Colors.white.withOpacity(0.05)),
-        boxShadow: [
-          BoxShadow(color: Colors.black.withOpacity(0.15), blurRadius: 8, offset: const Offset(0, 4))
-        ],
-      ),
-      child: Column(
-        crossAxisAlignment: CrossAxisAlignment.start,
-        children: [
+      );
+    }
+
+    return Column(
+      children: [
+        SizedBox(
+          height: 156,
+          child: PageView.builder(
+            controller: _pageController,
+            onPageChanged: (index) => setState(() => _currentPage = index),
+            itemCount: goals.length,
+            itemBuilder: (context, index) {
+              final g = goals[index];
+              
+              // ไล่ระดับสีตามประเภทเป้าหมายเพื่อความพรีเมียม
+              List<Color> gradientColors;
+              Color accentColor;
+              if (g.type == 'medium') {
+                gradientColors = [const Color(0xFF1A1A1A), const Color(0xFF0F3B20), const Color(0xFF227A41)];
+                accentColor = const Color(0xFF56D384);
+              } else if (g.type == 'long') {
+                gradientColors = [const Color(0xFF1A1A1A), const Color(0xFF122847), const Color(0xFF2463AC)];
+                accentColor = const Color(0xFF63B3ED);
+              } else { // short / default
+                gradientColors = [const Color(0xFF1A1A1A), const Color(0xFF634D0E), const Color(0xFFD69E0A)];
+                accentColor = const Color(0xFFFBBC05);
+              }
+
+              final remaining = g.target - g.current;
+              final isSuccess = remaining <= 0;
+
+              return Container(
+                margin: const EdgeInsets.symmetric(horizontal: 2),
+                padding: const EdgeInsets.all(18),
+                decoration: BoxDecoration(
+                  gradient: LinearGradient(
+                    colors: gradientColors,
+                    begin: Alignment.topLeft,
+                    end: Alignment.bottomRight,
+                  ),
+                  borderRadius: BorderRadius.circular(20),
+                  border: Border.all(color: Colors.white.withOpacity(0.08)),
+                  boxShadow: [
+                    BoxShadow(color: Colors.black.withOpacity(0.18), blurRadius: 8, offset: const Offset(0, 4))
+                  ],
+                ),
+                child: Column(
+                  crossAxisAlignment: CrossAxisAlignment.start,
+                  children: [
+                    Row(
+                      mainAxisAlignment: MainAxisAlignment.spaceBetween,
+                      children: [
+                        Row(
+                          children: [
+                            Text(g.emoji, style: const TextStyle(fontSize: 16)),
+                            const SizedBox(width: 8),
+                            const Text(
+                              'เป้าหมาย',
+                              style: TextStyle(color: Colors.white70, fontSize: 13, fontWeight: FontWeight.w500),
+                            ),
+                          ],
+                        ),
+                        GestureDetector(
+                          onTap: () => context.push('/goals'),
+                          child: Icon(Icons.edit_note_rounded, size: 22, color: Colors.white.withOpacity(0.6)),
+                        ),
+                      ],
+                    ),
+                    const SizedBox(height: 12),
+                    Row(
+                      mainAxisAlignment: MainAxisAlignment.spaceBetween,
+                      children: [
+                        Expanded(
+                          child: Text(
+                            g.name,
+                            style: const TextStyle(color: Colors.white, fontSize: 15, fontWeight: FontWeight.w600),
+                            overflow: TextOverflow.ellipsis,
+                          ),
+                        ),
+                        Text(
+                          '${Money.formatBaht(g.current)} / ${Money.formatBaht(g.target)}',
+                          style: const TextStyle(color: Colors.white, fontSize: 14, fontWeight: FontWeight.bold),
+                        ),
+                      ],
+                    ),
+                    const SizedBox(height: 10),
+                    ClipRRect(
+                      borderRadius: BorderRadius.circular(10),
+                      child: LinearProgressIndicator(
+                        value: g.progressPercentage,
+                        minHeight: 12,
+                        backgroundColor: Colors.white.withOpacity(0.18),
+                        valueColor: AlwaysStoppedAnimation<Color>(accentColor),
+                      ),
+                    ),
+                    const SizedBox(height: 8),
+                    Align(
+                      alignment: Alignment.centerRight,
+                      child: Text(
+                        isSuccess ? 'สำเร็จเป้าหมายแล้ว! 🎉' : 'เหลืออีก ${Money.formatBaht(remaining)} บาท',
+                        style: TextStyle(color: accentColor, fontSize: 11, fontWeight: FontWeight.w500),
+                      ),
+                    ),
+                  ],
+                ),
+              );
+            },
+          ),
+        ),
+        if (goals.length > 1) ...[
+          const SizedBox(height: 8),
           Row(
-            mainAxisAlignment: MainAxisAlignment.spaceBetween,
-            children: [
-              const Text(
-                'เป้าหมาย',
-                style: TextStyle(color: Colors.white70, fontSize: 14, fontWeight: FontWeight.w500),
+            mainAxisAlignment: MainAxisAlignment.center,
+            children: List.generate(
+              goals.length,
+              (index) => Container(
+                margin: const EdgeInsets.symmetric(horizontal: 3),
+                width: _currentPage == index ? 16 : 6,
+                height: 6,
+                decoration: BoxDecoration(
+                  borderRadius: BorderRadius.circular(3),
+                  color: _currentPage == index ? AppColors.primary : Colors.white30,
+                ),
               ),
-              GestureDetector(
-                onTap: () => context.push('/goals'),
-                child: Icon(Icons.edit_note_rounded, size: 22, color: Colors.white.withOpacity(0.6)),
-              ),
-            ],
-          ),
-          const SizedBox(height: 12),
-          const Row(
-            mainAxisAlignment: MainAxisAlignment.spaceBetween,
-            children: [
-              Text('ซื้อตู้เย็น', style: TextStyle(color: Colors.white, fontSize: 15, fontWeight: FontWeight.w600)),
-              Text('2,400 / 4000', style: TextStyle(color: Colors.white, fontSize: 14, fontWeight: FontWeight.bold)),
-            ],
-          ),
-          const SizedBox(height: 10),
-          ClipRRect(
-            borderRadius: BorderRadius.circular(10),
-            child: LinearProgressIndicator(
-              value: 2400 / 4000,
-              minHeight: 12,
-              backgroundColor: Colors.white.withOpacity(0.2),
-              valueColor: const AlwaysStoppedAnimation<Color>(Color(0xFFFBBC05)),
-            ),
-          ),
-          const SizedBox(height: 6),
-          const Align(
-            alignment: Alignment.centerRight,
-            child: Text(
-              'เหลืออีก 1600 บาท',
-              style: TextStyle(color: Color(0xFFFBBC05), fontSize: 11, fontWeight: FontWeight.w500),
             ),
           ),
         ],
-      ),
+      ],
     );
   }
 }

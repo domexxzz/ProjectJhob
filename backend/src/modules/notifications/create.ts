@@ -14,7 +14,21 @@ export async function createNotification(
 ) {
   const since = new Date(Date.now() - 20 * 60 * 60 * 1000);
   const dup = await prisma.notification.findFirst({ where: { userId, type, title, createdAt: { gte: since } } });
-  if (dup) return null;
+  if (dup) {
+    // หากมีแจ้งเตือนหัวข้อเดิมอยู่แล้วภายใน 20 ชม. ให้ปรับข้อมูลให้ล่าสุด (เช่น จำนวนวันที่เหลือลดลง)
+    // และดันขึ้นมาด้านบนสุดพร้อมแจ้งเตือนใหม่อีกครั้ง
+    const updated = await prisma.notification.update({
+      where: { id: dup.id },
+      data: {
+        body,
+        read: false,
+        createdAt: new Date(),
+        data: data ? JSON.stringify(data) : null,
+      },
+    });
+    await sendPush(userId, title, body);
+    return updated;
+  }
 
   const n = await prisma.notification.create({
     data: { userId, type, title, body, data: data ? JSON.stringify(data) : null },

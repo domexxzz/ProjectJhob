@@ -10,6 +10,7 @@ import '../../app/theme.dart';
 import '../../core/money.dart';
 import 'transaction.dart';
 import 'transactions_repository.dart';
+import '../notifications/notifications_repository.dart';
 
 const _thMonths = ['', 'ม.ค.', 'ก.พ.', 'มี.ค.', 'เม.ย.', 'พ.ค.', 'มิ.ย.', 'ก.ค.', 'ส.ค.', 'ก.ย.', 'ต.ค.', 'พ.ย.', 'ธ.ค.'];
 String _fmtThaiDate(DateTime d) => '${d.day} ${_thMonths[d.month]} ${d.year + 543}';
@@ -59,7 +60,9 @@ class _SlipScreenState extends ConsumerState<SlipScreen> {
       if (!mounted) return;
       setState(() {
         _type = 'expense';
-        if ((a.amount ?? 0) > 0) _amount.text = Money.format(a.amount!);
+        // a.amount เป็น satang → แปลงเป็นบาทก่อน set ลง field
+        // เพราะ _confirm() จะ toSatang() อีกครั้ง
+        if ((a.amount ?? 0) > 0) _amount.text = (a.amount! / 100).toStringAsFixed(2);
         if (a.date != null) _date = DateTime.tryParse(a.date!);
         _categoryId = a.categoryId;
         if ((a.merchant?.trim().isNotEmpty ?? false)) _desc.text = a.merchant!.trim();
@@ -175,6 +178,8 @@ class _SlipScreenState extends ConsumerState<SlipScreen> {
             occurredAt: _date,
           );
       ref.invalidate(dashboardProvider);
+      ref.invalidate(notificationsProvider); // รีเฟรชการแจ้งเตือนการทำนาย/งบประมาณล่วงหน้า
+      await ref.read(dashboardProvider.future); // รอให้ดึงข้อมูลเสร็จก่อนเด้งกลับ
       if (!mounted) return;
       if (alert != null) {
         await showDialog(

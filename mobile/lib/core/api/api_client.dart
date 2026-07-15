@@ -50,6 +50,11 @@ final dioProvider = Provider<Dio>((ref) {
     baseUrl: '$kApiBaseUrl/api/v1',
     connectTimeout: const Duration(seconds: 10),
     receiveTimeout: const Duration(seconds: 10),
+    headers: {
+      'Cache-Control': 'no-cache, no-store, must-revalidate',
+      'Pragma': 'no-cache',
+      'Expires': '0',
+    },
   ));
   final tokenStore = ref.watch(tokenStoreProvider);
   dio.interceptors.add(InterceptorsWrapper(

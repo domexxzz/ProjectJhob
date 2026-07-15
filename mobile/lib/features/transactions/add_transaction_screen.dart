@@ -6,6 +6,8 @@ import '../../app/theme.dart';
 import '../../core/money.dart';
 import 'transaction.dart';
 import 'transactions_repository.dart';
+import '../predictions/predictions_service.dart';
+import '../notifications/notifications_repository.dart';
 
 class AddTransactionScreen extends ConsumerStatefulWidget {
   const AddTransactionScreen({super.key, this.transaction});
@@ -73,6 +75,11 @@ class _AddTransactionScreenState extends ConsumerState<AddTransactionScreen> {
           source: _note.text.contains('(Scan)') ? 'ocr' : 'manual',
         );
       }
+      ref.invalidate(dashboardProvider);
+      ref.invalidate(predictionsProvider);
+      ref.invalidate(budgetsListProvider);
+      ref.invalidate(notificationsProvider); // อัปเดตแจ้งเตือนและทำนายเรียลไทม์
+      await ref.read(dashboardProvider.future); // รอให้ดึงข้อมูลเสร็จก่อนเด้งกลับ
       if (mounted) {
         if (anomalyAlert != null) {
           await showDialog(

@@ -73,16 +73,21 @@ class MenuScreen extends ConsumerWidget {
           ),
         ],
       ),
-      floatingActionButton: FloatingActionButton(
-        heroTag: 'menuFab',
-        onPressed: () => context.push('/add'),
-        backgroundColor: AppColors.primary,
-        foregroundColor: Colors.white,
-        shape: const CircleBorder(),
-        elevation: 6,
-        child: const Icon(Icons.add, size: 28),
+      floatingActionButton: Container(
+        height: 64,
+        width: 64,
+        margin: const EdgeInsets.only(top: 10),
+        child: FloatingActionButton(
+          heroTag: 'menuFab',
+          onPressed: () => context.push('/slip'),
+          backgroundColor: const Color(0xFF3CAE63),
+          foregroundColor: Colors.black,
+          shape: const CircleBorder(),
+          elevation: 4,
+          child: const Icon(Icons.add, size: 32),
+        ),
       ),
-      floatingActionButtonLocation: FloatingActionButtonLocation.centerDocked,
+      floatingActionButtonLocation: kFixedCenterDockedFabLocation,
       bottomNavigationBar: const _MenuNav(),
     );
   }
@@ -200,22 +205,33 @@ class _MenuNav extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
-    return BottomAppBar(
-      color: const Color(0xFF121212),
-      elevation: 12,
-      shape: const CircularNotchedRectangle(),
-      notchMargin: 8,
-      height: 66,
-      padding: EdgeInsets.zero,
-      child: Row(
-        mainAxisAlignment: MainAxisAlignment.spaceAround,
-        children: [
-          _MenuNavItem(icon: Icons.home_rounded, label: 'หน้าหลัก', onTap: () => context.go('/')),
-          _MenuNavItem(icon: Icons.bar_chart_rounded, label: 'งบ', onTap: () => context.push('/budgets')),
-          const SizedBox(width: 40),
-          _MenuNavItem(icon: Icons.smart_toy_rounded, label: 'พี่เงิน', onTap: () => context.push('/chat')),
-          const _MenuNavItem(icon: Icons.grid_view_rounded, label: 'เมนู', active: true),
+    return Container(
+      decoration: BoxDecoration(
+        color: const Color(0xFF1A1A1A),
+        borderRadius: const BorderRadius.only(
+          topLeft: Radius.circular(30),
+          topRight: Radius.circular(30),
+        ),
+        boxShadow: [
+          BoxShadow(color: Colors.black.withOpacity(0.3), blurRadius: 12, offset: const Offset(0, -2))
         ],
+      ),
+      child: BottomAppBar(
+        color: Colors.transparent,
+        elevation: 0,
+        notchMargin: 10,
+        height: 74,
+        padding: EdgeInsets.zero,
+        child: Row(
+          mainAxisAlignment: MainAxisAlignment.spaceAround,
+          children: [
+            _MenuNavItem(icon: Icons.home_outlined, label: 'หน้าหลัก', onTap: () => context.go('/')),
+            _MenuNavItem(icon: Icons.insert_chart_outlined_rounded, label: 'งบ', onTap: () => context.push('/budgets')),
+            const SizedBox(width: 48),
+            _MenuNavItem(icon: Icons.chat_bubble_outline_rounded, label: 'พี่เงิน', onTap: () => context.push('/chat')),
+            const _MenuNavItem(icon: Icons.grid_view_rounded, label: 'เมนู', active: true),
+          ],
+        ),
       ),
     );
   }
@@ -230,23 +246,25 @@ class _MenuNavItem extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
-    final color = active ? AppColors.primary : Colors.white38;
+    final color = active ? const Color(0xFF4CD97B) : Colors.white60;
     return InkWell(
       onTap: onTap,
-      borderRadius: BorderRadius.circular(12),
+      borderRadius: BorderRadius.circular(16),
       child: Padding(
-        padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 6),
+        padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 8),
         child: Column(
           mainAxisSize: MainAxisSize.min,
           children: [
-            Icon(icon, color: color, size: 24),
-            const SizedBox(height: 2),
-            Text(label,
-                style: TextStyle(
-                  color: color,
-                  fontSize: 10,
-                  fontWeight: active ? FontWeight.w700 : FontWeight.w500,
-                )),
+            Icon(icon, color: color, size: 28),
+            const SizedBox(height: 4),
+            Text(
+              label,
+              style: TextStyle(
+                color: color,
+                fontSize: 11,
+                fontWeight: active ? FontWeight.bold : FontWeight.w500,
+              ),
+            ),
           ],
         ),
       ),
