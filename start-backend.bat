@@ -1,6 +1,14 @@
 @echo off
 title Backend - AI Finance Coach
+
+echo Cleaning up port 4000 if in use...
+for /f "tokens=5" %%a in ('netstat -aon ^| findstr :4000 ^| findstr LISTENING') do (
+    echo Killing process with PID %%a occupying port 4000...
+    taskkill /f /pid %%a
+)
+
 cd /d "%~dp0backend"
+
 
 if not exist .env copy .env.example .env >nul
 

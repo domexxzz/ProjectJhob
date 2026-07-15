@@ -2,7 +2,8 @@
 title App (Android Emulator) - AI Finance Coach
 cd /d "%~dp0mobile"
 
-set "FLUTTER=C:\src\flutter\bin\flutter.bat"
+set "FLUTTER=C:\flutter\bin\flutter.bat"
+if not exist "%FLUTTER%" set "FLUTTER=C:\src\flutter\bin\flutter.bat"
 if not exist "%FLUTTER%" set "FLUTTER=flutter"
 
 echo === Getting Flutter packages ===
