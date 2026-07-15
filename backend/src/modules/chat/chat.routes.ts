@@ -12,7 +12,10 @@ export const chatRouter = Router();
 chatRouter.use(requireAuth);
 
 // เผื่อข้อความยาวจาก OCR (สลิป/ตาราง) — ปกติผู้ใช้พิมพ์สั้น แต่แนบรูปแล้ววิเคราะห์อาจยาว
-const sendSchema = z.object({ message: z.string().min(1).max(8000) });
+const sendSchema = z.object({
+  message: z.string().min(1).max(8000),
+  imageBase64: z.string().optional(), // ➕ รองรับการส่งรูปแบบ Base64
+});
 
 // GET /api/v1/chat -> ประวัติแชท
 chatRouter.get(
@@ -31,7 +34,7 @@ chatRouter.get(
 chatRouter.post(
   '/',
   asyncHandler(async (req, res) => {
-    const { message } = sendSchema.parse(req.body);
+    const { message, imageBase64 } = sendSchema.parse(req.body);
     const userId = req.userId!;
 
     // rate limit ง่ายๆ: 20 ข้อความ/นาที/คน
@@ -40,8 +43,25 @@ chatRouter.post(
     if (count >= 20) throw new HttpError(429, 'ส่งข้อความถี่เกินไป ลองใหม่อีกครั้งใน 1 นาที');
     await cache.set(rlKey, count + 1, 60);
 
-    // เก็บข้อความผู้ใช้
-    await prisma.chatMessage.create({ data: { userId, role: 'user', content: message } });
+    // ทำ OCR ถ้าผู้ใช้ส่งรูปภาพมาด้วย
+    let ocrText: string | undefined;
+    if (imageBase64) {
+      try {
+        ocrText = await ocrImage(imageBase64);
+      } catch (e) {
+        console.error('[chat] OCR failed for message image attachment:', e);
+      }
+    }
+
+    // เก็บข้อความผู้ใช้ โดยเก็บ ocrText และ flag ว่ามีรูปไว้ใน context
+    await prisma.chatMessage.create({
+      data: {
+        userId,
+        role: 'user',
+        content: message,
+        context: ocrText ? JSON.stringify({ hasImage: true, ocrText }) : null,
+      },
+    });
 
     // ── ถ้าเป็นคำขอ "ไฟล์การเงิน" → พี่เงินสร้างไฟล์ + แนบปุ่มดาวน์โหลด ──
     const exp = detectExportRequest(message);
@@ -66,7 +86,7 @@ chatRouter.post(
       return;
     }
 
-    // ประกอบ context จริง + ดึง history ล่าสุด
+    // ประกอบ context จริง + ดึง history ล่าสุด พร้อมแทรก OCR Context
     const context = await buildContext(userId);
     const recent = await prisma.chatMessage.findMany({
       where: { userId },
@@ -75,9 +95,26 @@ chatRouter.post(
     });
     const history: ChatTurn[] = recent
       .reverse()
-      .map((m) => ({ role: m.role === 'assistant' ? 'assistant' : 'user', content: m.content }));
+      .map((m) => {
+        let content = m.content;
+        if (m.role === 'user' && m.context) {
+          try {
+            const parsed = JSON.parse(m.context);
+            if (parsed.ocrText) {
+              content = `${m.content}\n\n[ข้อมูลที่แอปตรวจพบในรูปภาพที่ผู้ใช้แนบ: ${parsed.ocrText}]`;
+            }
+          } catch (_) {}
+        }
+        return { role: m.role === 'assistant' ? 'assistant' : 'user', content };
+      });
 
-    const { reply, source } = await generateReply(context, message, history);
+    // ส่งข้อความปัจจุบันพร้อมแนบข้อมูล OCR ล่าสุดเข้าไปคุยกับ LLM
+    let currentQuestion = message;
+    if (ocrText) {
+      currentQuestion = `${message}\n\n[ข้อมูลที่แอปตรวจพบในรูปภาพที่ส่งมาในข้อความนี้: ${ocrText}]`;
+    }
+
+    const { reply, source } = await generateReply(context, currentQuestion, history);
 
     // เก็บคำตอบ (แนบ snapshot ว่า source อะไร)
     const saved = await prisma.chatMessage.create({

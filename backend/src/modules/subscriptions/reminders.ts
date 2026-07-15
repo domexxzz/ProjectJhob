@@ -5,19 +5,35 @@ import { createNotification } from '../notifications/create';
 /** เตือน subscription ที่จะตัดเงินภายใน 2 วัน (reuse createNotification → กันซ้ำ + ยิง push) */
 export async function runSubscriptionReminders(userId: string) {
   const now = new Date();
-  const soon = new Date(now.getTime() + 2 * 24 * 60 * 60 * 1000);
+  const startOfToday = new Date(now.getFullYear(), now.getMonth(), now.getDate());
+  const soon = new Date(startOfToday.getTime() + 2 * 24 * 60 * 60 * 1000);
   const subs = await prisma.subscription.findMany({
-    where: { userId, nextBilling: { gte: now, lte: soon } },
+    where: { userId, nextBilling: { gte: startOfToday, lte: soon } },
   });
 
   const created = [];
   for (const s of subs) {
-    const days = Math.max(0, Math.ceil((new Date(s.nextBilling).getTime() - now.getTime()) / (24 * 60 * 60 * 1000)));
-    const when = days <= 1 ? 'พรุ่งนี้' : `อีก ${days} วัน`;
+    const nextBillingDate = new Date(s.nextBilling);
+    const diffTime = nextBillingDate.getTime() - startOfToday.getTime();
+    const days = Math.max(0, Math.round(diffTime / (24 * 60 * 60 * 1000)));
+
+    let when = '';
+    let titleWhen = '';
+    if (days === 0) {
+      when = 'วันนี้';
+      titleWhen = 'วันนี้';
+    } else if (days === 1) {
+      when = 'พรุ่งนี้';
+      titleWhen = 'พรุ่งนี้';
+    } else {
+      when = `อีก ${days} วัน`;
+      titleWhen = `ใน ${days} วัน`;
+    }
+
     const n = await createNotification(
       userId,
       'subscription',
-      `${s.name} จะตัดเงิน${days <= 1 ? 'พรุ่งนี้' : ''}`,
+      `${s.name} จะตัดเงิน${titleWhen}`,
       `${when} ${s.name} จะตัด ${baht(s.amount)} เตรียมเงินไว้นะ 💳`,
       { subscriptionId: s.id },
     );

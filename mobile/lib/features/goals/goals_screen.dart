@@ -95,7 +95,7 @@ class GoalsScreen extends ConsumerWidget {
         elevation: 6,
         child: const Icon(Icons.add, size: 28),
       ),
-      floatingActionButtonLocation: FloatingActionButtonLocation.centerDocked,
+      floatingActionButtonLocation: kFixedCenterDockedFabLocation,
       bottomNavigationBar: const _GoalsNav(),
     );
   }

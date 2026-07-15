@@ -5,6 +5,8 @@ import 'package:go_router/go_router.dart';
 import '../../app/theme.dart';
 import '../../core/money.dart';
 import '../transactions/transactions_repository.dart';
+import '../predictions/predictions_service.dart';
+import '../notifications/notifications_repository.dart';
 
 class EditBalanceScreen extends ConsumerStatefulWidget {
   const EditBalanceScreen({super.key});
@@ -65,6 +67,8 @@ class _EditBalanceScreenState extends ConsumerState<EditBalanceScreen> {
       }
 
       ref.invalidate(dashboardProvider);
+      ref.invalidate(predictionsProvider);
+      ref.invalidate(notificationsProvider); // อัปเดตข้อมูลพยากรณ์และแจ้งเตือนเรียลไทม์
 
       if (context.mounted) context.pop();
     } catch (e) {
@@ -79,8 +83,7 @@ class _EditBalanceScreenState extends ConsumerState<EditBalanceScreen> {
 
   @override
   Widget build(BuildContext context) {
-    final dashboardAsync = ref.watch(dashboardProvider);
-    final currentBalance = dashboardAsync.value?.summary.balance ?? 0;
+    final currentBalance = ref.watch(balanceSummaryProvider).balance;
     _prefillOnce(currentBalance);
 
     return Scaffold(

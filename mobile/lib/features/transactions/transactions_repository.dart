@@ -32,6 +32,12 @@ class TransactionsRepository {
   Future<Box> _getCacheBox() => Hive.openBox('cache');
   Future<Box> _getPendingBox() => Hive.openBox('pending_sync');
 
+  /// ล้าง Hive cache ทั้งหมดเมื่อข้อมูลเปลี่ยนแปลง (หลัง create/update/delete สำเร็จ)
+  Future<void> _clearCache() async {
+    final box = await _getCacheBox();
+    await box.clear();
+  }
+
   Future<DashboardData> list({String? month, String? type}) async {
     final cacheBox = await _getCacheBox();
     final cacheKey = 'txns_${month ?? 'all'}_${type ?? 'all'}';
@@ -82,12 +88,13 @@ class TransactionsRepository {
       if (categoryId != null) 'categoryId': categoryId,
       if (note != null && note.isNotEmpty) 'note': note,
       'source': source,
-      if (occurredAt != null) 'occurredAt': occurredAt.toIso8601String(),
+      if (occurredAt != null) 'occurredAt': occurredAt.toUtc().toIso8601String(),
     };
 
     try {
       final res = await _dio.post('/transactions', data: payload);
       final data = res.data as Map<String, dynamic>;
+      await _clearCache(); // ล้าง cache เพื่อ fetch ครั้งถัดไปได้ข้อมูลใหม่จาก server
       return data['anomalyAlert'] as String?;
     } catch (e) {
       // Offline fallback: Queue write operation
@@ -120,6 +127,7 @@ class TransactionsRepository {
     try {
       final res = await _dio.patch('/transactions/$id', data: payload);
       final data = res.data as Map<String, dynamic>;
+      await _clearCache(); // ล้าง cache หลัง update สำเร็จ
       return data['anomalyAlert'] as String?;
     } catch (e) {
       final pendingBox = await _getPendingBox();
@@ -138,6 +146,7 @@ class TransactionsRepository {
   Future<void> delete(String id) async {
     try {
       await _dio.delete('/transactions/$id');
+      await _clearCache(); // ล้าง cache หลัง delete สำเร็จ
     } catch (e) {
       final pendingBox = await _getPendingBox();
       final pendingActions = pendingBox.get('actions', defaultValue: []) as List;
@@ -241,11 +250,42 @@ final transactionsRepoProvider =
     Provider<TransactionsRepository>((ref) => TransactionsRepository(ref.watch(dioProvider)));
 
 final dashboardProvider =
-    FutureProvider.autoDispose<DashboardData>((ref) async {
+    FutureProvider<DashboardData>((ref) async {
   final repo = ref.watch(transactionsRepoProvider);
   // Auto-sync pending actions before fetching
   await repo.syncPending();
   return repo.list();
+});
+
+/// คำนวณ income / expense / balance จาก transactions list จริงๆ (client-side)
+/// ใช้ตัวเดียวกันทั้ง BalanceCard และ EditBalanceScreen
+/// ไม่ใช้ autoDispose เพื่อไม่ถูก dispose ระหว่างที่ dashboard รีเฟรชข้อมูล
+/// cache ค่าล่าสุดไว้ ไม่คืน 0 ระหว่าง loading
+final balanceSummaryProvider = Provider<({int income, int expense, int balance})>((ref) {
+  final dashboardAsync = ref.watch(dashboardProvider);
+
+  // ถ้ายังไม่มีข้อมูล (loading/error) คืนค่าไปเรื่อยๆ ไม่รีเซ็ตเป็น 0
+  final items = dashboardAsync.valueOrNull?.items;
+  if (items == null) {
+    // ยังโหลดอยู่ → คืน placeholder เดิม (ไม่ rebuild ส่วนอื่น)
+    return (income: 0, expense: 0, balance: 0);
+  }
+
+  int totalIncome = 0;
+  int totalExpense = 0;
+  for (final t in items) {
+    if (t.type == 'income') {
+      totalIncome += t.amount;
+    } else {
+      totalExpense += t.amount;
+    }
+  }
+
+  return (
+    income: totalIncome,
+    expense: totalExpense,
+    balance: totalIncome - totalExpense,
+  );
 });
 
 final categoriesProvider =
