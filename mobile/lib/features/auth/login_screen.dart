@@ -208,7 +208,7 @@ class _LoginScreenState extends ConsumerState<LoginScreen> {
                   Padding(
                     padding: const EdgeInsets.symmetric(horizontal: 12),
                     child: Text(
-                      'or continue with',
+                      'ดำเนินการต่อด้วย',
                       style: TextStyle(color: _kHint, fontSize: 13),
                     ),
                   ),
