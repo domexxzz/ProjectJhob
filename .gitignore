@@ -6,8 +6,16 @@ npm-debug.log*
 
 # Env / secrets
 .env
+.env.*
+!.env.example
+!**/.env.example
 .env.local
 .env.*.local
+*.pem
+*.key
+*service-account*.json
+google-services.json
+GoogleService-Info.plist
 
 # SQLite (dev)
 *.db
@@ -28,14 +36,21 @@ mobile/android/local.properties
 # Python
 __pycache__/
 *.pyc
-ai/.venv/
-ai/venv/
+.venv/
+venv/
+.pytest_cache/
+.mypy_cache/
+.ruff_cache/
+.coverage
+htmlcov/
 
 # OS / IDE
 .DS_Store
 Thumbs.db
 .idea/
 .vscode/
+*.swp
+*.tmp
 
 # local scratch (large/throwaway artifacts)
 scratch/
