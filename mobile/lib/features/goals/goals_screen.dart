@@ -1,3 +1,4 @@
+import 'dart:io';
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:go_router/go_router.dart';
@@ -269,15 +270,28 @@ class _GoalItemCard extends StatelessWidget {
           children: [
             Row(
               children: [
-                Container(
-                  width: 52,
-                  height: 52,
-                  decoration: BoxDecoration(
-                    shape: BoxShape.circle,
-                    color: Colors.white.withOpacity(0.1),
-                  ),
-                  alignment: Alignment.center,
-                  child: Text(goal.emoji, style: const TextStyle(fontSize: 24)),
+                Builder(
+                  builder: (context) {
+                    final hasLocalImage = goal.imagePath != null && File(goal.imagePath!).existsSync();
+                    return Container(
+                      width: 52,
+                      height: 52,
+                      decoration: BoxDecoration(
+                        shape: BoxShape.circle,
+                        color: Colors.white.withOpacity(0.1),
+                        image: hasLocalImage
+                            ? DecorationImage(
+                                image: FileImage(File(goal.imagePath!)),
+                                fit: BoxFit.cover,
+                              )
+                            : null,
+                      ),
+                      alignment: Alignment.center,
+                      child: hasLocalImage
+                          ? null
+                          : Text(goal.emoji, style: const TextStyle(fontSize: 24)),
+                    );
+                  },
                 ),
                 const SizedBox(width: 14),
                 Expanded(

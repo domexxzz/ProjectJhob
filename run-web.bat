@@ -1,8 +1,16 @@
 @echo off
 title App (Web) - AI Finance Coach
+
+echo Cleaning up port 5000 if in use...
+for /f "tokens=5" %%a in ('netstat -aon ^| findstr :5000 ^| findstr LISTENING') do (
+    echo Killing process with PID %%a occupying port 5000...
+    taskkill /f /pid %%a
+)
+
 cd /d "%~dp0mobile"
 
-set "FLUTTER=C:\src\flutter\bin\flutter.bat"
+set "FLUTTER=C:\flutter\bin\flutter.bat"
+if not exist "%FLUTTER%" set "FLUTTER=C:\src\flutter\bin\flutter.bat"
 if not exist "%FLUTTER%" set "FLUTTER=flutter"
 
 echo === Getting Flutter packages ===

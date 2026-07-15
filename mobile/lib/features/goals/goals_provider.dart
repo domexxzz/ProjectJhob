@@ -10,6 +10,7 @@ class GoalModel {
     this.deadline,
     this.type = 'short', // short | medium | long
     this.emoji = '🎯',
+    this.imagePath,
     required this.createdAt,
   });
 
@@ -20,6 +21,7 @@ class GoalModel {
   final DateTime? deadline;
   final String type;
   final String emoji;
+  final String? imagePath;
   final DateTime createdAt;
 
   double get progressPercentage {
@@ -35,6 +37,8 @@ class GoalModel {
     DateTime? deadline,
     String? type,
     String? emoji,
+    String? imagePath,
+    bool clearImage = false,
     DateTime? createdAt,
   }) {
     return GoalModel(
@@ -45,6 +49,7 @@ class GoalModel {
       deadline: deadline ?? this.deadline,
       type: type ?? this.type,
       emoji: emoji ?? this.emoji,
+      imagePath: clearImage ? null : (imagePath ?? this.imagePath),
       createdAt: createdAt ?? this.createdAt,
     );
   }
@@ -57,6 +62,7 @@ class GoalModel {
         'deadline': deadline?.toIso8601String(),
         'type': type,
         'emoji': emoji,
+        'imagePath': imagePath,
         'createdAt': createdAt.toIso8601String(),
       };
 
@@ -68,6 +74,7 @@ class GoalModel {
         deadline: j['deadline'] != null ? DateTime.parse(j['deadline'] as String) : null,
         type: (j['type'] ?? 'short') as String,
         emoji: (j['emoji'] ?? '🎯') as String,
+        imagePath: j['imagePath'] as String?,
         createdAt: DateTime.parse(j['createdAt'] as String),
       );
 }
@@ -130,7 +137,7 @@ class GoalsNotifier extends StateNotifier<List<GoalModel>> {
     ];
   }
 
-  void addGoal(String name, int target, DateTime? deadline, String type, String emoji) {
+  void addGoal(String name, int target, DateTime? deadline, String type, String emoji, String? imagePath) {
     final newGoal = GoalModel(
       id: 'goal-${DateTime.now().millisecondsSinceEpoch}',
       name: name,
@@ -139,13 +146,14 @@ class GoalsNotifier extends StateNotifier<List<GoalModel>> {
       deadline: deadline,
       type: type,
       emoji: emoji,
+      imagePath: imagePath,
       createdAt: DateTime.now(),
     );
     state = [...state, newGoal];
     _saveToHive();
   }
 
-  void updateGoal(String id, String name, int target, DateTime? deadline, String type, String emoji) {
+  void updateGoal(String id, String name, int target, DateTime? deadline, String type, String emoji, String? imagePath) {
     state = state.map((g) {
       if (g.id == id) {
         return g.copyWith(
@@ -154,6 +162,8 @@ class GoalsNotifier extends StateNotifier<List<GoalModel>> {
           deadline: deadline,
           type: type,
           emoji: emoji,
+          imagePath: imagePath,
+          clearImage: imagePath == null,
         );
       }
       return g;
