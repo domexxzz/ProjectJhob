@@ -71,7 +71,9 @@ class GoalModel {
         name: j['name'] as String,
         target: j['target'] as int,
         current: (j['current'] ?? 0) as int,
-        deadline: j['deadline'] != null ? DateTime.parse(j['deadline'] as String) : null,
+        deadline: j['deadline'] != null
+            ? DateTime.parse(j['deadline'] as String)
+            : null,
         type: (j['type'] ?? 'short') as String,
         emoji: (j['emoji'] ?? '🎯') as String,
         imagePath: j['imagePath'] as String?,
@@ -87,19 +89,30 @@ class GoalsNotifier extends StateNotifier<List<GoalModel>> {
   static const _boxName = 'goals_box';
 
   Future<void> _loadGoals() async {
-    final box = await Hive.openBox(_boxName);
-    final List? cached = box.get('goals');
-    if (cached != null) {
-      state = cached.map((item) => GoalModel.fromJson(Map<String, dynamic>.from(item as Map))).toList();
-    } else {
+    try {
+      final box = await Hive.openBox(_boxName);
+      final List? cached = box.get('goals');
+      if (cached != null) {
+        state = cached
+            .map((item) =>
+                GoalModel.fromJson(Map<String, dynamic>.from(item as Map)))
+            .toList();
+        return;
+      }
       state = _initialGoals();
       await _saveToHive();
+    } catch (_) {
+      state = _initialGoals();
     }
   }
 
   Future<void> _saveToHive() async {
-    final box = await Hive.openBox(_boxName);
-    await box.put('goals', state.map((g) => g.toJson()).toList());
+    try {
+      final box = await Hive.openBox(_boxName);
+      await box.put('goals', state.map((g) => g.toJson()).toList());
+    } catch (_) {
+      // ใช้งานต่อด้วย state ในหน่วยความจำ เมื่อ Web storage ไม่พร้อม
+    }
   }
 
   static List<GoalModel> _initialGoals() {
@@ -137,7 +150,8 @@ class GoalsNotifier extends StateNotifier<List<GoalModel>> {
     ];
   }
 
-  void addGoal(String name, int target, DateTime? deadline, String type, String emoji, String? imagePath) {
+  void addGoal(String name, int target, DateTime? deadline, String type,
+      String emoji, String? imagePath) {
     final newGoal = GoalModel(
       id: 'goal-${DateTime.now().millisecondsSinceEpoch}',
       name: name,
@@ -153,7 +167,8 @@ class GoalsNotifier extends StateNotifier<List<GoalModel>> {
     _saveToHive();
   }
 
-  void updateGoal(String id, String name, int target, DateTime? deadline, String type, String emoji, String? imagePath) {
+  void updateGoal(String id, String name, int target, DateTime? deadline,
+      String type, String emoji, String? imagePath) {
     state = state.map((g) {
       if (g.id == id) {
         return g.copyWith(
@@ -187,6 +202,7 @@ class GoalsNotifier extends StateNotifier<List<GoalModel>> {
   }
 }
 
-final goalsProvider = StateNotifierProvider<GoalsNotifier, List<GoalModel>>((ref) {
+final goalsProvider =
+    StateNotifierProvider<GoalsNotifier, List<GoalModel>>((ref) {
   return GoalsNotifier();
 });
