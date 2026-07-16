@@ -11,7 +11,7 @@ class ChatAttachment {
   });
 
   final String kind; // budget | transactions | summary | subscriptions
-  final String format; // xlsx | xml
+  final String format; // xlsx | xml | pdf | docx | csv | json | txt | html
   final String filename;
   final String label;
   final String token; // download token (ต่อกับ URL export)
@@ -54,7 +54,8 @@ class ChatMessage {
         final parsed = jsonDecode(ctx);
         if (parsed is Map) {
           if (parsed['attachment'] is Map) {
-            att = ChatAttachment.fromJson(Map<String, dynamic>.from(parsed['attachment'] as Map));
+            att = ChatAttachment.fromJson(
+                Map<String, dynamic>.from(parsed['attachment'] as Map));
           }
           if (parsed['hasImage'] == true) {
             hasImg = true;

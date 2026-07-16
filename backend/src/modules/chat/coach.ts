@@ -71,12 +71,12 @@ export async function generateReply(
 ): Promise<CoachReply> {
   const messages: LlmMessage[] = [
     { role: 'system', content: buildSystemPrompt(context) },
-    ...history.slice(-6),
+    ...history.slice(-12),
     { role: 'user', content: question },
   ];
   const out = await chatComplete(messages);
   if (out) return { reply: out.text, source: out.source };
-  return { reply: fallbackReply(context, question), source: 'fallback' };
+  return { reply: fallbackReply(context, question, history), source: 'fallback' };
 }
 
 /** OCR รูป (สลิป/เอกสาร) ด้วย Typhoon OCR — รับ data URL ("data:image/...;base64,xxx") คืนข้อความ */
@@ -103,10 +103,23 @@ export async function ocrImage(imageDataUrl: string): Promise<string> {
 }
 
 /** โค้ชแบบ rule-based — ตอบ grounded จาก context จริง (ใช้ตอนยังไม่ใส่ API key) */
-function fallbackReply(c: CoachContext, question: string): string {
+function fallbackReply(c: CoachContext, question: string, history: ChatTurn[]): string {
   const remaining = c.monthlyIncome - c.thisMonthSpent;
   const over = c.budgetRemaining.filter((b) => b.remaining < 0);
   const top = c.topExpenses[0];
+  const recentConversation = history.slice(-8).map((turn) => turn.content).join('\n');
+
+  if (
+    /ข้อความเปิดใจ|ร่างข้อความ|ประโยคเริ่มคุย|พูดยังไงดี/i.test(question) &&
+    /แฟน|คู่รัก|ครอบครัว/i.test(recentConversation) &&
+    /เงิน|ใช้จ่าย|ค่าใช้จ่าย|เกินตัว/i.test(recentConversation)
+  ) {
+    return (
+      'ลองเปิดใจแบบไม่กล่าวโทษประมาณนี้นะครับ 💬\n\n' +
+      '> “เราอยากคุยเรื่องการใช้เงินด้วยกัน เพราะเราเป็นห่วงอนาคตของเราสองคน ไม่ได้อยากควบคุมเธอนะ เราลองมาดูรายรับ–รายจ่ายและตั้งข้อตกลงที่สบายใจทั้งคู่ได้ไหม”\n\n' +
+      'เลือกคุยตอนที่ทั้งคู่ใจเย็น แล้วเริ่มจากเป้าหมายร่วมกันก่อนตัวเลขครับ'
+    );
+  }
 
   if (/ออม|เก็บเงิน|save|saving/i.test(question)) {
     const save20 = Math.max(0, Math.round(remaining * 0.2));

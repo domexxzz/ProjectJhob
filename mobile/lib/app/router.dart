@@ -1,4 +1,3 @@
-import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:go_router/go_router.dart';
 
@@ -7,8 +6,6 @@ import '../features/auth/login_screen.dart';
 import '../features/auth/register_screen.dart';
 import '../features/auth/forgot_password_screen.dart'; // ➕ อิมพอร์ตหน้าลืมรหัสผ่านเข้ามาเพิ่ม
 import '../features/dashboard/dashboard_screen.dart';
-import '../features/dashboard/edit_balance_screen.dart'; // ➕ อิมพอร์ตหน้าแก้ไขยอดเงินคงเหลือเข้ามา
-import '../features/transactions/add_transaction_screen.dart';
 import '../features/transactions/slip_screen.dart';
 import '../features/transactions/transaction.dart';
 import '../features/chat/chat_screen.dart';
@@ -74,15 +71,11 @@ final routerProvider = Provider<GoRouter>((ref) {
       // ── App ──────────────────────────────────────────────────────────────
       GoRoute(path: '/', builder: (_, __) => const DashboardScreen()),
       GoRoute(
-        path: '/edit-balance', // ➕ เส้นทางสำหรับหน้าแก้ไขยอดคงเหลือ
-        builder: (_, __) => const EditBalanceScreen(),
+        path: '/slip',
+        builder: (_, state) => SlipScreen(
+          startInManualMode: state.uri.queryParameters['mode'] == 'manual',
+        ),
       ),
-      GoRoute(
-        path: '/add',
-        builder: (context, state) =>
-            AddTransactionScreen(transaction: state.extra as Txn?),
-      ),
-      GoRoute(path: '/slip', builder: (_, __) => const SlipScreen()),
       GoRoute(path: '/chat', builder: (_, __) => const ChatScreen()),
       GoRoute(path: '/budgets', builder: (_, __) => const BudgetListScreen()),
       GoRoute(
