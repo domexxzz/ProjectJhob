@@ -57,7 +57,8 @@ class Txn {
 }
 
 class TxnSummary {
-  TxnSummary({required this.income, required this.expense, required this.balance});
+  TxnSummary(
+      {required this.income, required this.expense, required this.balance});
   final int income;
   final int expense;
   final int balance;
@@ -109,6 +110,10 @@ class BudgetStatus {
     required this.percentage,
     required this.isExceeded,
     required this.period,
+    this.projectedSpend = 0,
+    this.periodProgress = 0,
+    this.daysRemaining = 0,
+    this.riskLevel = 'safe',
   });
 
   final String id;
@@ -120,6 +125,10 @@ class BudgetStatus {
   final double percentage;
   final bool isExceeded;
   final String period;
+  final int projectedSpend;
+  final double periodProgress;
+  final int daysRemaining;
+  final String riskLevel; // safe | warning | danger
 
   factory BudgetStatus.fromJson(Map<String, dynamic> j) => BudgetStatus(
         id: j['id'] as String,
@@ -133,5 +142,9 @@ class BudgetStatus {
         percentage: (j['percentage'] as num).toDouble(),
         isExceeded: j['isExceeded'] as bool,
         period: j['period'] as String,
+        projectedSpend: (j['projectedSpend'] as num?)?.toInt() ?? 0,
+        periodProgress: (j['periodProgress'] as num?)?.toDouble() ?? 0,
+        daysRemaining: (j['daysRemaining'] as num?)?.toInt() ?? 0,
+        riskLevel: (j['riskLevel'] ?? 'safe') as String,
       );
 }

@@ -97,6 +97,19 @@ budgetsRouter.get(
       });
 
       const spent = agg._sum.amount || 0;
+      const totalMs = endDate.getTime() - startDate.getTime();
+      const elapsedMs = Math.max(0, Math.min(now.getTime() - startDate.getTime(), totalMs));
+      const minimumProgress = 1 / Math.max(1, Math.ceil(totalMs / 86_400_000));
+      const periodProgress = Math.max(minimumProgress, totalMs > 0 ? elapsedMs / totalMs : 1);
+      const projectedSpend = spent > 0 ? Math.max(spent, Math.round(spent / periodProgress)) : 0;
+      const actualRatio = b.amount > 0 ? spent / b.amount : 0;
+      const projectedRatio = b.amount > 0 ? projectedSpend / b.amount : 0;
+      const riskLevel = actualRatio >= 1 || projectedRatio >= 1.1
+        ? 'danger'
+        : actualRatio >= 0.8 || projectedRatio >= 0.9
+          ? 'warning'
+          : 'safe';
+      const daysRemaining = Math.max(0, Math.ceil((endDate.getTime() - now.getTime()) / 86_400_000));
 
       budgetsStatus.push({
         id: b.id,
@@ -115,6 +128,10 @@ budgetsRouter.get(
         percentage: b.amount > 0 ? parseFloat((spent / b.amount).toFixed(2)) : 0,
         isExceeded: spent > b.amount,
         period: b.period,
+        projectedSpend,
+        periodProgress: parseFloat(periodProgress.toFixed(3)),
+        daysRemaining,
+        riskLevel,
       });
     }
 
