@@ -37,6 +37,8 @@ dev_dependencies:
 flutter:
   uses-material-design: true
   assets:
-    - assets/images/
+    - assets/images/logo.png
     - assets/images/goal_banner.png
+    - assets/images/chat_avatar_v2.png
+    - assets/images/chat_typing_v2.png
 

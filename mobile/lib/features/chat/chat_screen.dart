@@ -39,7 +39,9 @@ class _ChatScreenState extends ConsumerState<ChatScreen> {
 
   CoachMood get _mood => _listening
       ? CoachMood.listening
-      : (_sending || _attaching ? CoachMood.thinking : CoachMood.idle);
+      : (_sending || _attaching || _typingId != null
+          ? CoachMood.thinking
+          : CoachMood.idle);
 
   @override
   void initState() {
@@ -244,6 +246,14 @@ class _ChatScreenState extends ConsumerState<ChatScreen> {
                                     message: m,
                                     animate: !m.isUser && m.id == _typingId,
                                     onGrow: _followLatestMessage,
+                                    onTypingComplete: !m.isUser &&
+                                            m.id == _typingId
+                                        ? () {
+                                            if (mounted && _typingId == m.id) {
+                                              setState(() => _typingId = null);
+                                            }
+                                          }
+                                        : null,
                                   )),
                               if (_sending) const _TypingBubble(),
                             ],
@@ -621,11 +631,14 @@ class _AvatarHeaderState extends State<_AvatarHeader>
         : mood == CoachMood.thinking
             ? 'กำลังคิด...'
             : 'พร้อมให้คำปรึกษา';
-    final face = mood == CoachMood.listening
-        ? '👂'
+    final statusIcon = mood == CoachMood.listening
+        ? Icons.mic_rounded
         : mood == CoachMood.thinking
-            ? '💭'
-            : '🤖';
+            ? Icons.more_horiz_rounded
+            : Icons.check_rounded;
+    final avatarAsset = mood == CoachMood.thinking
+        ? 'assets/images/chat_typing_v2.png'
+        : 'assets/images/chat_avatar_v2.png';
 
     return Padding(
       padding: const EdgeInsets.symmetric(vertical: 6),
@@ -640,25 +653,76 @@ class _AvatarHeaderState extends State<_AvatarHeader>
               final glow = (mood == CoachMood.idle ? 8.0 : 16.0) + 10 * t;
               return Transform.scale(
                 scale: scale,
-                child: Container(
-                  width: 48,
-                  height: 48,
-                  alignment: Alignment.center,
-                  decoration: BoxDecoration(
-                    shape: BoxShape.circle,
-                    gradient: LinearGradient(
-                      colors: [color, color.withOpacity(0.7)],
-                      begin: Alignment.topLeft,
-                      end: Alignment.bottomRight,
+                child: Stack(
+                  clipBehavior: Clip.none,
+                  children: [
+                    Container(
+                      width: 58,
+                      height: 58,
+                      padding: const EdgeInsets.all(2),
+                      decoration: BoxDecoration(
+                        shape: BoxShape.circle,
+                        color: color,
+                        border: Border.all(
+                          color: Colors.white.withValues(alpha: 0.16),
+                          width: 1,
+                        ),
+                        boxShadow: [
+                          BoxShadow(
+                            color: color.withValues(alpha: 0.45),
+                            blurRadius: glow,
+                            spreadRadius: 1,
+                          )
+                        ],
+                      ),
+                      child: ClipOval(
+                        child: SizedBox.expand(
+                          child: AnimatedSwitcher(
+                            duration: const Duration(milliseconds: 280),
+                            layoutBuilder: (currentChild, previousChildren) {
+                              return Stack(
+                                fit: StackFit.expand,
+                                alignment: Alignment.center,
+                                children: [
+                                  ...previousChildren,
+                                  if (currentChild != null) currentChild,
+                                ],
+                              );
+                            },
+                            child: Image.asset(
+                              avatarAsset,
+                              key: ValueKey(avatarAsset),
+                              width: double.infinity,
+                              height: double.infinity,
+                              fit: BoxFit.cover,
+                              alignment: Alignment.center,
+                              errorBuilder: (context, error, stackTrace) {
+                                return Image.asset(
+                                  'assets/images/logo.png',
+                                  fit: BoxFit.cover,
+                                );
+                              },
+                            ),
+                          ),
+                        ),
+                      ),
                     ),
-                    boxShadow: [
-                      BoxShadow(
-                          color: color.withOpacity(0.45),
-                          blurRadius: glow,
-                          spreadRadius: 1)
-                    ],
-                  ),
-                  child: Text(face, style: const TextStyle(fontSize: 24)),
+                    Positioned(
+                      right: -2,
+                      bottom: -2,
+                      child: Container(
+                        width: 20,
+                        height: 20,
+                        decoration: BoxDecoration(
+                          color: color,
+                          shape: BoxShape.circle,
+                          border: Border.all(
+                              color: const Color(0xFF0D1117), width: 2),
+                        ),
+                        child: Icon(statusIcon, color: Colors.white, size: 12),
+                      ),
+                    ),
+                  ],
                 ),
               );
             },
@@ -751,12 +815,18 @@ MarkdownStyleSheet _coachMdStyle() => MarkdownStyleSheet(
     );
 
 class _Bubble extends StatelessWidget {
-  const _Bubble(
-      {super.key, required this.message, this.animate = false, this.onGrow});
+  const _Bubble({
+    super.key,
+    required this.message,
+    this.animate = false,
+    this.onGrow,
+    this.onTypingComplete,
+  });
   final ChatMessage message;
   final bool
       animate; // true = ค่อย ๆ พิมพ์ออกมา (เฉพาะข้อความพี่เงินที่เพิ่งตอบ)
   final VoidCallback? onGrow;
+  final VoidCallback? onTypingComplete;
 
   @override
   Widget build(BuildContext context) {
@@ -815,7 +885,11 @@ class _Bubble extends StatelessWidget {
                       fontWeight: FontWeight.w500,
                     ))
                 : animate
-                    ? _TypewriterMarkdown(text: message.content, onGrow: onGrow)
+                    ? _TypewriterMarkdown(
+                        text: message.content,
+                        onGrow: onGrow,
+                        onComplete: onTypingComplete,
+                      )
                     : MarkdownBody(
                         data: message.content,
                         selectable: true,
@@ -870,9 +944,14 @@ class _DownloadButton extends StatelessWidget {
 
 /// ค่อย ๆ เผยข้อความทีละไม่กี่ตัวอักษร + เคอร์เซอร์กะพริบ จนครบแล้วโชว์ markdown เต็ม
 class _TypewriterMarkdown extends StatefulWidget {
-  const _TypewriterMarkdown({required this.text, this.onGrow});
+  const _TypewriterMarkdown({
+    required this.text,
+    this.onGrow,
+    this.onComplete,
+  });
   final String text;
   final VoidCallback? onGrow;
+  final VoidCallback? onComplete;
 
   @override
   State<_TypewriterMarkdown> createState() => _TypewriterMarkdownState();
@@ -897,6 +976,7 @@ class _TypewriterMarkdownState extends State<_TypewriterMarkdown> {
           t.cancel();
         }
       });
+      if (_done) widget.onComplete?.call();
       // เลื่อนจอตามข้อความที่ยาวขึ้น (throttle ทุก ~6 tick)
       if (widget.onGrow != null && (_done || _shown % (step * 6) < step))
         widget.onGrow!();
