@@ -45,10 +45,16 @@ class _SlipScreenState extends ConsumerState<SlipScreen> {
   void initState() {
     super.initState();
     _imageMode = !widget.startInManualMode;
+    _amount.addListener(_onAmountChanged);
+  }
+
+  void _onAmountChanged() {
+    setState(() {});
   }
 
   @override
   void dispose() {
+    _amount.removeListener(_onAmountChanged);
     _amount.dispose();
     _desc.dispose();
     super.dispose();
@@ -355,6 +361,12 @@ class _SlipScreenState extends ConsumerState<SlipScreen> {
                   ),
                   const SizedBox(height: 16),
 
+                  // ── ข้อมูลการเชื่อมโยงงบประมาณ (Proactive Budget Status Display) ──
+                  if (_categoryId != null && _type == 'expense') ...[
+                    _buildBudgetInfoCard(context, ref, _categoryId!),
+                    const SizedBox(height: 16),
+                  ],
+
                   // ── คำอธิบาย ──
                   const Text('คำอธิบาย (ไม่บังคับ)', style: TextStyle(color: Colors.white, fontSize: 14, fontWeight: FontWeight.w600)),
                   const SizedBox(height: 8),
@@ -388,6 +400,177 @@ class _SlipScreenState extends ConsumerState<SlipScreen> {
                 ],
               ),
             ),
+    );
+  }
+
+  Widget _buildBudgetInfoCard(BuildContext context, WidgetRef ref, String categoryId) {
+    final statuses = ref.watch(budgetStatusProvider);
+    BudgetStatus? targetStatus;
+    for (final s in statuses) {
+      if (s.categoryId == categoryId) {
+        targetStatus = s;
+        break;
+      }
+    }
+
+    final double enteredAmount = double.tryParse(_amount.text.replaceAll(',', '').trim()) ?? 0;
+    final int enteredSatang = Money.toSatang(enteredAmount);
+
+    if (targetStatus == null) {
+      return Container(
+        padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 12),
+        decoration: BoxDecoration(
+          color: const Color(0xFF131D17),
+          borderRadius: BorderRadius.circular(12),
+          border: Border.all(color: Colors.white10),
+        ),
+        child: Row(
+          mainAxisAlignment: MainAxisAlignment.spaceBetween,
+          children: [
+            const Expanded(
+              child: Column(
+                crossAxisAlignment: CrossAxisAlignment.start,
+                children: [
+                  Text('ยังไม่ได้ตั้งงบประมาณสำหรับหมวดนี้', style: TextStyle(color: Colors.white60, fontSize: 13)),
+                  SizedBox(height: 2),
+                  Text('ตั้งค่าไว้เพื่อช่วยควบคุมค่าใช้จ่ายได้ดีขึ้น', style: TextStyle(color: Colors.white38, fontSize: 11)),
+                ],
+              ),
+            ),
+            TextButton.icon(
+              onPressed: () => context.push('/budgets'),
+              icon: const Icon(Icons.add_chart_rounded, size: 16, color: AppColors.primary),
+              label: const Text('ตั้งงบ', style: TextStyle(color: AppColors.primary, fontSize: 13, fontWeight: FontWeight.bold)),
+            ),
+          ],
+        ),
+      );
+    }
+
+    final newSpent = targetStatus.spent + enteredSatang;
+    final isExceededNow = targetStatus.spent > targetStatus.amount;
+    final willExceed = newSpent > targetStatus.amount;
+    
+    final currentPercent = targetStatus.amount > 0 ? (targetStatus.spent / targetStatus.amount).clamp(0.0, 1.0) : 0.0;
+    final newPercent = targetStatus.amount > 0 ? (newSpent / targetStatus.amount).clamp(0.0, 1.0) : 0.0;
+
+    return Container(
+      padding: const EdgeInsets.all(16),
+      decoration: BoxDecoration(
+        color: const Color(0xFF13241A),
+        borderRadius: BorderRadius.circular(14),
+        border: Border.all(color: willExceed ? Colors.redAccent.withOpacity(0.3) : AppColors.primary.withOpacity(0.2)),
+      ),
+      child: Column(
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: [
+          Row(
+            mainAxisAlignment: MainAxisAlignment.spaceBetween,
+            children: [
+              Row(
+                children: [
+                  const Icon(Icons.pie_chart_outline_rounded, color: AppColors.primary, size: 18),
+                  const SizedBox(width: 6),
+                  Text(
+                    'งบประมาณ: ${targetStatus.category?.nameTh ?? ""}',
+                    style: const TextStyle(color: Colors.white, fontSize: 13, fontWeight: FontWeight.bold),
+                  ),
+                ],
+              ),
+              GestureDetector(
+                onTap: () => context.push('/budgets'),
+                child: const Row(
+                  children: [
+                    Text('ดูงบทั้งหมด', style: TextStyle(color: AppColors.primary, fontSize: 12, fontWeight: FontWeight.bold)),
+                    Icon(Icons.chevron_right_rounded, color: AppColors.primary, size: 16),
+                  ],
+                ),
+              ),
+            ],
+          ),
+          const SizedBox(height: 12),
+          Row(
+            mainAxisAlignment: MainAxisAlignment.spaceBetween,
+            children: [
+              Text(
+                'ใช้ไป ฿${Money.format(targetStatus.spent)} / ฿${Money.format(targetStatus.amount)}',
+                style: const TextStyle(color: Colors.white70, fontSize: 13),
+              ),
+              if (enteredSatang > 0)
+                Text(
+                  'ใหม่: ฿${Money.format(newSpent)}',
+                  style: TextStyle(
+                    color: willExceed ? Colors.redAccent : AppColors.primary,
+                    fontSize: 13,
+                    fontWeight: FontWeight.bold,
+                  ),
+                ),
+            ],
+          ),
+          const SizedBox(height: 8),
+          
+          // Progress Bar showing spent vs new spent vs limit
+          Stack(
+            children: [
+              Container(
+                height: 8,
+                width: double.infinity,
+                decoration: BoxDecoration(
+                  color: Colors.white.withOpacity(0.08),
+                  borderRadius: BorderRadius.circular(4),
+                ),
+              ),
+              if (enteredSatang > 0 && newPercent > currentPercent)
+                FractionallySizedBox(
+                  widthFactor: newPercent,
+                  child: Container(
+                    height: 8,
+                    decoration: BoxDecoration(
+                      color: willExceed ? Colors.redAccent.withOpacity(0.5) : AppColors.primary.withOpacity(0.5),
+                      borderRadius: BorderRadius.circular(4),
+                    ),
+                  ),
+                ),
+              FractionallySizedBox(
+                widthFactor: currentPercent,
+                child: Container(
+                  height: 8,
+                  decoration: BoxDecoration(
+                    color: isExceededNow ? Colors.redAccent : AppColors.primary,
+                    borderRadius: BorderRadius.circular(4),
+                  ),
+                ),
+              ),
+            ],
+          ),
+          const SizedBox(height: 10),
+          Row(
+            mainAxisAlignment: MainAxisAlignment.spaceBetween,
+            children: [
+              if (willExceed)
+                Text(
+                  isExceededNow 
+                      ? 'เกินงบประมาณอยู่ ฿${Money.format(targetStatus.spent - targetStatus.amount)}'
+                      : 'รายการนี้จะทำให้เกินงบไป ฿${Money.format(newSpent - targetStatus.amount)}',
+                  style: const TextStyle(color: Colors.redAccent, fontSize: 11, fontWeight: FontWeight.w500),
+                )
+              else
+                Text(
+                  'เหลือใช้อีก ฿${Money.format(targetStatus.amount - newSpent)}',
+                  style: const TextStyle(color: Colors.white38, fontSize: 11),
+                ),
+              Text(
+                '${(newPercent * 100).toStringAsFixed(0)}%',
+                style: TextStyle(
+                  color: willExceed ? Colors.redAccent : AppColors.primary,
+                  fontSize: 11,
+                  fontWeight: FontWeight.bold,
+                ),
+              ),
+            ],
+          ),
+        ],
+      ),
     );
   }
 
