@@ -257,37 +257,6 @@ final dashboardProvider =
   return repo.list();
 });
 
-/// คำนวณ income / expense / balance จาก transactions list จริงๆ (client-side)
-/// ใช้ตัวเดียวกันทั้ง BalanceCard และ EditBalanceScreen
-/// ไม่ใช้ autoDispose เพื่อไม่ถูก dispose ระหว่างที่ dashboard รีเฟรชข้อมูล
-/// cache ค่าล่าสุดไว้ ไม่คืน 0 ระหว่าง loading
-final balanceSummaryProvider = Provider<({int income, int expense, int balance})>((ref) {
-  final dashboardAsync = ref.watch(dashboardProvider);
-
-  // ถ้ายังไม่มีข้อมูล (loading/error) คืนค่าไปเรื่อยๆ ไม่รีเซ็ตเป็น 0
-  final items = dashboardAsync.valueOrNull?.items;
-  if (items == null) {
-    // ยังโหลดอยู่ → คืน placeholder เดิม (ไม่ rebuild ส่วนอื่น)
-    return (income: 0, expense: 0, balance: 0);
-  }
-
-  int totalIncome = 0;
-  int totalExpense = 0;
-  for (final t in items) {
-    if (t.type == 'income') {
-      totalIncome += t.amount;
-    } else {
-      totalExpense += t.amount;
-    }
-  }
-
-  return (
-    income: totalIncome,
-    expense: totalExpense,
-    balance: totalIncome - totalExpense,
-  );
-});
-
 final categoriesProvider =
     FutureProvider.autoDispose<List<Category>>((ref) => ref.watch(transactionsRepoProvider).categories());
 

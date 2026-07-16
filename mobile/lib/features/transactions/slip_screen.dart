@@ -20,7 +20,9 @@ const _boxBorder = Color(0xFF2C4636);
 
 /// หน้า "เลือกสลิป" — อัพสลิป (OCR อัตโนมัติ) หรือเขียนเอง → ยืนยันบันทึกรายการ
 class SlipScreen extends ConsumerStatefulWidget {
-  const SlipScreen({super.key});
+  const SlipScreen({super.key, this.startInManualMode = false});
+
+  final bool startInManualMode;
 
   @override
   ConsumerState<SlipScreen> createState() => _SlipScreenState();
@@ -31,13 +33,19 @@ class _SlipScreenState extends ConsumerState<SlipScreen> {
   final _amount = TextEditingController();
   final _desc = TextEditingController();
 
-  bool _imageMode = true; // true = เลือกไฟล์รูป, false = เขียนเอง
+  late bool _imageMode; // true = เลือกไฟล์รูป, false = เขียนเอง
   String _type = 'expense';
   String? _categoryId;
   DateTime? _date;
   String? _fileName;
   bool _analyzing = false;
   bool _saving = false;
+
+  @override
+  void initState() {
+    super.initState();
+    _imageMode = !widget.startInManualMode;
+  }
 
   @override
   void dispose() {
@@ -371,7 +379,10 @@ class _SlipScreenState extends ConsumerState<SlipScreen> {
                       onPressed: _saving ? null : _confirm,
                       child: _saving
                           ? const SizedBox(height: 22, width: 22, child: CircularProgressIndicator(strokeWidth: 2, color: Colors.white))
-                          : const Text('ยืนยันการแก้ไข', style: TextStyle(fontSize: 16, fontWeight: FontWeight.bold)),
+                          : Text(
+                              _imageMode ? 'ยืนยันบันทึกสลิป' : 'บันทึกสลิป',
+                              style: const TextStyle(fontSize: 16, fontWeight: FontWeight.bold),
+                            ),
                     ),
                   ),
                 ],

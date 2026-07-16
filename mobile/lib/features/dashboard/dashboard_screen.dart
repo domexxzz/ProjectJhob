@@ -54,15 +54,13 @@ class DashboardScreen extends ConsumerWidget {
                       onRetry: () => ref.invalidate(dashboardProvider),
                     ),
                     data: (d) {
-  final summary = ref.watch(balanceSummaryProvider);
-
   return Column(
     crossAxisAlignment: CrossAxisAlignment.start,
     children: [
       _BalanceCard(
-        balance: summary.balance,
-        income: summary.income,
-        expense: summary.expense,
+        balance: d.summary.balance,
+        income: d.summary.income,
+        expense: d.summary.expense,
       ),
       const SizedBox(height: 16),
 
@@ -193,7 +191,7 @@ class _GreenHeader extends StatelessWidget {
 // ─────────────────────────────────────────────────────────────────────────────
 // Balance Card (ยอดคงเหลือ)
 // ─────────────────────────────────────────────────────────────────────────────
-class _BalanceCard extends ConsumerWidget {
+class _BalanceCard extends StatelessWidget {
   const _BalanceCard({
     required this.balance,
     required this.income,
@@ -204,7 +202,7 @@ class _BalanceCard extends ConsumerWidget {
   final int expense;
 
   @override
-  Widget build(BuildContext context, WidgetRef ref) {
+  Widget build(BuildContext context) {
     return Container(
       padding: const EdgeInsets.all(20),
       decoration: BoxDecoration(
@@ -219,36 +217,30 @@ class _BalanceCard extends ConsumerWidget {
       child: Column(
         crossAxisAlignment: CrossAxisAlignment.start,
         children: [
-          Row(
-            mainAxisAlignment: MainAxisAlignment.spaceBetween,
-            children: [
-              const Text(
-                'ยอดคงเหลือ',
-                style: TextStyle(color: Colors.white60, fontSize: 13),
-              ),
-              GestureDetector(
-                onTap: () async {
-                  await context.push('/edit-balance');
-                  ref.invalidate(dashboardProvider); // ดึงยอดใหม่ทันทีที่กลับมา
-                  await ref.read(dashboardProvider.future);
-                },
-                child: const Icon(Icons.edit_outlined, size: 16, color: Colors.white38),
-              ),
-            ],
+          const Text(
+            'ยอดคงเหลือ',
+            style: TextStyle(color: Colors.white60, fontSize: 13),
           ),
           const SizedBox(height: 8),
           Row(
             crossAxisAlignment: CrossAxisAlignment.end,
-            mainAxisAlignment: MainAxisAlignment.spaceBetween,
             children: [
-              Text(
-                Money.formatBaht(balance),
-                style: const TextStyle(
-                  color: Colors.white,
-                  fontSize: 30,
-                  fontWeight: FontWeight.bold,
+              Expanded(
+                child: FittedBox(
+                  fit: BoxFit.scaleDown,
+                  alignment: Alignment.bottomLeft,
+                  child: Text(
+                    Money.formatBaht(balance),
+                    maxLines: 1,
+                    style: const TextStyle(
+                      color: Colors.white,
+                      fontSize: 30,
+                      fontWeight: FontWeight.bold,
+                    ),
+                  ),
                 ),
               ),
+              const SizedBox(width: 16),
               Column(
                 crossAxisAlignment: CrossAxisAlignment.end,
                 children: [
@@ -277,7 +269,7 @@ class _MiniStatRow extends StatelessWidget {
       children: [
         Text('$label  ', style: const TextStyle(color: Colors.white54, fontSize: 12)),
         Text(
-          '${Money.formatBaht(value)} ฿',
+          Money.formatBaht(value),
           style: TextStyle(color: color, fontSize: 13, fontWeight: FontWeight.bold),
         ),
       ],
@@ -584,7 +576,7 @@ class _BudgetsCard extends ConsumerWidget {
                             ),
                             const SizedBox(width: 12),
                             Text(
-                              '฿ ${Money.formatBaht(status.spent)} / ${Money.formatBaht(status.amount)}',
+                              '${Money.formatBaht(status.spent)} / ${Money.formatBaht(status.amount)}',
                               style: const TextStyle(color: Colors.white, fontSize: 14, fontWeight: FontWeight.bold),
                             ),
                           ],
@@ -673,7 +665,7 @@ class _RecentTxnCards extends StatelessWidget {
                   crossAxisAlignment: CrossAxisAlignment.start,
                   children: [
                     Text(
-                      '฿ ${Money.formatBaht(t.amount)}',
+                      Money.formatBaht(t.amount),
                       style: const TextStyle(
                         color: Colors.white,
                         fontWeight: FontWeight.bold,
@@ -709,7 +701,7 @@ class _QuickActionsGrid extends StatelessWidget {
       (icon: Icons.document_scanner_outlined, label: 'สแกนสลิป', onTap: () => context.push('/slip')),
       (icon: Icons.chat_bubble_outline_rounded, label: 'ปรึกษาพี่เงิน', onTap: () => context.push('/chat')),
       (icon: Icons.flag_outlined, label: 'เป้าหมาย', onTap: () => context.push('/goals')),
-      (icon: Icons.add_outlined, label: 'เพิ่มรายการ', onTap: () => context.push('/add')),
+      (icon: Icons.edit_note_rounded, label: 'บันทึกสลิป', onTap: () => context.push('/slip?mode=manual')),
     ];
 
     return Container(

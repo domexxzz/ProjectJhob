@@ -6,7 +6,13 @@ import { prisma } from '../../lib/prisma';
 import { cache } from '../../lib/cache';
 import { buildContext } from './context_builder';
 import { generateReply, ChatTurn, ocrImage } from './coach';
-import { detectExportRequest, buildExportReply, buildDynamicExportReply, ChatAttachment } from './export_intent';
+import {
+  detectExportRequest,
+  buildExportReply,
+  buildDynamicExportReply,
+  ChatAttachment,
+} from './export_intent';
+import { checkFinanceScope, OUT_OF_SCOPE_REPLY } from './finance_scope';
 
 export const chatRouter = Router();
 chatRouter.use(requireAuth);
@@ -53,6 +59,34 @@ chatRouter.post(
       }
     }
 
+    // ตรวจขอบเขตก่อนเรียก LLM และก่อนสร้างไฟล์ เพื่อให้พี่เงินตอบเฉพาะเรื่องการเงิน
+    const priorMessagesDesc = await prisma.chatMessage.findMany({
+      where: { userId },
+      orderBy: { createdAt: 'desc' },
+      take: 16,
+    });
+    const history: ChatTurn[] = [...priorMessagesDesc].reverse().filter((m) => {
+      if (m.role !== 'assistant' || !m.context) return true;
+      try {
+        const source = JSON.parse(m.context).source;
+        return source !== 'finance-scope-guard' && source !== 'export-format-unsupported';
+      } catch (_) {
+        return true;
+      }
+    }).map((m) => {
+      let content = m.content;
+      if (m.role === 'user' && m.context) {
+        try {
+          const parsed = JSON.parse(m.context);
+          if (parsed.ocrText) {
+            content = `${m.content}\n\n[ข้อมูลที่แอปตรวจพบในรูปภาพที่ผู้ใช้แนบ: ${parsed.ocrText}]`;
+          }
+        } catch (_) {}
+      }
+      return { role: m.role === 'assistant' ? 'assistant' : 'user', content };
+    });
+    const scope = checkFinanceScope(message, history, ocrText);
+
     // เก็บข้อความผู้ใช้ โดยเก็บ ocrText และ flag ว่ามีรูปไว้ใน context
     await prisma.chatMessage.create({
       data: {
@@ -63,6 +97,19 @@ chatRouter.post(
       },
     });
 
+    if (!scope.allowed) {
+      const saved = await prisma.chatMessage.create({
+        data: {
+          userId,
+          role: 'assistant',
+          content: OUT_OF_SCOPE_REPLY,
+          context: JSON.stringify({ source: 'finance-scope-guard', reason: scope.reason }),
+        },
+      });
+      res.status(201).json({ message: saved, source: 'finance-scope-guard' });
+      return;
+    }
+
     // ── ถ้าเป็นคำขอ "ไฟล์การเงิน" → พี่เงินสร้างไฟล์ + แนบปุ่มดาวน์โหลด ──
     const exp = detectExportRequest(message);
     if (exp) {
@@ -71,10 +118,6 @@ chatRouter.post(
       if (exp.kind === 'custom') {
         // ข้อมูลจากบทสนทนา → ให้ LLM จัดเป็นตาราง
         const ctx = await buildContext(userId);
-        const recent = await prisma.chatMessage.findMany({ where: { userId }, orderBy: { createdAt: 'desc' }, take: 8 });
-        const history: ChatTurn[] = recent
-          .reverse()
-          .map((mm) => ({ role: mm.role === 'assistant' ? 'assistant' : 'user', content: mm.content }));
         ({ reply, attachment } = await buildDynamicExportReply(userId, exp.format, ctx, message, history));
       } else {
         ({ reply, attachment } = buildExportReply(userId, exp.kind, exp.format));
@@ -86,27 +129,8 @@ chatRouter.post(
       return;
     }
 
-    // ประกอบ context จริง + ดึง history ล่าสุด พร้อมแทรก OCR Context
+    // ประกอบ context จริง โดยใช้เฉพาะบทสนทนาก่อนข้อความปัจจุบัน (ไม่ส่งคำถามซ้ำ)
     const context = await buildContext(userId);
-    const recent = await prisma.chatMessage.findMany({
-      where: { userId },
-      orderBy: { createdAt: 'desc' },
-      take: 8,
-    });
-    const history: ChatTurn[] = recent
-      .reverse()
-      .map((m) => {
-        let content = m.content;
-        if (m.role === 'user' && m.context) {
-          try {
-            const parsed = JSON.parse(m.context);
-            if (parsed.ocrText) {
-              content = `${m.content}\n\n[ข้อมูลที่แอปตรวจพบในรูปภาพที่ผู้ใช้แนบ: ${parsed.ocrText}]`;
-            }
-          } catch (_) {}
-        }
-        return { role: m.role === 'assistant' ? 'assistant' : 'user', content };
-      });
 
     // ส่งข้อความปัจจุบันพร้อมแนบข้อมูล OCR ล่าสุดเข้าไปคุยกับ LLM
     let currentQuestion = message;

@@ -1,13 +1,13 @@
 import { Router } from 'express';
 import { asyncHandler, HttpError } from '../../lib/http';
 import { cache } from '../../lib/cache';
-import { buildExportFile, buildDynamicFile, verifyExportToken, DynamicTable, ExportKind, ExportFormat } from './export.service';
+import { buildExportFile, buildDynamicFile, verifyExportToken, DynamicExportPayload, ExportKind, ExportFormat } from './export.service';
 
 export const exportRouter = Router();
 
 const KINDS: ExportKind[] = ['budget', 'transactions', 'summary', 'subscriptions'];
 
-// GET /api/v1/export/:kind?format=xlsx|xml&dt=<download token>
+// GET /api/v1/export/:kind?format=xlsx|xml|pdf|docx|csv|json|txt|html&dt=<download token>
 // auth ผ่าน dt (short-lived token). ถ้า token มี cacheId → dynamic (ตารางจากแชท), ไม่งั้น → export จาก DB
 exportRouter.get(
   '/:kind',
@@ -23,14 +23,17 @@ exportRouter.get(
       throw new HttpError(401, 'download token ไม่ถูกต้องหรือหมดอายุ');
     }
 
-    const format: ExportFormat = req.query.format === 'xml' ? 'xml' : 'xlsx';
+    const requested = String(req.query.format ?? 'xlsx').toLowerCase();
+    const formats: ExportFormat[] = ['xlsx', 'xml', 'pdf', 'docx', 'csv', 'json', 'txt', 'html'];
+    if (!formats.includes(requested as ExportFormat)) throw new HttpError(400, 'รูปแบบไฟล์ไม่ถูกต้อง');
+    const format = requested as ExportFormat;
 
     let file;
     if (cacheId) {
       // dynamic — ตารางที่ LLM จัดจากแชท (เก็บใน cache 15 นาที)
-      const table = await cache.get<DynamicTable>(`export:${cacheId}`);
-      if (!table) throw new HttpError(410, 'ไฟล์หมดอายุแล้ว (เกิน 15 นาที) — ขอพี่เงินสร้างใหม่อีกครั้งได้เลย');
-      file = buildDynamicFile(table, format);
+      const payload = await cache.get<DynamicExportPayload>(`export:${cacheId}`);
+      if (!payload) throw new HttpError(410, 'ไฟล์หมดอายุแล้ว (เกิน 15 นาที) — ขอพี่เงินสร้างใหม่อีกครั้งได้เลย');
+      file = await buildDynamicFile(payload, format);
     } else {
       const kind = req.params.kind as ExportKind;
       if (!KINDS.includes(kind)) throw new HttpError(400, 'ชนิดไฟล์ไม่ถูกต้อง');
