@@ -18,7 +18,8 @@ class MenuScreen extends ConsumerWidget {
       backgroundColor: const Color(0xFF121212),
       body: Column(
         children: [
-          _MenuHeader(name: user?.displayName ?? 'เพื่อน', streak: user?.streak ?? 0),
+          _MenuHeader(
+              name: user?.displayName ?? 'เพื่อน', streak: user?.streak ?? 0),
           Expanded(
             child: SingleChildScrollView(
               padding: const EdgeInsets.fromLTRB(16, 24, 16, 100),
@@ -52,7 +53,8 @@ class MenuScreen extends ConsumerWidget {
                         child: _MenuCard(
                           icon: Icons.lock,
                           title: 'ความเป็นส่วนตัว',
-                          subtitle: 'การจัดการรหัสผ่าน,\nและตั้งค่าความเป็นส่วนตัว',
+                          subtitle:
+                              'การจัดการรหัสผ่าน,\nและตั้งค่าความเป็นส่วนตัว',
                           onTap: () => _soon(context),
                         ),
                       ),
@@ -126,7 +128,8 @@ class _MenuHeader extends StatelessWidget {
             decoration: BoxDecoration(
               shape: BoxShape.circle,
               color: Colors.grey.shade700,
-              border: Border.all(color: AppColors.primary.withOpacity(0.5), width: 2),
+              border: Border.all(
+                  color: AppColors.primary.withOpacity(0.5), width: 2),
             ),
             child: const Icon(Icons.person, color: Colors.white70, size: 26),
           ),
@@ -136,17 +139,25 @@ class _MenuHeader extends StatelessWidget {
               crossAxisAlignment: CrossAxisAlignment.start,
               children: [
                 Text(name,
-                    style: const TextStyle(color: Colors.white, fontSize: 16, fontWeight: FontWeight.bold)),
+                    style: const TextStyle(
+                        color: Colors.white,
+                        fontSize: 16,
+                        fontWeight: FontWeight.bold)),
                 const SizedBox(height: 4),
                 Container(
-                  padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 3),
+                  padding:
+                      const EdgeInsets.symmetric(horizontal: 10, vertical: 3),
                   decoration: BoxDecoration(
                     color: AppColors.primary.withOpacity(0.25),
                     borderRadius: BorderRadius.circular(12),
-                    border: Border.all(color: AppColors.primary.withOpacity(0.4)),
+                    border:
+                        Border.all(color: AppColors.primary.withOpacity(0.4)),
                   ),
                   child: Text('ใช้งานต่อเนื่อง $streak วัน',
-                      style: const TextStyle(color: AppColors.primary, fontSize: 11, fontWeight: FontWeight.w600)),
+                      style: const TextStyle(
+                          color: AppColors.primary,
+                          fontSize: 11,
+                          fontWeight: FontWeight.w600)),
                 ),
               ],
             ),
@@ -159,7 +170,11 @@ class _MenuHeader extends StatelessWidget {
 }
 
 class _MenuCard extends StatelessWidget {
-  const _MenuCard({required this.icon, required this.title, required this.subtitle, required this.onTap});
+  const _MenuCard(
+      {required this.icon,
+      required this.title,
+      required this.subtitle,
+      required this.onTap});
   final IconData icon;
   final String title;
   final String subtitle;
@@ -190,9 +205,15 @@ class _MenuCard extends StatelessWidget {
               child: Icon(icon, color: const Color(0xFF1A1A1A), size: 24),
             ),
             const Spacer(),
-            Text(title, style: const TextStyle(color: Colors.white, fontSize: 15, fontWeight: FontWeight.bold)),
+            Text(title,
+                style: const TextStyle(
+                    color: Colors.white,
+                    fontSize: 15,
+                    fontWeight: FontWeight.bold)),
             const SizedBox(height: 4),
-            Text(subtitle, style: const TextStyle(color: Colors.white54, fontSize: 11, height: 1.3)),
+            Text(subtitle,
+                style: const TextStyle(
+                    color: Colors.white54, fontSize: 11, height: 1.3)),
           ],
         ),
       ),
@@ -213,7 +234,10 @@ class _MenuNav extends StatelessWidget {
           topRight: Radius.circular(30),
         ),
         boxShadow: [
-          BoxShadow(color: Colors.black.withOpacity(0.3), blurRadius: 12, offset: const Offset(0, -2))
+          BoxShadow(
+              color: Colors.black.withOpacity(0.3),
+              blurRadius: 12,
+              offset: const Offset(0, -2))
         ],
       ),
       child: BottomAppBar(
@@ -225,11 +249,22 @@ class _MenuNav extends StatelessWidget {
         child: Row(
           mainAxisAlignment: MainAxisAlignment.spaceAround,
           children: [
-            _MenuNavItem(icon: Icons.home_outlined, label: 'หน้าหลัก', onTap: () => context.go('/')),
-            _MenuNavItem(icon: Icons.insert_chart_outlined_rounded, label: 'งบ', onTap: () => context.push('/budgets')),
+            _MenuNavItem(
+                icon: Icons.home_outlined,
+                label: 'หน้าหลัก',
+                onTap: () => context.go('/')),
+            _MenuNavItem(
+              icon: Icons.dashboard_outlined,
+              label: 'แดชบอร์ด',
+              onTap: () => context.push('/financial-dashboard'),
+            ),
             const SizedBox(width: 48),
-            _MenuNavItem(icon: Icons.chat_bubble_outline_rounded, label: 'พี่เงิน', onTap: () => context.push('/chat')),
-            const _MenuNavItem(icon: Icons.grid_view_rounded, label: 'เมนู', active: true),
+            _MenuNavItem(
+                icon: Icons.chat_bubble_outline_rounded,
+                label: 'พี่เงิน',
+                onTap: () => context.push('/chat')),
+            const _MenuNavItem(
+                icon: Icons.grid_view_rounded, label: 'เมนู', active: true),
           ],
         ),
       ),
@@ -238,7 +273,11 @@ class _MenuNav extends StatelessWidget {
 }
 
 class _MenuNavItem extends StatelessWidget {
-  const _MenuNavItem({required this.icon, required this.label, this.active = false, this.onTap});
+  const _MenuNavItem(
+      {required this.icon,
+      required this.label,
+      this.active = false,
+      this.onTap});
   final IconData icon;
   final String label;
   final bool active;

@@ -16,7 +16,8 @@ class GoalsScreen extends ConsumerWidget {
     final goals = ref.watch(goalsProvider);
     final user = ref.watch(authControllerProvider).user;
     return Scaffold(
-      backgroundColor: const Color(0xFF121212), // คุมโทน Premium Dark UI แบบ Dashboard
+      backgroundColor:
+          const Color(0xFF121212), // คุมโทน Premium Dark UI แบบ Dashboard
       body: Column(
         children: [
           // 1. Top Green Gradient Header Bar (ถอดจากภาพ goal.png และ dashboard)
@@ -153,7 +154,8 @@ class _GreenHeader extends StatelessWidget {
                 ),
                 const SizedBox(height: 6),
                 Container(
-                  padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 4),
+                  padding:
+                      const EdgeInsets.symmetric(horizontal: 12, vertical: 4),
                   decoration: BoxDecoration(
                     color: Colors.white.withOpacity(0.2),
                     borderRadius: BorderRadius.circular(12),
@@ -172,7 +174,8 @@ class _GreenHeader extends StatelessWidget {
           ),
           IconButton(
             onPressed: () {},
-            icon: const Icon(Icons.notifications_none_rounded, color: Colors.white, size: 28),
+            icon: const Icon(Icons.notifications_none_rounded,
+                color: Colors.white, size: 28),
           ),
         ],
       ),
@@ -205,7 +208,7 @@ class _CoachBanner extends StatelessWidget {
         borderRadius: BorderRadius.circular(24),
         child: Image.asset(
           'assets/images/goal_banner.png', // เปลี่ยนเป็น path รูปภาพที่คุณเซฟไว้ในโปรเจกต์
-          fit: BoxFit.cover, 
+          fit: BoxFit.cover,
           width: double.infinity,
           // ในกรณีที่รูปภาพยังโหลดไม่ขึ้นหรือระบุ path ผิด จะแสดงกล่องสีดำเพื่อไม่ให้ UI พัง
           errorBuilder: (context, error, stackTrace) {
@@ -213,7 +216,8 @@ class _CoachBanner extends StatelessWidget {
               height: 140,
               color: const Color(0xFF061A13),
               alignment: Alignment.center,
-              child: const Icon(Icons.image_not_supported_rounded, color: Colors.white24, size: 40),
+              child: const Icon(Icons.image_not_supported_rounded,
+                  color: Colors.white24, size: 40),
             );
           },
         ),
@@ -272,7 +276,8 @@ class _GoalItemCard extends StatelessWidget {
               children: [
                 Builder(
                   builder: (context) {
-                    final hasLocalImage = goal.imagePath != null && File(goal.imagePath!).existsSync();
+                    final hasLocalImage = goal.imagePath != null &&
+                        File(goal.imagePath!).existsSync();
                     return Container(
                       width: 52,
                       height: 52,
@@ -289,7 +294,8 @@ class _GoalItemCard extends StatelessWidget {
                       alignment: Alignment.center,
                       child: hasLocalImage
                           ? null
-                          : Text(goal.emoji, style: const TextStyle(fontSize: 24)),
+                          : Text(goal.emoji,
+                              style: const TextStyle(fontSize: 24)),
                     );
                   },
                 ),
@@ -309,7 +315,8 @@ class _GoalItemCard extends StatelessWidget {
                       const SizedBox(height: 4),
                       Text(
                         'เป้าหมาย ฿ ${Money.format(goal.target)}',
-                        style: TextStyle(color: Colors.white.withOpacity(0.6), fontSize: 13),
+                        style: TextStyle(
+                            color: Colors.white.withOpacity(0.6), fontSize: 13),
                       ),
                     ],
                   ),
@@ -365,13 +372,19 @@ class _GoalItemCard extends StatelessWidget {
               children: [
                 Text(
                   '฿ ${Money.format(goal.current)} / ${Money.format(goal.target)}',
-                  style: const TextStyle(color: Colors.white, fontSize: 13, fontWeight: FontWeight.bold),
+                  style: const TextStyle(
+                      color: Colors.white,
+                      fontSize: 13,
+                      fontWeight: FontWeight.bold),
                 ),
                 Text(
                   displayPercentage >= 100
                       ? 'สำเร็จแล้ว 🎉'
                       : 'เหลืออีก ฿ ${Money.format(remaining)} บาท',
-                  style: TextStyle(color: Colors.white.withOpacity(0.5), fontSize: 11, fontWeight: FontWeight.w500),
+                  style: TextStyle(
+                      color: Colors.white.withOpacity(0.5),
+                      fontSize: 11,
+                      fontWeight: FontWeight.w500),
                 ),
               ],
             ),
@@ -407,7 +420,8 @@ class _AddGoalButton extends StatelessWidget {
         child: const Row(
           mainAxisAlignment: MainAxisAlignment.center,
           children: [
-            Icon(Icons.add_circle_outline_rounded, color: Color(0xFF4CD97B), size: 24),
+            Icon(Icons.add_circle_outline_rounded,
+                color: Color(0xFF4CD97B), size: 24),
             SizedBox(width: 10),
             Text(
               'เพิ่มเป้าหมาย',
@@ -452,7 +466,8 @@ class _RecommendationCard extends StatelessWidget {
               color: Color(0xFF061A13),
               shape: BoxShape.circle,
             ),
-            child: const Icon(Icons.android_rounded, color: Color(0xFF4CD97B), size: 28),
+            child: const Icon(Icons.android_rounded,
+                color: Color(0xFF4CD97B), size: 28),
           ),
           const SizedBox(width: 16),
           Expanded(
@@ -470,12 +485,14 @@ class _RecommendationCard extends StatelessWidget {
                 const SizedBox(height: 4),
                 Text(
                   'ลองตั้งเป้าหมายระยะสั้นก่อน เพื่อสร้างวินัยทางการเงิน',
-                  style: TextStyle(color: Colors.white.withOpacity(0.6), fontSize: 12),
+                  style: TextStyle(
+                      color: Colors.white.withOpacity(0.6), fontSize: 12),
                 ),
               ],
             ),
           ),
-          const Icon(Icons.chevron_right_rounded, color: Colors.white54, size: 24),
+          const Icon(Icons.chevron_right_rounded,
+              color: Colors.white54, size: 24),
         ],
       ),
     );
@@ -498,7 +515,10 @@ class _GoalsNav extends StatelessWidget {
           topRight: Radius.circular(30),
         ),
         boxShadow: [
-          BoxShadow(color: Colors.black.withOpacity(0.3), blurRadius: 12, offset: const Offset(0, -2))
+          BoxShadow(
+              color: Colors.black.withOpacity(0.3),
+              blurRadius: 12,
+              offset: const Offset(0, -2))
         ],
       ),
       child: BottomAppBar(
@@ -510,11 +530,24 @@ class _GoalsNav extends StatelessWidget {
         child: Row(
           mainAxisAlignment: MainAxisAlignment.spaceAround,
           children: [
-            _NavItem(icon: Icons.home_outlined, label: 'หน้าหลัก', onTap: () => context.go('/')),
-            _NavItem(icon: Icons.insert_chart_outlined_rounded, label: 'งบ', onTap: () => context.push('/budgets')),
+            _NavItem(
+                icon: Icons.home_outlined,
+                label: 'หน้าหลัก',
+                onTap: () => context.go('/')),
+            _NavItem(
+              icon: Icons.dashboard_outlined,
+              label: 'แดชบอร์ด',
+              onTap: () => context.push('/financial-dashboard'),
+            ),
             const SizedBox(width: 48),
-            _NavItem(icon: Icons.chat_bubble_outline_rounded, label: 'พี่เงิน', onTap: () => context.push('/chat')),
-            _NavItem(icon: Icons.grid_view_rounded, label: 'เมนู', onTap: () => context.push('/menu')),
+            _NavItem(
+                icon: Icons.chat_bubble_outline_rounded,
+                label: 'พี่เงิน',
+                onTap: () => context.push('/chat')),
+            _NavItem(
+                icon: Icons.grid_view_rounded,
+                label: 'เมนู',
+                onTap: () => context.push('/menu')),
           ],
         ),
       ),
@@ -523,7 +556,11 @@ class _GoalsNav extends StatelessWidget {
 }
 
 class _NavItem extends StatelessWidget {
-  const _NavItem({required this.icon, required this.label, this.active = false, this.onTap});
+  const _NavItem(
+      {required this.icon,
+      required this.label,
+      this.active = false,
+      this.onTap});
   final IconData icon;
   final String label;
   final bool active;

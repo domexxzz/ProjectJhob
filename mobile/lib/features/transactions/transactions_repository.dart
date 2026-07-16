@@ -9,7 +9,8 @@ import 'transaction.dart';
 typedef DashboardData = ({List<Txn> items, TxnSummary summary});
 
 class AnalyzedSlip {
-  AnalyzedSlip({this.amount, this.date, this.ref, this.merchant, this.categoryId});
+  AnalyzedSlip(
+      {this.amount, this.date, this.ref, this.merchant, this.categoryId});
   final int? amount;
   final String? date;
   final String? ref;
@@ -48,7 +49,7 @@ class TransactionsRepository {
         if (type != null) 'type': type,
       });
       final data = res.data as Map<String, dynamic>;
-      
+
       // Save raw JSON to cache for offline-first read
       await cacheBox.put(cacheKey, jsonEncode(data));
 
@@ -69,7 +70,7 @@ class TransactionsRepository {
         .map((e) => Txn.fromJson(e as Map<String, dynamic>))
         .toList();
     return (
-      items: items, 
+      items: items,
       summary: TxnSummary.fromJson(data['summary'] as Map<String, dynamic>)
     );
   }
@@ -88,7 +89,8 @@ class TransactionsRepository {
       if (categoryId != null) 'categoryId': categoryId,
       if (note != null && note.isNotEmpty) 'note': note,
       'source': source,
-      if (occurredAt != null) 'occurredAt': occurredAt.toUtc().toIso8601String(),
+      if (occurredAt != null)
+        'occurredAt': occurredAt.toUtc().toIso8601String(),
     };
 
     try {
@@ -99,7 +101,8 @@ class TransactionsRepository {
     } catch (e) {
       // Offline fallback: Queue write operation
       final pendingBox = await _getPendingBox();
-      final pendingActions = pendingBox.get('actions', defaultValue: []) as List;
+      final pendingActions =
+          pendingBox.get('actions', defaultValue: []) as List;
       pendingActions.add({
         'action': 'create',
         'data': payload,
@@ -131,7 +134,8 @@ class TransactionsRepository {
       return data['anomalyAlert'] as String?;
     } catch (e) {
       final pendingBox = await _getPendingBox();
-      final pendingActions = pendingBox.get('actions', defaultValue: []) as List;
+      final pendingActions =
+          pendingBox.get('actions', defaultValue: []) as List;
       pendingActions.add({
         'action': 'update',
         'id': id,
@@ -149,7 +153,8 @@ class TransactionsRepository {
       await _clearCache(); // ล้าง cache หลัง delete สำเร็จ
     } catch (e) {
       final pendingBox = await _getPendingBox();
-      final pendingActions = pendingBox.get('actions', defaultValue: []) as List;
+      final pendingActions =
+          pendingBox.get('actions', defaultValue: []) as List;
       pendingActions.add({
         'action': 'delete',
         'id': id,
@@ -201,13 +206,15 @@ class TransactionsRepository {
   }
 
   Future<AnalyzedSlip> analyzeText(String text) async {
-    final res = await _dio.post('/transactions/analyze-text', data: {'text': text});
+    final res =
+        await _dio.post('/transactions/analyze-text', data: {'text': text});
     return AnalyzedSlip.fromJson(res.data as Map<String, dynamic>);
   }
 
   /// อัพสลิป (data URL) → backend OCR + ดึงยอด/วันที่/ร้าน/หมวด (เรียกครั้งเดียว)
   Future<AnalyzedSlip> parseSlip(String dataUrl) async {
-    final res = await _dio.post('/transactions/parse-slip', data: {'imageBase64': dataUrl});
+    final res = await _dio
+        .post('/transactions/parse-slip', data: {'imageBase64': dataUrl});
     return AnalyzedSlip.fromJson(res.data as Map<String, dynamic>);
   }
 
@@ -221,6 +228,42 @@ class TransactionsRepository {
     } catch (e) {
       return [];
     }
+  }
+
+  Future<Budget> createBudget({
+    required String categoryId,
+    required int amount,
+    required String period,
+  }) async {
+    final res = await _dio.post('/budgets', data: {
+      'categoryId': categoryId,
+      'amount': amount,
+      'period': period,
+    });
+    await _clearCache();
+    final data = res.data as Map<String, dynamic>;
+    return Budget.fromJson(data['budget'] as Map<String, dynamic>);
+  }
+
+  Future<Budget> updateBudget(
+    String id, {
+    int? amount,
+    String? period,
+    String? categoryId,
+  }) async {
+    final res = await _dio.patch('/budgets/$id', data: {
+      if (amount != null) 'amount': amount,
+      if (period != null) 'period': period,
+      if (categoryId != null) 'categoryId': categoryId,
+    });
+    await _clearCache();
+    final data = res.data as Map<String, dynamic>;
+    return Budget.fromJson(data['budget'] as Map<String, dynamic>);
+  }
+
+  Future<void> deleteBudget(String id) async {
+    await _dio.delete('/budgets/$id');
+    await _clearCache();
   }
 
   Future<List<BudgetStatus>> listBudgetStatuses({String? period}) async {
@@ -244,23 +287,24 @@ extension on DateTime {
 
 enum DashboardPeriod { day, week, month }
 
-final dashboardPeriodProvider = StateProvider<DashboardPeriod>((ref) => DashboardPeriod.month);
+final dashboardPeriodProvider =
+    StateProvider<DashboardPeriod>((ref) => DashboardPeriod.month);
 
-final transactionsRepoProvider =
-    Provider<TransactionsRepository>((ref) => TransactionsRepository(ref.watch(dioProvider)));
+final transactionsRepoProvider = Provider<TransactionsRepository>(
+    (ref) => TransactionsRepository(ref.watch(dioProvider)));
 
-final dashboardProvider =
-    FutureProvider<DashboardData>((ref) async {
+final dashboardProvider = FutureProvider<DashboardData>((ref) async {
   final repo = ref.watch(transactionsRepoProvider);
   // Auto-sync pending actions before fetching
   await repo.syncPending();
   return repo.list();
 });
 
-final categoriesProvider =
-    FutureProvider.autoDispose<List<Category>>((ref) => ref.watch(transactionsRepoProvider).categories());
+final categoriesProvider = FutureProvider.autoDispose<List<Category>>(
+    (ref) => ref.watch(transactionsRepoProvider).categories());
 
-final budgetsListProvider = FutureProvider.autoDispose<List<Budget>>((ref) async {
+final budgetsListProvider =
+    FutureProvider.autoDispose<List<Budget>>((ref) async {
   final repo = ref.watch(transactionsRepoProvider);
   return repo.listBudgets();
 });
@@ -274,7 +318,7 @@ final budgetStatusProvider = Provider.autoDispose<List<BudgetStatus>>((ref) {
   final transactions = dashboardAsync.value?.items ?? [];
 
   final now = DateTime.now();
-  
+
   final startOfMonth = DateTime(now.year, now.month, 1);
   final endOfMonth = DateTime(now.year, now.month + 1, 1);
 
@@ -289,12 +333,30 @@ final budgetStatusProvider = Provider.autoDispose<List<BudgetStatus>>((ref) {
 
     final filtered = transactions.where((t) {
       if (t.type != 'expense') return false;
-      if (t.occurredAt.isBefore(start) || t.occurredAt.isAfter(end)) return false;
-      if (b.categoryId != null && t.category?.id != b.categoryId) return false;
+      if (t.occurredAt.isBefore(start) || t.occurredAt.isAfter(end)) {
+        return false;
+      }
+      if (b.categoryId != null && t.category?.id != b.categoryId) {
+        return false;
+      }
       return true;
     });
 
     final spent = filtered.fold<int>(0, (sum, t) => sum + t.amount);
+    final totalDays = end.difference(start).inDays;
+    final elapsedDays = now.difference(start).inHours / 24;
+    final periodProgress = totalDays > 0
+        ? (elapsedDays / totalDays).clamp(1 / totalDays, 1.0)
+        : 1.0;
+    final projectedCandidate =
+        spent == 0 ? 0 : (spent / periodProgress).round();
+    final projectedSpend =
+        projectedCandidate < spent ? spent : projectedCandidate;
+    final actualRatio = b.amount > 0 ? spent / b.amount : 0.0;
+    final projectedRatio = b.amount > 0 ? projectedSpend / b.amount : 0.0;
+    final riskLevel = actualRatio >= 1 || projectedRatio >= 1.1
+        ? 'danger'
+        : (actualRatio >= 0.8 || projectedRatio >= 0.9 ? 'warning' : 'safe');
 
     return BudgetStatus(
       id: b.id,
@@ -306,6 +368,10 @@ final budgetStatusProvider = Provider.autoDispose<List<BudgetStatus>>((ref) {
       percentage: b.amount > 0 ? spent / b.amount : 0.0,
       isExceeded: spent > b.amount,
       period: b.period,
+      projectedSpend: projectedSpend,
+      periodProgress: periodProgress,
+      daysRemaining: (totalDays - elapsedDays.ceil()).clamp(0, totalDays),
+      riskLevel: riskLevel,
     );
   }).toList();
 });

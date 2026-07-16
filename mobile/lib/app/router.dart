@@ -6,6 +6,7 @@ import '../features/auth/login_screen.dart';
 import '../features/auth/register_screen.dart';
 import '../features/auth/forgot_password_screen.dart'; // ➕ อิมพอร์ตหน้าลืมรหัสผ่านเข้ามาเพิ่ม
 import '../features/dashboard/dashboard_screen.dart';
+import '../features/dashboard/financial_dashboard_screen.dart';
 import '../features/transactions/slip_screen.dart';
 import '../features/transactions/transaction.dart';
 import '../features/chat/chat_screen.dart';
@@ -25,6 +26,7 @@ import '../features/notifications/notifications_screen.dart';
 import '../features/menu/menu_screen.dart';
 import '../features/predictions/predictions_screen.dart';
 import '../features/goals/set_deadline_screen.dart';
+
 /// Set เป็น true หลังจากผ่าน Welcome3 แล้วกด "เริ่มต้นใช้งาน"
 /// ใช้ควบคุม redirect ไม่ให้ข้าม Login page เมื่อมี token เดิมค้างอยู่
 final onboardingDoneProvider = StateProvider<bool>((ref) => false);
@@ -39,13 +41,13 @@ final routerProvider = Provider<GoRouter>((ref) {
       final loc = state.matchedLocation;
 
       // หน้า onboarding — ไม่ต้องตรวจ auth
-      final onOnboarding = loc == '/welcome1' ||
-          loc == '/welcome2' ||
-          loc == '/welcome3';
+      final onOnboarding =
+          loc == '/welcome1' || loc == '/welcome2' || loc == '/welcome3';
       if (onOnboarding) return null;
 
       // 💡 เพิ่มการตรวจจับหน้าลืมรหัสผ่าน เพื่อไม่ให้ระบบเตะกลับไปหน้า Login ขณะที่ user ทำการกู้คืนรหัส
-      final onAuthPage = loc == '/login' || loc == '/register' || loc == '/forgot-password';
+      final onAuthPage =
+          loc == '/login' || loc == '/register' || loc == '/forgot-password';
 
       if (!authed) return onAuthPage ? null : '/login';
 
@@ -66,10 +68,16 @@ final routerProvider = Provider<GoRouter>((ref) {
       GoRoute(path: '/login', builder: (_, __) => const LoginScreen()),
       GoRoute(path: '/register', builder: (_, __) => const RegisterScreen()),
       // ➕ เพิ่มเส้นทางสำหรับหน้าลืมรหัสผ่าน (3 สเต็ปในหน้าเดียวที่เราทำไว้)
-      GoRoute(path: '/forgot-password', builder: (_, __) => const ForgotPasswordScreen()),
+      GoRoute(
+          path: '/forgot-password',
+          builder: (_, __) => const ForgotPasswordScreen()),
 
       // ── App ──────────────────────────────────────────────────────────────
       GoRoute(path: '/', builder: (_, __) => const DashboardScreen()),
+      GoRoute(
+        path: '/financial-dashboard',
+        builder: (_, __) => const FinancialDashboardScreen(),
+      ),
       GoRoute(
         path: '/slip',
         builder: (_, state) => SlipScreen(
@@ -80,15 +88,25 @@ final routerProvider = Provider<GoRouter>((ref) {
       GoRoute(path: '/budgets', builder: (_, __) => const BudgetListScreen()),
       GoRoute(
         path: '/budgets/edit',
-        builder: (context, state) => BudgetEditScreen(status: state.extra as BudgetStatus),
+        builder: (context, state) =>
+            BudgetEditScreen(status: state.extra as BudgetStatus),
       ),
-      GoRoute(path: '/budgets/amount', builder: (_, __) => const BudgetAmountScreen()),
-      GoRoute(path: '/budgets/duration', builder: (_, __) => const BudgetDurationScreen()),
+      GoRoute(
+          path: '/budgets/amount',
+          builder: (_, __) => const BudgetAmountScreen()),
+      GoRoute(
+          path: '/budgets/duration',
+          builder: (_, __) => const BudgetDurationScreen()),
       GoRoute(path: '/profile', builder: (_, __) => const ProfileScreen()),
       GoRoute(path: '/menu', builder: (_, __) => const MenuScreen()),
-      GoRoute(path: '/subscriptions', builder: (_, __) => const SubscriptionsScreen()),
-      GoRoute(path: '/notifications', builder: (_, __) => const NotificationsScreen()),
-      GoRoute(path: '/predictions', builder: (_, __) => const PredictionsScreen()),
+      GoRoute(
+          path: '/subscriptions',
+          builder: (_, __) => const SubscriptionsScreen()),
+      GoRoute(
+          path: '/notifications',
+          builder: (_, __) => const NotificationsScreen()),
+      GoRoute(
+          path: '/predictions', builder: (_, __) => const PredictionsScreen()),
       GoRoute(path: '/goals', builder: (_, __) => const GoalsScreen()),
       GoRoute(path: '/goals/add', builder: (_, __) => const EditGoalScreen()),
       GoRoute(
@@ -106,15 +124,15 @@ final routerProvider = Provider<GoRouter>((ref) {
         },
       ),
       GoRoute(
-  path: '/goals/duration',
-  builder: (context, state) {
-    final extra = state.extra as Map<String, DateTime?>?;
-    return SetDeadlineScreen(
-      initialStartDate: extra?['startDate'],
-      initialEndDate: extra?['endDate'],
-    );
-  },
-),
+        path: '/goals/duration',
+        builder: (context, state) {
+          final extra = state.extra as Map<String, DateTime?>?;
+          return SetDeadlineScreen(
+            initialStartDate: extra?['startDate'],
+            initialEndDate: extra?['endDate'],
+          );
+        },
+      ),
     ],
   );
 });
