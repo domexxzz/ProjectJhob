@@ -2,6 +2,7 @@ import 'dart:io';
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:go_router/go_router.dart';
+import 'package:flutter/foundation.dart' show kIsWeb; // 👈 เพิ่มบรรทัดนี้
 
 import '../../app/theme.dart';
 import '../../core/money.dart';
@@ -276,26 +277,33 @@ class _GoalItemCard extends StatelessWidget {
               children: [
                 Builder(
                   builder: (context) {
-                    final hasLocalImage = goal.imagePath != null &&
-                        File(goal.imagePath!).existsSync();
+                    // มีรูปหรือไม่ (เช็คแยกกรณี Web ใช้ path ตรงๆ / มือถือต้องเช็คว่าไฟล์มีอยู่จริง)
+                    final bool hasImage = goal.imagePath != null &&
+                        goal.imagePath!.isNotEmpty &&
+                        (kIsWeb || File(goal.imagePath!).existsSync());
+
+                    // เลือก ImageProvider ให้ถูกต้องตามแพลตฟอร์ม (เหมือนกับหน้าแก้ไขเป้าหมาย)
+                    final ImageProvider? imageProvider = hasImage
+                        ? (kIsWeb
+                            ? NetworkImage(goal.imagePath!)
+                            : FileImage(File(goal.imagePath!)) as ImageProvider)
+                        : null;
+
                     return Container(
                       width: 52,
                       height: 52,
                       decoration: BoxDecoration(
                         shape: BoxShape.circle,
                         color: Colors.white.withOpacity(0.1),
-                        image: hasLocalImage
+                        image: imageProvider != null
                             ? DecorationImage(
-                                image: FileImage(File(goal.imagePath!)),
+                                image: imageProvider,
                                 fit: BoxFit.cover,
                               )
                             : null,
                       ),
                       alignment: Alignment.center,
-                      child: hasLocalImage
-                          ? null
-                          : Text(goal.emoji,
-                              style: const TextStyle(fontSize: 24)),
+                      child: hasImage ? null : Text(goal.emoji, style: const TextStyle(fontSize: 24)),
                     );
                   },
                 ),

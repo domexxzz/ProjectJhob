@@ -6,6 +6,7 @@ import '../../app/theme.dart';
 import '../../core/money.dart';
 import '../transactions/transaction.dart';
 import '../transactions/transactions_repository.dart';
+import '../auth/auth_controller.dart'; 
 
 class BudgetListScreen extends ConsumerWidget {
   const BudgetListScreen({super.key});
@@ -23,398 +24,347 @@ class BudgetListScreen extends ConsumerWidget {
   Widget build(BuildContext context, WidgetRef ref) {
     final budgets = ref.watch(budgetsListProvider);
     final statuses = ref.watch(budgetStatusProvider);
+    final user = ref.watch(authControllerProvider).user;
 
     return Scaffold(
-      backgroundColor: const Color(0xFF101210),
-      appBar: AppBar(
-        backgroundColor: const Color(0xFF101210),
-        surfaceTintColor: Colors.transparent,
-        centerTitle: true,
-        title: const Text(
-          'งบประมาณ',
-          style: TextStyle(fontSize: 18, fontWeight: FontWeight.w700),
-        ),
-        leading: IconButton(
-          onPressed: () => context.pop(),
-          icon: const Icon(Icons.arrow_back_rounded),
-        ),
-      ),
-      body: RefreshIndicator(
-        color: AppColors.primary,
-        onRefresh: () => _refresh(ref),
-        child: ListView(
-          physics: const AlwaysScrollableScrollPhysics(),
-          padding: const EdgeInsets.fromLTRB(16, 8, 16, 32),
-          children: [
-            const _BudgetBanner(),
-            const SizedBox(height: 22),
-            Row(
-              children: [
-                const Expanded(
-                  child: Text(
-                    'งบประมาณของฉัน',
-                    style: TextStyle(
-                      color: Colors.white,
-                      fontSize: 17,
-                      fontWeight: FontWeight.w700,
-                    ),
-                  ),
-                ),
-                Text(
-                  '${statuses.length} หมวด',
-                  style: const TextStyle(color: Colors.white38, fontSize: 11),
-                ),
-              ],
-            ),
-            const SizedBox(height: 12),
-            budgets.when(
-              loading: () => const SizedBox(
-                height: 180,
-                child: Center(
-                    child: CircularProgressIndicator(color: AppColors.primary)),
-              ),
-              error: (error, _) => _BudgetError(
-                message: '$error',
-                onRetry: () => _refresh(ref),
-              ),
-              data: (items) {
-                if (items.isEmpty) return const _EmptyBudgetState();
-                return _BudgetOverviewCard(statuses: statuses);
-              },
-            ),
-            const SizedBox(height: 14),
-            OutlinedButton.icon(
-              onPressed: () async {
-                final created = await context.push<bool>('/budgets/amount');
-                if (created == true) await _refresh(ref);
-              },
-              style: OutlinedButton.styleFrom(
-                foregroundColor: AppColors.primary,
-                side: BorderSide(
-                    color: AppColors.primary.withValues(alpha: 0.65)),
-                backgroundColor: const Color(0xFF11261A),
-                minimumSize: const Size.fromHeight(52),
-                shape: RoundedRectangleBorder(
-                    borderRadius: BorderRadius.circular(13)),
-              ),
-              icon: const Icon(Icons.add_circle_outline_rounded),
-              label: const Text(
-                'เพิ่มงบประมาณ',
-                style: TextStyle(fontWeight: FontWeight.w700),
-              ),
-            ),
-            const SizedBox(height: 28),
-            const Text(
-              'ประมาณการความเสี่ยง',
-              style: TextStyle(
-                color: Colors.white,
-                fontSize: 15,
-                fontWeight: FontWeight.w700,
-              ),
-            ),
-            const SizedBox(height: 10),
-            _RiskRecommendation(statuses: statuses),
-          ],
-        ),
-      ),
-    );
-  }
-}
-
-class _BudgetBanner extends StatelessWidget {
-  const _BudgetBanner();
-
-  @override
-  Widget build(BuildContext context) {
-    return Container(
-      height: 118,
-      padding: const EdgeInsets.symmetric(horizontal: 18),
-      decoration: BoxDecoration(
-        gradient: const LinearGradient(
-          colors: [Color(0xFF031B0D), Color(0xFF0B2D18)],
-          begin: Alignment.topLeft,
-          end: Alignment.bottomRight,
-        ),
-        borderRadius: BorderRadius.circular(20),
-        border: Border.all(color: AppColors.primary.withValues(alpha: 0.18)),
-      ),
-      child: const Row(
+      backgroundColor: const Color(0xFF121212), // ธีม Premium Dark UI แบบเดียวกับเป้าหมายและแดชบอร์ด
+      body: Column(
         children: [
-          CircleAvatar(
-            radius: 34,
-            backgroundColor: Color(0xFF07130A),
-            child: Text('🤖', style: TextStyle(fontSize: 38)),
+          // 1. Top Green Gradient Header Bar (ถอดดีไซน์ไล่ระดับสีแบบเดียวกับ Goals Screen เป๊ะๆ)
+          _GreenHeader(
+            name: user?.displayName ?? 'Fanta Inazuma',
+            streak: user?.streak ?? 20,
           ),
-          SizedBox(width: 16),
+
+          // 2. ส่วนแสดงเนื้อหารายการงบประมาณ
           Expanded(
-            child: Column(
-              mainAxisAlignment: MainAxisAlignment.center,
-              crossAxisAlignment: CrossAxisAlignment.end,
-              children: [
-                Text('คุมรายจ่ายให้ทัน',
-                    style: TextStyle(color: Colors.white70, fontSize: 13)),
-                Text('ก่อนงบจะหมด',
-                    style: TextStyle(color: Colors.white70, fontSize: 13)),
-                SizedBox(height: 5),
-                Text('ทำได้แน่!',
-                    style: TextStyle(
-                      color: AppColors.primary,
-                      fontSize: 22,
-                      fontWeight: FontWeight.w900,
-                      fontStyle: FontStyle.italic,
-                    )),
-              ],
+            child: RefreshIndicator(
+              color: const Color(0xFF3CAE63),
+              onRefresh: () => _refresh(ref),
+              child: ListView(
+                padding: const EdgeInsets.fromLTRB(16, 20, 16, 120),
+                children: [
+                  Row(
+                    mainAxisAlignment: MainAxisAlignment.spaceBetween,
+                    children: [
+                      const Text(
+                        'งบประมาณรายเดือน 📊',
+                        style: TextStyle(
+                          color: Colors.white,
+                          fontSize: 18,
+                          fontWeight: FontWeight.bold,
+                          letterSpacing: 0.5,
+                        ),
+                      ),
+                      IconButton(
+                        onPressed: () => context.push('/budgets/amount'),
+                        icon: const Icon(Icons.add_circle_outline, color: AppColors.primary, size: 26),
+                      ),
+                    ],
+                  ),
+                  const SizedBox(height: 16),
+
+                  // จัดการสถานะการโหลดข้อมูลจาก Provider
+                  budgets.when(
+                    loading: () => const Padding(
+                      padding: EdgeInsets.symmetric(vertical: 40),
+                      child: Center(child: CircularProgressIndicator(color: AppColors.primary)),
+                    ),
+                    error: (err, _) => _BudgetError(
+                      message: err.toString(),
+                      onRetry: () => _refresh(ref),
+                    ),
+                    data: (list) {
+                      if (list.isEmpty) {
+                        return Container(
+                          width: double.infinity,
+                          padding: const EdgeInsets.all(24),
+                          decoration: BoxDecoration(
+                            borderRadius: BorderRadius.circular(20),
+                            gradient: const LinearGradient(
+                              colors: [Color(0xFF041E14), Color(0xFF0A2B1D)],
+                              begin: Alignment.topLeft,
+                              end: Alignment.bottomRight,
+                            ),
+                            border: Border.all(color: const Color(0xFF3CAE63).withOpacity(0.2)),
+                          ),
+                          child: const Column(
+                            children: [
+                              Icon(Icons.pie_chart_outline_rounded, color: Colors.white24, size: 44),
+                              SizedBox(height: 12),
+                              Text(
+                                'ยังไม่มีการตั้งงบประมาณ',
+                                style: TextStyle(color: Colors.white70, fontSize: 14, fontWeight: FontWeight.bold),
+                              ),
+                              SizedBox(height: 4),
+                              Text(
+                                'เพิ่มงบประมาณเพื่อควบคุมค่าใช้จ่ายในแต่ละหมวดหมู่กันเลย 💸',
+                                style: TextStyle(color: Colors.white38, fontSize: 11),
+                              ),
+                            ],
+                          ),
+                        );
+                      }
+
+                      // เรียงลำดับจากระดับความเสี่ยงการใช้เงินเกินงบมากที่สุดไปน้อย
+                      final sorted = List<BudgetStatus>.from(statuses);
+                      sorted.sort((a, b) => _riskScore(b).compareTo(_riskScore(a)));
+
+                      return ListView.builder(
+                        shrinkWrap: true,
+                        physics: const NeverScrollableScrollPhysics(),
+                        itemCount: sorted.length,
+                        itemBuilder: (context, idx) {
+                          final status = sorted[idx];
+                          final pct = status.percentage;
+                          
+                          // ดึงรายละเอียดสี สัญลักษณ์ของ Badge
+                          final badge = _getBudgetStatusDetails(pct);
+
+                          // คำนวณยอดเงินเหลือ / เกิน
+                          final remaining = status.amount - status.spent;
+                          final overBy = status.spent - status.amount;
+
+                          return Container(
+                            margin: const EdgeInsets.only(bottom: 14),
+                            padding: const EdgeInsets.all(18),
+                            decoration: BoxDecoration(
+                              // ปรับสีพื้นหลัง Gradient โทนล่างขึ้นบน [0xFF0C3A1E] -> [0xFF203231] ตัวเดียวกับ Goal Item Card
+                              gradient: const LinearGradient(
+                                colors: [
+                                  Color(0xFF0C3A1E), // ล่าง
+                                  Color(0xFF203231), // บน
+                                ],
+                                begin: Alignment.bottomCenter,
+                                end: Alignment.topCenter,
+                              ),
+                              borderRadius: BorderRadius.circular(24),
+                              boxShadow: [
+                                BoxShadow(
+                                  color: Colors.black.withOpacity(0.06),
+                                  blurRadius: 12,
+                                  offset: const Offset(0, 4),
+                                )
+                              ],
+                            ),
+                            child: Column(
+                              crossAxisAlignment: CrossAxisAlignment.start,
+                              children: [
+                                Row(
+                                  mainAxisAlignment: MainAxisAlignment.spaceBetween,
+                                  children: [
+                                    Row(
+                                      children: [
+                                        Text(status.category?.icon ?? '📊', style: const TextStyle(fontSize: 18)),
+                                        const SizedBox(width: 10),
+                                        Text(
+                                          status.category?.nameTh ?? 'ไม่ระบุหมวดหมู่',
+                                          style: const TextStyle(color: Colors.white, fontSize: 16, fontWeight: FontWeight.bold),
+                                        ),
+                                        const SizedBox(width: 10),
+                                        // Badge บอกระดับความปลอดภัย
+                                        Container(
+                                          padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 4),
+                                          decoration: BoxDecoration(
+                                            color: badge.$3,
+                                            borderRadius: BorderRadius.circular(12),
+                                          ),
+                                          child: Row(
+                                            mainAxisSize: MainAxisSize.min,
+                                            children: [
+                                              Icon(badge.$2, size: 12, color: badge.$4),
+                                              const SizedBox(width: 4),
+                                              Text(
+                                                badge.$1,
+                                                style: TextStyle(
+                                                  color: badge.$4,
+                                                  fontSize: 11,
+                                                  fontWeight: FontWeight.bold,
+                                                ),
+                                              ),
+                                            ],
+                                          ),
+                                        ),
+                                      ],
+                                    ),
+                                    GestureDetector(
+                                      onTap: () => context.push('/budgets/edit', extra: status),
+                                      child: Icon(Icons.edit_note_rounded, size: 24, color: Colors.white.withOpacity(0.6)),
+                                    ),
+                                  ],
+                                ),
+                                const SizedBox(height: 14),
+
+                                // ปรับค่าตัวเลขและสัญลักษณ์ให้อยู่ในระนาบเดียวกันแบบแอปฟินเทค
+                                Row(
+                                  mainAxisAlignment: MainAxisAlignment.spaceBetween,
+                                  children: [
+                                    const Text(
+                                      'ยอดใช้จ่ายสะสม',
+                                      style: TextStyle(color: Colors.white60, fontSize: 13),
+                                    ),
+                                    Text(
+                                      '฿ ${Money.format(status.spent)} / ${Money.format(status.amount)}',
+                                      style: const TextStyle(color: Colors.white, fontSize: 14, fontWeight: FontWeight.bold),
+                                    ),
+                                  ],
+                                ),
+                                const SizedBox(height: 12),
+
+                                // Stack Progress Bar มินิมอลเรียบหรู ถอดแบบจาก Goals
+                                Stack(
+                                  children: [
+                                    Container(
+                                      height: 8,
+                                      width: double.infinity,
+                                      decoration: BoxDecoration(
+                                        color: const Color(0xFFEEEEEE).withOpacity(0.12),
+                                        borderRadius: BorderRadius.circular(10),
+                                      ),
+                                    ),
+                                    FractionallySizedBox(
+                                      widthFactor: pct.clamp(0.0, 1.0),
+                                      child: AnimatedContainer(
+                                        duration: const Duration(milliseconds: 300),
+                                        curve: Curves.easeOutCubic,
+                                        height: 8,
+                                        decoration: BoxDecoration(
+                                          color: badge.$4, // ใช้แถบสีเดียวกับสถานะ Badge
+                                          borderRadius: BorderRadius.circular(10),
+                                        ),
+                                      ),
+                                    ),
+                                  ],
+                                ),
+                                const SizedBox(height: 10),
+                                Align(
+                                  alignment: Alignment.centerRight,
+                                  child: Text(
+                                    pct >= 1.0
+                                        ? 'ใช้เงินเกินงบไปแล้ว ฿ ${Money.format(overBy)} บาท 🚨'
+                                        : 'เหลืออีก ฿ ${Money.format(remaining)} บาท',
+                                    style: TextStyle(color: badge.$4, fontSize: 11, fontWeight: FontWeight.w500),
+                                  ),
+                                ),
+                              ],
+                            ),
+                          );
+                        },
+                      );
+                    },
+                  ),
+                ],
+              ),
             ),
           ),
         ],
       ),
+      // แก้ไข Footer Bottom Navigation Bar ให้แมตช์เป็นตัวเดียวกับหน้า Goals
+      bottomNavigationBar: const _BudgetsNav(),
     );
+  }
+
+  (String, IconData, Color, Color) _getBudgetStatusDetails(double pct) {
+    if (pct >= 1.0) {
+      return (
+        'อันตราย',
+        Icons.error_outline_rounded,
+        const Color(0xFFFF4D4F).withOpacity(0.15),
+        const Color(0xFFFF4D4F), // สีแดงเดียวกับเป้าหมายที่สำเร็จแล้วหรือใช้เกิน
+      );
+    } else if (pct >= 0.8) {
+      return (
+        'เสี่ยง',
+        Icons.warning_amber_rounded,
+        const Color(0xFFFFD54F).withOpacity(0.15),
+        const Color(0xFFFFD54F), // สีเหลือง
+      );
+    } else {
+      return (
+        'ปลอดภัย',
+        Icons.check_circle_outline_rounded,
+        const Color(0xFF37C871).withOpacity(0.15),
+        const Color(0xFF37C871), // สีเขียว
+      );
+    }
+  }
+
+  double _riskScore(BudgetStatus status) {
+    return status.percentage;
   }
 }
 
-class _BudgetOverviewCard extends StatelessWidget {
-  const _BudgetOverviewCard({required this.statuses});
-
-  final List<BudgetStatus> statuses;
+// ─────────────────────────────────────────────────────────────────────────────
+// 1. Green Header (ปรับแต่ง Gradient ให้ตรงกับหน้า GoalsScreen เป๊ะๆ)
+// ─────────────────────────────────────────────────────────────────────────────
+class _GreenHeader extends StatelessWidget {
+  const _GreenHeader({required this.name, required this.streak});
+  final String name;
+  final int streak;
 
   @override
   Widget build(BuildContext context) {
+    final topPad = MediaQuery.of(context).padding.top;
     return Container(
-      padding: const EdgeInsets.fromLTRB(14, 14, 14, 8),
-      decoration: BoxDecoration(
-        gradient: const LinearGradient(
-          colors: [Color(0xFF00150E), Color(0xFF052D1B)],
-          begin: Alignment.topLeft,
-          end: Alignment.bottomRight,
+      width: double.infinity,
+      padding: EdgeInsets.fromLTRB(20, topPad + 16, 20, 24),
+      decoration: const BoxDecoration(
+        gradient: LinearGradient(
+          colors: [Color(0xFF06120A), Color(0xFF334E3D), Color(0xFF3CAE63)],
+          begin: Alignment.topCenter,
+          end: Alignment.bottomCenter,
         ),
-        borderRadius: BorderRadius.circular(18),
-        border: Border.all(color: Colors.white.withValues(alpha: 0.18)),
-        boxShadow: const [
-          BoxShadow(
-              color: Colors.black26, blurRadius: 12, offset: Offset(0, 5)),
-        ],
-      ),
-      child: Column(
-        children: [
-          Row(
-            children: [
-              const Expanded(
-                child: Text('ภาพรวมงบประมาณ',
-                    style: TextStyle(color: Colors.white70, fontSize: 12)),
-              ),
-              Icon(Icons.edit_note_rounded,
-                  color: Colors.white.withValues(alpha: 0.65), size: 21),
-            ],
-          ),
-          const SizedBox(height: 8),
-          ...statuses.map((status) => _BudgetStatusRow(status: status)),
-        ],
-      ),
-    );
-  }
-}
-
-class _BudgetStatusRow extends StatelessWidget {
-  const _BudgetStatusRow({required this.status});
-
-  final BudgetStatus status;
-
-  @override
-  Widget build(BuildContext context) {
-    final risk = _riskStyle(status.riskLevel);
-    final remaining = status.amount - status.spent;
-    final projectedOver = status.projectedSpend - status.amount;
-
-    return InkWell(
-      onTap: () => context.push('/budgets/edit', extra: status),
-      borderRadius: BorderRadius.circular(10),
-      child: Padding(
-        padding: const EdgeInsets.fromLTRB(0, 5, 0, 10),
-        child: Column(
-          children: [
-            Row(
-              children: [
-                Expanded(
-                  flex: 4,
-                  child: Text(
-                    status.category?.nameTh ?? 'งบรวม',
-                    overflow: TextOverflow.ellipsis,
-                    style: const TextStyle(color: Colors.white, fontSize: 14),
-                  ),
-                ),
-                Expanded(
-                  flex: 3,
-                  child: Text(
-                    risk.label,
-                    textAlign: TextAlign.center,
-                    style: TextStyle(
-                      color: risk.color,
-                      fontSize: 12,
-                      fontWeight: FontWeight.w700,
-                    ),
-                  ),
-                ),
-                Expanded(
-                  flex: 4,
-                  child: Text(
-                    '${Money.formatBaht(status.spent)} / ${Money.formatBaht(status.amount)}',
-                    textAlign: TextAlign.end,
-                    style: const TextStyle(
-                      color: Colors.white,
-                      fontSize: 13,
-                      fontWeight: FontWeight.w700,
-                    ),
-                  ),
-                ),
-              ],
-            ),
-            const SizedBox(height: 6),
-            ClipRRect(
-              borderRadius: BorderRadius.circular(6),
-              child: LinearProgressIndicator(
-                value: status.percentage.clamp(0.0, 1.0),
-                minHeight: 7,
-                backgroundColor: Colors.white.withValues(alpha: 0.62),
-                valueColor: AlwaysStoppedAnimation(risk.color),
-              ),
-            ),
-            const SizedBox(height: 4),
-            Row(
-              children: [
-                Expanded(
-                  child: Text(
-                    status.period == 'weekly' ? 'งบรายสัปดาห์' : 'งบรายเดือน',
-                    style: const TextStyle(color: Colors.white38, fontSize: 9),
-                  ),
-                ),
-                Text(
-                  remaining < 0
-                      ? 'ใช้เกิน ${Money.formatBaht(-remaining)}'
-                      : projectedOver > 0
-                          ? 'คาดว่าจะเกิน ${Money.formatBaht(projectedOver)}'
-                          : 'ใช้ได้อีก ${Money.formatBaht(remaining)}',
-                  style: TextStyle(
-                    color: status.riskLevel == 'danger'
-                        ? risk.color
-                        : Colors.white60,
-                    fontSize: 9,
-                  ),
-                ),
-              ],
-            ),
-          ],
+        borderRadius: BorderRadius.only(
+          bottomLeft: Radius.circular(32),
+          bottomRight: Radius.circular(32),
         ),
-      ),
-    );
-  }
-}
-
-class _RiskRecommendation extends StatelessWidget {
-  const _RiskRecommendation({required this.statuses});
-
-  final List<BudgetStatus> statuses;
-
-  @override
-  Widget build(BuildContext context) {
-    if (statuses.isEmpty) {
-      return const _AdviceCard(
-        color: AppColors.primary,
-        icon: Icons.lightbulb_outline_rounded,
-        title: 'เริ่มจากหมวดที่ใช้บ่อย',
-        message:
-            'ลองเพิ่มงบค่ากิน ค่าเดินทาง หรือค่าของใช้ เพื่อให้พี่เงินช่วยเฝ้าระวัง',
-      );
-    }
-
-    final sorted = [...statuses]
-      ..sort((a, b) => _riskScore(b).compareTo(_riskScore(a)));
-    final worst = sorted.first;
-    final risk = _riskStyle(worst.riskLevel);
-    final name = worst.category?.nameTh ?? 'งบรวม';
-
-    if (worst.riskLevel == 'danger') {
-      final projectedDifference = worst.projectedSpend - worst.amount;
-      final excess = projectedDifference > 0 ? projectedDifference : 0;
-      return _AdviceCard(
-        color: risk.color,
-        icon: Icons.warning_amber_rounded,
-        title: '$name มีความเสี่ยงสูง',
-        message:
-            'หากใช้ในอัตราเดิม คาดว่าสิ้นรอบจะเกินประมาณ ${Money.formatBaht(excess)} เหลือเวลา ${worst.daysRemaining} วัน',
-      );
-    }
-
-    if (worst.riskLevel == 'warning') {
-      return _AdviceCard(
-        color: risk.color,
-        icon: Icons.speed_rounded,
-        title: '$name เริ่มเข้าเขตเสี่ยง',
-        message:
-            'คาดว่าสิ้นรอบจะใช้ ${Money.formatBaht(worst.projectedSpend)} จากงบ ${Money.formatBaht(worst.amount)} ควรชะลอรายจ่ายที่ไม่จำเป็น',
-      );
-    }
-
-    return const _AdviceCard(
-      color: AppColors.primary,
-      icon: Icons.verified_rounded,
-      title: 'ภาพรวมยังอยู่ในระดับปลอดภัย',
-      message:
-          'อัตราการใช้จ่ายปัจจุบันยังสอดคล้องกับวงเงินที่ตั้งไว้ รักษาแบบนี้ต่อได้เลย',
-    );
-  }
-}
-
-class _AdviceCard extends StatelessWidget {
-  const _AdviceCard({
-    required this.color,
-    required this.icon,
-    required this.title,
-    required this.message,
-  });
-
-  final Color color;
-  final IconData icon;
-  final String title;
-  final String message;
-
-  @override
-  Widget build(BuildContext context) {
-    return Container(
-      padding: const EdgeInsets.all(15),
-      decoration: BoxDecoration(
-        color: color.withValues(alpha: 0.09),
-        borderRadius: BorderRadius.circular(15),
-        border: Border.all(color: color.withValues(alpha: 0.28)),
       ),
       child: Row(
-        crossAxisAlignment: CrossAxisAlignment.start,
         children: [
           Container(
-            width: 40,
-            height: 40,
-            decoration: BoxDecoration(
-              color: color.withValues(alpha: 0.14),
+            width: 48,
+            height: 48,
+            decoration: const BoxDecoration(
               shape: BoxShape.circle,
+              color: Color(0xFF5E6E85),
             ),
-            child: Icon(icon, color: color, size: 22),
+            child: const Icon(Icons.person, color: Colors.white, size: 30),
           ),
-          const SizedBox(width: 11),
+          const SizedBox(width: 14),
           Expanded(
             child: Column(
               crossAxisAlignment: CrossAxisAlignment.start,
               children: [
-                Text(title,
-                    style: TextStyle(
-                      color: color,
-                      fontSize: 13,
-                      fontWeight: FontWeight.w800,
-                    )),
-                const SizedBox(height: 4),
-                Text(message,
+                Text(
+                  name,
+                  style: const TextStyle(
+                    color: Colors.white,
+                    fontSize: 18,
+                    fontWeight: FontWeight.w600,
+                  ),
+                ),
+                const SizedBox(height: 6),
+                Container(
+                  padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 4),
+                  decoration: BoxDecoration(
+                    color: Colors.white.withOpacity(0.2),
+                    borderRadius: BorderRadius.circular(12),
+                  ),
+                  child: Text(
+                    'ใช้งานต่อเนื่อง $streak วัน',
                     style: const TextStyle(
-                        color: Colors.white60, fontSize: 11, height: 1.45)),
+                      color: Colors.white,
+                      fontSize: 12,
+                      fontWeight: FontWeight.bold,
+                    ),
+                  ),
+                ),
               ],
             ),
+          ),
+          IconButton(
+            onPressed: () {},
+            icon: const Icon(Icons.notifications_none_rounded, color: Colors.white, size: 28),
           ),
         ],
       ),
@@ -422,31 +372,102 @@ class _AdviceCard extends StatelessWidget {
   }
 }
 
-class _EmptyBudgetState extends StatelessWidget {
-  const _EmptyBudgetState();
+// ─────────────────────────────────────────────────────────────────────────────
+// Bottom Navigation Bar (ปรับแต่งดีไซน์ให้เข้าคู่กับ Goals / Dashboard)
+// ─────────────────────────────────────────────────────────────────────────────
+class _BudgetsNav extends StatelessWidget {
+  const _BudgetsNav();
 
   @override
   Widget build(BuildContext context) {
     return Container(
-      padding: const EdgeInsets.symmetric(vertical: 34, horizontal: 16),
       decoration: BoxDecoration(
-        color: const Color(0xFF151815),
-        borderRadius: BorderRadius.circular(16),
-        border: Border.all(color: Colors.white.withValues(alpha: 0.06)),
-      ),
-      child: const Column(
-        children: [
-          Icon(Icons.account_balance_wallet_outlined,
-              color: Colors.white30, size: 38),
-          SizedBox(height: 10),
-          Text('ยังไม่มีงบประมาณ',
-              style:
-                  TextStyle(color: Colors.white, fontWeight: FontWeight.w700)),
-          SizedBox(height: 4),
-          Text('เพิ่มงบเพื่อเริ่มติดตามและประเมินความเสี่ยง',
-              textAlign: TextAlign.center,
-              style: TextStyle(color: Colors.white38, fontSize: 11)),
+        color: const Color(0xFF1A1A1A),
+        borderRadius: const BorderRadius.only(
+          topLeft: Radius.circular(30),
+          topRight: Radius.circular(30),
+        ),
+        boxShadow: [
+          BoxShadow(
+            color: Colors.black.withOpacity(0.3),
+            blurRadius: 12,
+            offset: const Offset(0, -2),
+          )
         ],
+      ),
+      child: BottomAppBar(
+        color: Colors.transparent,
+        elevation: 0,
+        notchMargin: 10,
+        height: 74,
+        padding: EdgeInsets.zero,
+        child: Row(
+          mainAxisAlignment: MainAxisAlignment.spaceAround,
+          children: [
+            _NavItem(
+              icon: Icons.home_outlined, 
+              label: 'หน้าหลัก', 
+              onTap: () => context.go('/')
+            ),
+            _NavItem(
+              icon: Icons.dashboard_outlined, 
+              label: 'แดชบอร์ด', 
+              onTap: () => context.push('/financial-dashboard')
+            ),
+            const SizedBox(width: 48), // เผื่อพื้นที่ว่างให้ FloatingActionButton ตรงกลางของเฟรมเวิร์ก
+            _NavItem(
+              icon: Icons.chat_bubble_outline_rounded, 
+              label: 'พี่เงิน', 
+              onTap: () => context.push('/chat')
+            ),
+            _NavItem(
+              icon: Icons.grid_view_rounded, 
+              label: 'เมนู', 
+              onTap: () => context.push('/menu')
+            ),
+          ],
+        ),
+      ),
+    );
+  }
+}
+
+class _NavItem extends StatelessWidget {
+  const _NavItem({
+    required this.icon,
+    required this.label,
+    this.active = false,
+    this.onTap,
+  });
+
+  final IconData icon;
+  final String label;
+  final bool active;
+  final VoidCallback? onTap;
+
+  @override
+  Widget build(BuildContext context) {
+    final color = active ? const Color(0xFF4CD97B) : Colors.white60;
+    return InkWell(
+      onTap: onTap,
+      borderRadius: BorderRadius.circular(16),
+      child: Padding(
+        padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 8),
+        child: Column(
+          mainAxisSize: MainAxisSize.min,
+          children: [
+            Icon(icon, color: color, size: 28),
+            const SizedBox(height: 4),
+            Text(
+              label,
+              style: TextStyle(
+                color: color,
+                fontSize: 11,
+                fontWeight: active ? FontWeight.bold : FontWeight.w500,
+              ),
+            ),
+          ],
+        ),
       ),
     );
   }
@@ -454,7 +475,6 @@ class _EmptyBudgetState extends StatelessWidget {
 
 class _BudgetError extends StatelessWidget {
   const _BudgetError({required this.message, required this.onRetry});
-
   final String message;
   final VoidCallback onRetry;
 
@@ -468,37 +488,12 @@ class _BudgetError extends StatelessWidget {
       ),
       child: Column(
         children: [
-          const Text('โหลดงบประมาณไม่สำเร็จ',
-              style: TextStyle(color: Colors.white)),
+          const Text('โหลดงบประมาณไม่สำเร็จ', style: TextStyle(color: Colors.white)),
           const SizedBox(height: 5),
-          Text(message,
-              textAlign: TextAlign.center,
-              style: const TextStyle(color: Colors.white38, fontSize: 10)),
+          Text(message, textAlign: TextAlign.center, style: const TextStyle(color: Colors.white38, fontSize: 10)),
           TextButton(onPressed: onRetry, child: const Text('ลองใหม่')),
         ],
       ),
     );
   }
-}
-
-({String label, Color color}) _riskStyle(String level) {
-  switch (level) {
-    case 'danger':
-      return (label: 'อันตราย', color: const Color(0xFFFF4444));
-    case 'warning':
-      return (label: 'เสี่ยง', color: const Color(0xFFFFE568));
-    default:
-      return (label: 'ปลอดภัย', color: const Color(0xFF3FC776));
-  }
-}
-
-double _riskScore(BudgetStatus status) {
-  final priority = switch (status.riskLevel) {
-    'danger' => 3,
-    'warning' => 2,
-    _ => 1,
-  };
-  final projectedRatio =
-      status.amount == 0 ? 0 : status.projectedSpend / status.amount;
-  return (priority * 10 + projectedRatio).toDouble();
 }
