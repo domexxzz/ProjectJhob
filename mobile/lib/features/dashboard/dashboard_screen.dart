@@ -313,6 +313,33 @@ class _GoalsCardState extends ConsumerState<_GoalsCard> {
     super.dispose();
   }
 
+  // ฟังก์ชันดึงป้ายกำกับและสีตามประเภทเป้าหมาย (ใช้ Record แบบ Positioned มั่นใจได้ 100%)
+  (String, IconData, Color, Color) _getTypeBadgeDetails(String type) {
+    switch (type) {
+      case 'medium':
+        return (
+          'ระยะกลาง (1 ปี)',
+          Icons.timelapse_rounded,
+          const Color(0xFF56D384).withOpacity(0.15),
+          const Color(0xFF56D384)
+        );
+      case 'long':
+        return (
+          'ระยะยาว (1 ปีขึ้นไป)',
+          Icons.trending_up_rounded,
+          const Color(0xFF63B3ED).withOpacity(0.15),
+          const Color(0xFF63B3ED)
+        );
+      default: // short
+        return (
+          'ระยะสั้น (ใน 0-6 เดือน)',
+          Icons.shutter_speed_rounded,
+          const Color(0xFFFBBC05).withOpacity(0.15),
+          const Color(0xFFFBBC05)
+        );
+    }
+  }
+
   @override
   Widget build(BuildContext context) {
     final goals = ref.watch(goalsProvider);
@@ -371,7 +398,7 @@ class _GoalsCardState extends ConsumerState<_GoalsCard> {
     return Column(
       children: [
         SizedBox(
-          height: 156,
+          height: 164, 
           child: PageView.builder(
             controller: _pageController,
             onPageChanged: (index) => setState(() => _currentPage = index),
@@ -408,10 +435,11 @@ class _GoalsCardState extends ConsumerState<_GoalsCard> {
 
               final remaining = g.target - g.current;
               final isSuccess = remaining <= 0;
+              final badge = _getTypeBadgeDetails(g.type); 
 
               return Container(
                 margin: const EdgeInsets.symmetric(horizontal: 2),
-                padding: const EdgeInsets.all(18),
+                padding: const EdgeInsets.all(16),
                 decoration: BoxDecoration(
                   gradient: LinearGradient(
                     colors: gradientColors,
@@ -443,6 +471,30 @@ class _GoalsCardState extends ConsumerState<_GoalsCard> {
                                   color: Colors.white70,
                                   fontSize: 13,
                                   fontWeight: FontWeight.w500),
+                            ),
+                            const SizedBox(width: 8),
+                            // Badge แสดงประเภทระยะเวลาเป้าหมาย (แก้ไขเรียกผ่านตัวระบุตำแหน่งดัชนี ดึงค่าถูกต้องแน่นอน)
+                            Container(
+                              padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 3),
+                              decoration: BoxDecoration(
+                                color: badge.$3, // badgeBg
+                                borderRadius: BorderRadius.circular(20),
+                              ),
+                              child: Row(
+                                mainAxisSize: MainAxisSize.min,
+                                children: [
+                                  Icon(badge.$2, size: 11, color: badge.$4), // icon, badgeText
+                                  const SizedBox(width: 3),
+                                  Text(
+                                    badge.$1, // label
+                                    style: TextStyle(
+                                      color: badge.$4, // badgeText
+                                      fontSize: 10,
+                                      fontWeight: FontWeight.bold,
+                                    ),
+                                  ),
+                                ],
+                              ),
                             ),
                           ],
                         ),

@@ -45,10 +45,14 @@ class _EditGoalScreenState extends ConsumerState<EditGoalScreen> {
         final goal = ref.read(goalsProvider).firstWhere((g) => g.id == widget.goalId);
         setState(() {
           _nameController.text = goal.name;
-          _targetController.text = (goal.target / 100).round().toString();
+          
+          // เปลี่ยนจาก .round() เป็นเช็คทศนิยม เพื่อรองรับเงินที่เป็นเศษสตางค์ได้อย่างถูกต้อง
+          final double bahtAmount = goal.target / 100;
+          _targetController.text = bahtAmount % 1 == 0 ? bahtAmount.toInt().toString() : bahtAmount.toString();
+          
           _selectedDate = goal.deadline;
-          _startDate = goal.deadline;
-          _endDate = null;
+          _startDate = goal.startDate;
+          _endDate = goal.deadline;
           _selectedType = goal.type;
           _selectedEmoji = goal.emoji;
           if (goal.imagePath != null) {
@@ -197,16 +201,29 @@ class _EditGoalScreenState extends ConsumerState<EditGoalScreen> {
     );
   }
 
+  // คำนวณจำนวนเดือนจากช่วงวันที่ แล้วแปลงเป็นประเภทเป้าหมายอัตโนมัติ
+  // 0-6 เดือน = ระยะสั้น, 6-12 เดือน = ระยะกลาง, มากกว่า 12 เดือน = ระยะยาว
+  String _autoDetectGoalType(DateTime start, DateTime end) {
+    final int months = ((end.year - start.year) * 12) + (end.month - start.month);
+    if (months <= 6) {
+      return 'short';
+    } else if (months <= 12) {
+      return 'medium';
+    } else {
+      return 'long';
+    }
+  }
+
   String _getTypeLabel(String type) {
     switch (type) {
       case 'short':
-        return 'ระยะสั้น (ภายใน 1 ปี)';
+        return 'ระยะสั้น (0-6เดือน)';
       case 'medium':
-        return 'ระยะกลาง (1 - 3 ปี)';
+        return 'ระยะกลาง (1ปี)';
       case 'long':
-        return 'ระยะยาว (3 ปีขึ้นไป)';
+        return 'ระยะยาว (1 ปีขึ้นไป)';
       default:
-        return 'ระยะสั้น (ภายใน 1 ปี)';
+        return 'ระยะสั้น (ภายใน 0-6 เดือน)';
     }
   }
 
@@ -216,7 +233,11 @@ class _EditGoalScreenState extends ConsumerState<EditGoalScreen> {
     final int currentSavings = widget.goalId != null
         ? (goals.firstWhere((g) => g.id == widget.goalId, orElse: () => goals.first).current)
         : 0;
-    final int targetVal = (int.tryParse(_targetController.text) ?? 0) * 100;
+        
+    // แก้ไขบัคตรงนี้: เปลี่ยนมาใช้ double.tryParse เพื่อไม่ให้ระบบเออร์เรอร์เวลาลบตัวเลขหรือใส่จุดทศนิยม
+    final double bahtVal = double.tryParse(_targetController.text) ?? 0;
+    final int targetVal = (bahtVal * 100).toInt();
+    
     final int remaining = (targetVal - currentSavings).clamp(0, targetVal);
     final double progress = targetVal > 0 ? (currentSavings / targetVal).clamp(0.0, 1.0) : 0.0;
 
@@ -457,7 +478,7 @@ class _EditGoalScreenState extends ConsumerState<EditGoalScreen> {
                           const SizedBox(height: 8),
                           TextFormField(
                             controller: _targetController,
-                            keyboardType: TextInputType.number,
+                            keyboardType: const TextInputType.numberWithOptions(decimal: true),
                             style: const TextStyle(fontSize: 18, fontWeight: FontWeight.bold, color: Color(0xFF4CD97B)),
                             decoration: InputDecoration(
                               filled: true,
@@ -487,7 +508,8 @@ class _EditGoalScreenState extends ConsumerState<EditGoalScreen> {
                             ),
                             onChanged: (val) => setState(() {}),
                             validator: (value) {
-                              if (value == null || int.tryParse(value) == null || int.parse(value) <= 0) {
+                              // แก้ไขบัคตรงนี้: ปรับมาตรวจเช็คด้วย double.tryParse เพื่อป้องกัน Error ตอนกรอกเลขหรือจุดทศนิยม
+                              if (value == null || double.tryParse(value) == null || double.parse(value) <= 0) {
                                 return 'กรุณากรอกจำนวนเงินเป้าหมายที่มากกว่า 0';
                               }
                               return null;
@@ -592,6 +614,10 @@ class _EditGoalScreenState extends ConsumerState<EditGoalScreen> {
                           _startDate = result['startDate'];
                           _endDate = result['endDate'];
                           _selectedDate = result['endDate'];
+                          // ให้ระบบเลือกประเภทเป้าหมายให้อัตโนมัติตามระยะเวลาที่เลือก
+                          if (_startDate != null && _endDate != null) {
+                            _selectedType = _autoDetectGoalType(_startDate!, _endDate!);
+                          }
                         });
                       }
                     },
@@ -648,7 +674,7 @@ class _EditGoalScreenState extends ConsumerState<EditGoalScreen> {
                               Text(
                                 'มีเวลาอีก 3 เดือน ให้แบ่งเก็บเดือนละ 1000 บาท',
                                 style: TextStyle(color: Colors.white.withOpacity(0.5), fontSize: 13),
-                              ),
+                               )
                             ],
                           ),
                         ),
@@ -760,15 +786,15 @@ class _EditGoalScreenState extends ConsumerState<EditGoalScreen> {
                 child: Text('เลือกประเภทเป้าหมาย', style: TextStyle(fontWeight: FontWeight.bold, fontSize: 17, color: Colors.white)),
               ),
               ListTile(
-                title: const Text('ระยะสั้น (ภายใน 1 ปี)', style: TextStyle(color: Colors.white)),
+                title: const Text('ระยะสั้น (ภายใน 0-12 เดือน)', style: TextStyle(color: Colors.white)),
                 onTap: () { setState(() => _selectedType = 'short'); Navigator.pop(context); },
               ),
               ListTile(
-                title: const Text('ระยะกลาง (1 - 3 ปี)', style: TextStyle(color: Colors.white)),
+                title: const Text('ระยะกลาง (1 ปี)', style: TextStyle(color: Colors.white)),
                 onTap: () { setState(() => _selectedType = 'medium'); Navigator.pop(context); },
               ),
               ListTile(
-                title: const Text('ระยะยาว (3 ปีขึ้นไป)', style: TextStyle(color: Colors.white)),
+                title: const Text('ระยะยาว (1 ปีขึ้นไป)', style: TextStyle(color: Colors.white)),
                 onTap: () { setState(() => _selectedType = 'long'); Navigator.pop(context); },
               ),
               const SizedBox(height: 16),
@@ -782,7 +808,11 @@ class _EditGoalScreenState extends ConsumerState<EditGoalScreen> {
   void _saveGoal() {
     if (_formKey.currentState!.validate()) {
       final name = _nameController.text.trim();
-      final int targetVal = (int.tryParse(_targetController.text) ?? 0) * 100;
+      
+      // แก้ไขบัคตรงนี้: แปลงค่าเป็น double ก่อนแล้วค่อยคูณ 100 เพื่อเซฟหน่วยสตางค์เข้า Database/Provider ได้อย่างเสถียร
+      final double bahtVal = double.tryParse(_targetController.text) ?? 0;
+      final int targetVal = (bahtVal * 100).toInt();
+      
       final imagePath = _selectedImageFile?.path;
       
       if (widget.goalId != null) {
@@ -794,6 +824,7 @@ class _EditGoalScreenState extends ConsumerState<EditGoalScreen> {
           _selectedType,
           _selectedEmoji,
           imagePath,
+          startDate: _startDate,
         );
       } else {
         ref.read(goalsProvider.notifier).addGoal(
@@ -803,6 +834,7 @@ class _EditGoalScreenState extends ConsumerState<EditGoalScreen> {
           _selectedType,
           _selectedEmoji,
           imagePath,
+          startDate: _startDate,
         );
       }
       context.pop();

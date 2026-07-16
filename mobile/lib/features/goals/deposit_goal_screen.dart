@@ -159,8 +159,7 @@ class _DepositGoalScreenState extends ConsumerState<DepositGoalScreen> {
     final text = _amountController.text.trim();
     final baht = double.tryParse(text) ?? 0;
     if (baht > 0) {
-      final satang = Money.toSatang(baht);
-      // ตรงนี้ทำการเชื่อมโยงและส่งข้อมูลเข้า State Notifier ของคุณทันที ทำให้หน้าแรกเปลี่ยนตาม
+      final satang = (baht * 100).toInt(); // หรือเรียกใช้ Money.toSatang(baht) ตามโครงสร้างเดิม
       ref.read(goalsProvider.notifier).addSavings(widget.goalId, satang);
       context.pop();
       ScaffoldMessenger.of(context).showSnackBar(
