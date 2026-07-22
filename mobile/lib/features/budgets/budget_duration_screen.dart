@@ -25,8 +25,14 @@ class _BudgetDurationScreenState extends State<BudgetDurationScreen> {
         centerTitle: true,
         title: const Text('กำหนดระยะเวลา', style: TextStyle(color: Colors.white, fontWeight: FontWeight.bold, fontSize: 18)),
         leading: IconButton(
-          icon: const Icon(Icons.arrow_back, color: Colors.white),
-          onPressed: () => context.pop(),
+          icon: const Icon(Icons.arrow_back, color: Colors.white, size: 24),
+          onPressed: () {
+            if (Navigator.of(context).canPop() || context.canPop()) {
+              context.pop();
+            } else {
+              context.go('/');
+            }
+          },
         ),
       ),
       body: Stack(

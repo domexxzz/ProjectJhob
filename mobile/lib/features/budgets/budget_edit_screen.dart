@@ -77,23 +77,15 @@ class _BudgetEditScreenState extends ConsumerState<BudgetEditScreen> {
                   children: [
                     Align(
                       alignment: Alignment.centerLeft,
-                      child: GestureDetector(
-                        onTap: () => context.pop(),
-                        child: Container(
-                          padding: const EdgeInsets.all(10),
-                          decoration: BoxDecoration(
-                            shape: BoxShape.circle,
-                            color: const Color(0xFF3CAE63),
-                            boxShadow: [
-                              BoxShadow(
-                                color: const Color(0xFF3CAE63).withOpacity(0.4),
-                                blurRadius: 12,
-                                spreadRadius: 2,
-                              ),
-                            ],
-                          ),
-                          child: const Icon(Icons.arrow_back_rounded, color: Colors.white, size: 24),
-                        ),
+                      child: IconButton(
+                        onPressed: () {
+                          if (Navigator.of(context).canPop() || context.canPop()) {
+                            context.pop();
+                          } else {
+                            context.go('/');
+                          }
+                        },
+                        icon: const Icon(Icons.arrow_back, color: Colors.white, size: 24),
                       ),
                     ),
                     const Text(

@@ -3,6 +3,7 @@ import 'dart:convert';
 
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
+import 'package:go_router/go_router.dart';
 import 'package:image_picker/image_picker.dart';
 import 'package:speech_to_text/speech_to_text.dart';
 import 'package:flutter_markdown_plus/flutter_markdown_plus.dart';
@@ -12,6 +13,7 @@ import '../../app/theme.dart';
 import '../../core/api/api_client.dart';
 import 'chat_message.dart';
 import 'chat_repository.dart';
+import '../../widgets/app_bottom_nav_bar.dart';
 
 enum CoachMood { idle, listening, thinking }
 
@@ -211,9 +213,24 @@ class _ChatScreenState extends ConsumerState<ChatScreen> {
     return Scaffold(
       appBar: AppBar(
         centerTitle: true,
-        title: const Text(
-          'พี่เงิน',
-          style: TextStyle(fontSize: 18, fontWeight: FontWeight.w800),
+        leading: IconButton(
+          icon: const Icon(Icons.arrow_back, color: Colors.white, size: 24),
+          onPressed: () {
+            if (Navigator.of(context).canPop() || context.canPop()) {
+              context.pop();
+            } else {
+              context.go('/');
+            }
+          },
+        ),
+        title: RichText(
+          text: const TextSpan(
+            style: TextStyle(fontSize: 22, fontWeight: FontWeight.bold),
+            children: [
+              TextSpan(text: 'พี่', style: TextStyle(color: Colors.white)),
+              TextSpan(text: 'เงิน', style: TextStyle(color: Color(0xFF3CAE63))),
+            ],
+          ),
         ),
       ),
       body: SafeArea(

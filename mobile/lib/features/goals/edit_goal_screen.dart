@@ -260,28 +260,20 @@ class _EditGoalScreenState extends ConsumerState<EditGoalScreen> {
                 children: [
                   Align(
                     alignment: Alignment.centerLeft,
-                    child: GestureDetector(
-                      onTap: () => context.pop(),
-                      child: Container(
-                        padding: const EdgeInsets.all(10),
-                        decoration: BoxDecoration(
-                          shape: BoxShape.circle,
-                          color: const Color(0xFF3CAE63),
-                          boxShadow: [
-                            BoxShadow(
-                              color: const Color(0xFF3CAE63).withOpacity(0.4),
-                              blurRadius: 12,
-                              spreadRadius: 2,
-                            ),
-                          ],
-                        ),
-                        child: const Icon(Icons.arrow_back_rounded, color: Colors.white, size: 24),
-                      ),
+                    child: IconButton(
+                      onPressed: () {
+                        if (Navigator.of(context).canPop() || context.canPop()) {
+                          context.pop();
+                        } else {
+                          context.go('/');
+                        }
+                      },
+                      icon: const Icon(Icons.arrow_back, color: Colors.white, size: 24),
                     ),
                   ),
-                  const Text(
-                    'แก้ไขเป้าหมาย',
-                    style: TextStyle(fontWeight: FontWeight.bold, fontSize: 24, color: Colors.white, letterSpacing: 0.5),
+                  Text(
+                    widget.goalId != null ? 'แก้ไขเป้าหมาย' : 'เพิ่มเป้าหมาย',
+                    style: const TextStyle(fontWeight: FontWeight.bold, fontSize: 24, color: Colors.white, letterSpacing: 0.5),
                   ),
                 ],
               ),
@@ -628,7 +620,7 @@ class _EditGoalScreenState extends ConsumerState<EditGoalScreen> {
                     icon: Icons.flag_rounded,
                     title: 'ประเภทเป้าหมาย',
                     subtitle: _getTypeLabel(_selectedType),
-                    onTap: () => _showTypeSelectionBottomSheet(),
+                    onTap: null, // แสดงเพื่อบอกระยะเวลาเท่านั้น ไม่สามารถกดเลือกได้
                   ),
                   const SizedBox(height: 24),
                   
@@ -684,24 +676,26 @@ class _EditGoalScreenState extends ConsumerState<EditGoalScreen> {
                   ),
                   const SizedBox(height: 48),
                   
-                  // ปุ่มลบ และ ยืนยันการแก้ไข
+                  // ปุ่มลบ และ ยืนยันการบันทึก/แก้ไข
                   Row(
                     children: [
-                      Expanded(
-                        child: SizedBox(
-                          height: 56,
-                          child: ElevatedButton(
-                            onPressed: () => _deleteGoal(),
-                            style: ElevatedButton.styleFrom(
-                              backgroundColor: const Color(0xFFFF5959), 
-                              elevation: 0,
-                              shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(16)),
+                      if (widget.goalId != null) ...[
+                        Expanded(
+                          child: SizedBox(
+                            height: 56,
+                            child: ElevatedButton(
+                              onPressed: () => _deleteGoal(),
+                              style: ElevatedButton.styleFrom(
+                                backgroundColor: const Color(0xFFFF5959), 
+                                elevation: 0,
+                                shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(16)),
+                              ),
+                              child: const Text('ลบ', style: TextStyle(color: Colors.white, fontWeight: FontWeight.bold, fontSize: 16)),
                             ),
-                            child: const Text('ลบ', style: TextStyle(color: Colors.white, fontWeight: FontWeight.bold, fontSize: 16)),
                           ),
                         ),
-                      ),
-                      const SizedBox(width: 14),
+                        const SizedBox(width: 14),
+                      ],
                       Expanded(
                         child: SizedBox(
                           height: 56,
@@ -712,9 +706,9 @@ class _EditGoalScreenState extends ConsumerState<EditGoalScreen> {
                               elevation: 0,
                               shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(16)),
                             ),
-                            child: const Text(
-                              'ยืนยันการแก้ไข',
-                              style: TextStyle(color: Colors.white, fontWeight: FontWeight.bold, fontSize: 16),
+                            child: Text(
+                              widget.goalId != null ? 'ยืนยันการแก้ไข' : 'บันทึกเป้าหมาย',
+                              style: const TextStyle(color: Colors.white, fontWeight: FontWeight.bold, fontSize: 16),
                             ),
                           ),
                         ),
@@ -735,7 +729,7 @@ class _EditGoalScreenState extends ConsumerState<EditGoalScreen> {
     required IconData icon,
     required String title,
     required String subtitle,
-    required VoidCallback onTap,
+    VoidCallback? onTap,
   }) {
     return GestureDetector(
       onTap: onTap,
@@ -764,7 +758,8 @@ class _EditGoalScreenState extends ConsumerState<EditGoalScreen> {
                 ],
               ),
             ),
-            const Icon(Icons.arrow_forward_ios_rounded, color: Colors.white30, size: 14),
+            if (onTap != null)
+              const Icon(Icons.arrow_forward_ios_rounded, color: Colors.white30, size: 14),
           ],
         ),
       ),
@@ -809,7 +804,11 @@ class _EditGoalScreenState extends ConsumerState<EditGoalScreen> {
     if (_formKey.currentState!.validate()) {
       final name = _nameController.text.trim();
       
-      // แก้ไขบัคตรงนี้: แปลงค่าเป็น double ก่อนแล้วค่อยคูณ 100 เพื่อเซฟหน่วยสตางค์เข้า Database/Provider ได้อย่างเสถียร
+      // ให้ระบบคำนวณและซิงก์ประเภทเป้าหมายจากช่วงวันที่อัตโนมัติก่อนบันทึก
+      if (_startDate != null && _endDate != null) {
+        _selectedType = _autoDetectGoalType(_startDate!, _endDate!);
+      }
+
       final double bahtVal = double.tryParse(_targetController.text) ?? 0;
       final int targetVal = (bahtVal * 100).toInt();
       

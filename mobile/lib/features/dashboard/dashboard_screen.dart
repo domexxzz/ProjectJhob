@@ -9,6 +9,7 @@ import '../transactions/transaction.dart';
 import '../transactions/transactions_repository.dart';
 import '../notifications/notif_bell.dart';
 import '../goals/goals_provider.dart';
+import '../../widgets/app_bottom_nav_bar.dart';
 
 // ─────────────────────────────────────────────────────────────────────────────
 // Dashboard Screen (Main) - Premium Dark UI Redesign
@@ -91,26 +92,9 @@ class DashboardScreen extends ConsumerWidget {
           ),
         ],
       ),
-      floatingActionButton: Container(
-        height: 64,
-        width: 64,
-        margin: const EdgeInsets.only(top: 10),
-        child: FloatingActionButton(
-          onPressed: () async {
-            await context.push('/slip'); // ปุ่ม + → หน้าเลือกสลิป
-            ref.invalidate(dashboardProvider);
-            await ref.read(
-                dashboardProvider.future); // รอโหลดเสร็จให้ balance อัปเดตทันที
-          },
-          backgroundColor: const Color(0xFF3CAE63),
-          foregroundColor: Colors.black,
-          shape: const CircleBorder(),
-          elevation: 4,
-          child: const Icon(Icons.add, size: 32),
-        ),
-      ),
+      floatingActionButton: const AppFloatingActionButton(),
       floatingActionButtonLocation: kFixedCenterDockedFabLocation,
-      bottomNavigationBar: const _DashboardNav(),
+      bottomNavigationBar: const AppBottomNavigationBar(currentTab: AppTab.home),
     );
   }
 }
@@ -334,8 +318,8 @@ class _GoalsCardState extends ConsumerState<_GoalsCard> {
         return (
           'ระยะสั้น (ใน 0-6 เดือน)',
           Icons.shutter_speed_rounded,
-          const Color(0xFFFBBC05).withOpacity(0.15),
-          const Color(0xFFFBBC05)
+          const Color(0xFFFFC067).withOpacity(0.15),
+          const Color(0xFFFFC067)
         );
     }
   }
@@ -427,10 +411,10 @@ class _GoalsCardState extends ConsumerState<_GoalsCard> {
                 // short / default
                 gradientColors = [
                   const Color(0xFF1A1A1A),
-                  const Color(0xFF634D0E),
-                  const Color(0xFFD69E0A)
+                  const Color(0xFF6B4E0A),
+                  const Color(0xFFFFC067)
                 ];
-                accentColor = const Color(0xFFFBBC05);
+                accentColor = const Color(0xFFFFC067);
               }
 
               final remaining = g.target - g.current;
@@ -545,10 +529,10 @@ class _GoalsCardState extends ConsumerState<_GoalsCard> {
                         isSuccess
                             ? 'สำเร็จเป้าหมายแล้ว! 🎉'
                             : 'เหลืออีก ${Money.formatBaht(remaining)} บาท',
-                        style: TextStyle(
-                            color: accentColor,
-                            fontSize: 11,
-                            fontWeight: FontWeight.w500),
+                        style: const TextStyle(
+                            color: Colors.white,
+                            fontSize: 12,
+                            fontWeight: FontWeight.w600),
                       ),
                     ),
                   ],
@@ -662,15 +646,15 @@ class _BudgetsCard extends ConsumerWidget {
                       String statusLabel;
                       Color statusColor;
 
-                      if (status.riskLevel == 'danger') {
+                      if (pct >= 0.8 || status.riskLevel == 'danger') {
                         statusLabel = 'อันตราย';
-                        statusColor = const Color(0xFFFF4B4B);
-                      } else if (status.riskLevel == 'warning') {
+                        statusColor = const Color(0xFFFF4D4F);
+                      } else if (pct >= 0.7 || status.riskLevel == 'warning') {
                         statusLabel = 'เสี่ยง';
-                        statusColor = const Color(0xFFFFE568);
+                        statusColor = const Color(0xFFFFC067);
                       } else {
                         statusLabel = 'ปลอดภัย';
-                        statusColor = const Color(0xFF3CAE63);
+                        statusColor = const Color(0xFF37C871);
                       }
 
                       final cat = status.category;
@@ -933,94 +917,4 @@ class _ErrorBox extends StatelessWidget {
 }
 
 // ─────────────────────────────────────────────────────────────────────────────
-// Bottom Navigation Bar
-// ─────────────────────────────────────────────────────────────────────────────
-class _DashboardNav extends StatelessWidget {
-  const _DashboardNav();
 
-  @override
-  Widget build(BuildContext context) {
-    return Container(
-      decoration: BoxDecoration(
-        color: const Color(0xFF1A1A1A),
-        borderRadius: const BorderRadius.only(
-          topLeft: Radius.circular(30),
-          topRight: Radius.circular(30),
-        ),
-        boxShadow: [
-          BoxShadow(
-              color: Colors.black.withOpacity(0.3),
-              blurRadius: 12,
-              offset: const Offset(0, -2))
-        ],
-      ),
-      child: BottomAppBar(
-        color: Colors.transparent,
-        elevation: 0,
-        notchMargin: 10,
-        height: 74,
-        padding: EdgeInsets.zero,
-        child: Row(
-          mainAxisAlignment: MainAxisAlignment.spaceAround,
-          children: [
-            const _NavItem(
-                icon: Icons.home_outlined, label: 'หน้าหลัก', active: true),
-            _NavItem(
-              icon: Icons.dashboard_outlined,
-              label: 'แดชบอร์ด',
-              onTap: () => context.push('/financial-dashboard'),
-            ),
-            const SizedBox(width: 48),
-            _NavItem(
-                icon: Icons.chat_bubble_outline_rounded,
-                label: 'พี่เงิน',
-                onTap: () => context.push('/chat')),
-            _NavItem(
-                icon: Icons.grid_view_rounded,
-                label: 'เมนู',
-                onTap: () => context.push('/menu')),
-          ],
-        ),
-      ),
-    );
-  }
-}
-
-class _NavItem extends StatelessWidget {
-  const _NavItem(
-      {required this.icon,
-      required this.label,
-      this.active = false,
-      this.onTap});
-  final IconData icon;
-  final String label;
-  final bool active;
-  final VoidCallback? onTap;
-
-  @override
-  Widget build(BuildContext context) {
-    final color = active ? const Color(0xFF4CD97B) : Colors.white60;
-    return InkWell(
-      onTap: onTap,
-      borderRadius: BorderRadius.circular(16),
-      child: Padding(
-        padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 8),
-        child: Column(
-          mainAxisSize: MainAxisSize.min,
-          children: [
-            Icon(icon, color: color, size: 28),
-            const SizedBox(height: 4),
-            Text(
-              label,
-              style: TextStyle(
-                color: color,
-                fontSize: 11,
-                fontWeight: active ? FontWeight.bold : FontWeight.w500,
-              ),
-            ),
-          ],
-        ),
-      ),
-    );
-  }
-}
