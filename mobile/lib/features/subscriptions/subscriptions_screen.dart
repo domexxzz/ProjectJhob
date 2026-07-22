@@ -27,8 +27,14 @@ class SubscriptionsScreen extends ConsumerWidget {
         backgroundColor: const Color(0xFF121212),
         elevation: 0,
         leading: IconButton(
-          icon: const Icon(Icons.arrow_back, color: Colors.white),
-          onPressed: () => context.pop(),
+          icon: const Icon(Icons.arrow_back, color: Colors.white, size: 24),
+          onPressed: () {
+            if (Navigator.of(context).canPop() || context.canPop()) {
+              context.pop();
+            } else {
+              context.go('/');
+            }
+          },
         ),
         title: const Text('Subscription', style: TextStyle(color: Colors.white)),
         actions: [

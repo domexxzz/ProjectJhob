@@ -23,8 +23,14 @@ class PredictionsScreen extends ConsumerWidget {
       backgroundColor: const Color(0xFF0D1117),
       appBar: AppBar(
         leading: IconButton(
-          icon: const Icon(Icons.arrow_back_ios_new_rounded, size: 20),
-          onPressed: () => context.pop(),
+          icon: const Icon(Icons.arrow_back, color: Colors.white, size: 24),
+          onPressed: () {
+            if (Navigator.of(context).canPop() || context.canPop()) {
+              context.pop();
+            } else {
+              context.go('/');
+            }
+          },
         ),
         title: const Text(
           'วิเคราะห์ & คาดการณ์ AI',

@@ -32,6 +32,32 @@ class GoalModel {
     return (current / target).clamp(0.0, 1.0);
   }
 
+  String get calculatedType {
+    if (startDate != null && deadline != null) {
+      final int months = ((deadline!.year - startDate!.year) * 12) + (deadline!.month - startDate!.month);
+      if (months <= 6) return 'short';
+      if (months <= 12) return 'medium';
+      return 'long';
+    } else if (deadline != null) {
+      final int months = ((deadline!.year - createdAt.year) * 12) + (deadline!.month - createdAt.month);
+      if (months <= 6) return 'short';
+      if (months <= 12) return 'medium';
+      return 'long';
+    }
+    return type;
+  }
+
+  String get typeLabel {
+    switch (calculatedType) {
+      case 'medium':
+        return 'ระยะกลาง (6-12 เดือน)';
+      case 'long':
+        return 'ระยะยาว (1 ปีขึ้นไป)';
+      default:
+        return 'ระยะสั้น (0-6 เดือน)';
+    }
+  }
+
   GoalModel copyWith({
     String? id,
     String? name,

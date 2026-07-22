@@ -7,6 +7,7 @@ import '../../core/money.dart';
 import '../transactions/transaction.dart';
 import '../transactions/transactions_repository.dart';
 import '../auth/auth_controller.dart'; 
+import '../../widgets/app_bottom_nav_bar.dart';
 
 class BudgetListScreen extends ConsumerWidget {
   const BudgetListScreen({super.key});
@@ -259,32 +260,33 @@ class BudgetListScreen extends ConsumerWidget {
           ),
         ],
       ),
-      // แก้ไข Footer Bottom Navigation Bar ให้แมตช์เป็นตัวเดียวกับหน้า Goals
-      bottomNavigationBar: const _BudgetsNav(),
+      floatingActionButton: const AppFloatingActionButton(),
+      floatingActionButtonLocation: kFixedCenterDockedFabLocation,
+      bottomNavigationBar: const AppBottomNavigationBar(currentTab: AppTab.budgets),
     );
   }
 
   (String, IconData, Color, Color) _getBudgetStatusDetails(double pct) {
-    if (pct >= 1.0) {
+    if (pct >= 0.8) {
       return (
         'อันตราย',
         Icons.error_outline_rounded,
         const Color(0xFFFF4D4F).withOpacity(0.15),
-        const Color(0xFFFF4D4F), // สีแดงเดียวกับเป้าหมายที่สำเร็จแล้วหรือใช้เกิน
+        const Color(0xFFFF4D4F), // >= 80% สีแดง
       );
-    } else if (pct >= 0.8) {
+    } else if (pct >= 0.7) {
       return (
         'เสี่ยง',
         Icons.warning_amber_rounded,
-        const Color(0xFFFFD54F).withOpacity(0.15),
-        const Color(0xFFFFD54F), // สีเหลือง
+        const Color(0xFFFFC067).withOpacity(0.15),
+        const Color(0xFFFFC067), // 70% - 79% สีทอง/เหลือง #FFC067
       );
     } else {
       return (
         'ปลอดภัย',
         Icons.check_circle_outline_rounded,
         const Color(0xFF37C871).withOpacity(0.15),
-        const Color(0xFF37C871), // สีเขียว
+        const Color(0xFF37C871), // <= 69% สีเขียว
       );
     }
   }
@@ -372,106 +374,7 @@ class _GreenHeader extends StatelessWidget {
   }
 }
 
-// ─────────────────────────────────────────────────────────────────────────────
-// Bottom Navigation Bar (ปรับแต่งดีไซน์ให้เข้าคู่กับ Goals / Dashboard)
-// ─────────────────────────────────────────────────────────────────────────────
-class _BudgetsNav extends StatelessWidget {
-  const _BudgetsNav();
 
-  @override
-  Widget build(BuildContext context) {
-    return Container(
-      decoration: BoxDecoration(
-        color: const Color(0xFF1A1A1A),
-        borderRadius: const BorderRadius.only(
-          topLeft: Radius.circular(30),
-          topRight: Radius.circular(30),
-        ),
-        boxShadow: [
-          BoxShadow(
-            color: Colors.black.withOpacity(0.3),
-            blurRadius: 12,
-            offset: const Offset(0, -2),
-          )
-        ],
-      ),
-      child: BottomAppBar(
-        color: Colors.transparent,
-        elevation: 0,
-        notchMargin: 10,
-        height: 74,
-        padding: EdgeInsets.zero,
-        child: Row(
-          mainAxisAlignment: MainAxisAlignment.spaceAround,
-          children: [
-            _NavItem(
-              icon: Icons.home_outlined, 
-              label: 'หน้าหลัก', 
-              onTap: () => context.go('/')
-            ),
-            _NavItem(
-              icon: Icons.dashboard_outlined, 
-              label: 'แดชบอร์ด', 
-              onTap: () => context.push('/financial-dashboard')
-            ),
-            const SizedBox(width: 48), // เผื่อพื้นที่ว่างให้ FloatingActionButton ตรงกลางของเฟรมเวิร์ก
-            _NavItem(
-              icon: Icons.chat_bubble_outline_rounded, 
-              label: 'พี่เงิน', 
-              onTap: () => context.push('/chat')
-            ),
-            _NavItem(
-              icon: Icons.grid_view_rounded, 
-              label: 'เมนู', 
-              onTap: () => context.push('/menu')
-            ),
-          ],
-        ),
-      ),
-    );
-  }
-}
-
-class _NavItem extends StatelessWidget {
-  const _NavItem({
-    required this.icon,
-    required this.label,
-    this.active = false,
-    this.onTap,
-  });
-
-  final IconData icon;
-  final String label;
-  final bool active;
-  final VoidCallback? onTap;
-
-  @override
-  Widget build(BuildContext context) {
-    final color = active ? const Color(0xFF4CD97B) : Colors.white60;
-    return InkWell(
-      onTap: onTap,
-      borderRadius: BorderRadius.circular(16),
-      child: Padding(
-        padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 8),
-        child: Column(
-          mainAxisSize: MainAxisSize.min,
-          children: [
-            Icon(icon, color: color, size: 28),
-            const SizedBox(height: 4),
-            Text(
-              label,
-              style: TextStyle(
-                color: color,
-                fontSize: 11,
-                fontWeight: active ? FontWeight.bold : FontWeight.w500,
-              ),
-            ),
-          ],
-        ),
-      ),
-    );
-  }
-}
 
 class _BudgetError extends StatelessWidget {
   const _BudgetError({required this.message, required this.onRetry});

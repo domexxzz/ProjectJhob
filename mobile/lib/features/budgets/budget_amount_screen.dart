@@ -124,8 +124,14 @@ class _BudgetAmountScreenState extends ConsumerState<BudgetAmountScreen> {
       backgroundColor: AppColors.bg, // ใช้พื้นหลังเดียวกับ Goal
       appBar: AppBar(
         leading: IconButton(
-          icon: const Icon(Icons.arrow_back_ios_new_rounded, color: AppColors.primary), // ไอคอนเดียวกับ Goal
-          onPressed: () => context.pop(),
+          icon: const Icon(Icons.arrow_back, color: Colors.white, size: 24),
+          onPressed: () {
+            if (Navigator.of(context).canPop() || context.canPop()) {
+              context.pop();
+            } else {
+              context.go('/');
+            }
+          },
         ),
         title: const Text(
           'ตั้งค่าวงเงินงบประมาณ',

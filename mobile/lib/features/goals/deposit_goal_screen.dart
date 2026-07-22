@@ -35,8 +35,14 @@ class _DepositGoalScreenState extends ConsumerState<DepositGoalScreen> {
       backgroundColor: AppColors.bg,
       appBar: AppBar(
         leading: IconButton(
-          icon: const Icon(Icons.arrow_back_ios_new_rounded, color: AppColors.primary),
-          onPressed: () => context.pop(),
+          icon: const Icon(Icons.arrow_back, color: Colors.white, size: 24),
+          onPressed: () {
+            if (Navigator.of(context).canPop() || context.canPop()) {
+              context.pop();
+            } else {
+              context.go('/');
+            }
+          },
         ),
         title: const Text(
           'กำหนดเงินเข้าเป้าหมาย',

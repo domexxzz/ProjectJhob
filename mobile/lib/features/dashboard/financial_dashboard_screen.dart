@@ -6,8 +6,11 @@ import 'package:intl/intl.dart';
 
 import '../../app/theme.dart';
 import '../../core/money.dart';
+import '../auth/auth_controller.dart';
+import '../notifications/notif_bell.dart';
 import '../transactions/transaction.dart';
 import '../transactions/transactions_repository.dart';
+import '../../widgets/app_bottom_nav_bar.dart';
 
 enum _DashboardRange { day, week, month, year }
 
@@ -26,109 +29,98 @@ class _FinancialDashboardScreenState
 
   @override
   Widget build(BuildContext context) {
+    final user = ref.watch(authControllerProvider).user;
     final dashboard = ref.watch(dashboardProvider);
 
     return Scaffold(
       backgroundColor: const Color(0xFF0D0F0E),
-      appBar: AppBar(
-        backgroundColor: const Color(0xFF0D0F0E),
-        surfaceTintColor: Colors.transparent,
-        centerTitle: true,
-        title: const Text(
-          'แดชบอร์ด',
-          style: TextStyle(fontSize: 18, fontWeight: FontWeight.w700),
-        ),
-        leading: IconButton(
-          onPressed: () => context.pop(),
-          icon: const Icon(Icons.arrow_back_rounded),
-        ),
-      ),
-      body: RefreshIndicator(
-        color: AppColors.primary,
-        onRefresh: () async {
-          ref.invalidate(dashboardProvider);
-          await ref.read(dashboardProvider.future);
-        },
-        child: dashboard.when(
-          loading: () => const Center(
-            child: CircularProgressIndicator(color: AppColors.primary),
+      body: Column(
+        children: [
+          _GreenHeader(
+            name: user?.displayName ?? 'Chnitsara Nansthit',
+            streak: user?.streak ?? 0,
           ),
-          error: (error, _) => ListView(
-            padding: const EdgeInsets.all(24),
-            children: [
-              const SizedBox(height: 160),
-              const Icon(Icons.cloud_off_rounded,
-                  color: Colors.white38, size: 42),
-              const SizedBox(height: 12),
-              const Text(
-                'โหลดข้อมูลแดชบอร์ดไม่สำเร็จ',
-                textAlign: TextAlign.center,
-                style: TextStyle(color: Colors.white, fontSize: 16),
-              ),
-              const SizedBox(height: 8),
-              Text(
-                '$error',
-                textAlign: TextAlign.center,
-                style: const TextStyle(color: Colors.white54, fontSize: 12),
-              ),
-            ],
-          ),
-          data: (data) {
-            final visible = _filterTransactions(data.items, _range);
-            final income = visible
-                .where((item) => item.isIncome)
-                .fold<int>(0, (sum, item) => sum + item.amount);
-            final expense = visible
-                .where((item) => !item.isIncome)
-                .fold<int>(0, (sum, item) => sum + item.amount);
+          Expanded(
+            child: RefreshIndicator(
+              color: AppColors.primary,
+              onRefresh: () async {
+                ref.invalidate(dashboardProvider);
+                await ref.read(dashboardProvider.future);
+              },
+              child: dashboard.when(
+                loading: () => const Center(
+                  child: CircularProgressIndicator(color: AppColors.primary),
+                ),
+                error: (error, _) => ListView(
+                  padding: const EdgeInsets.all(24),
+                  children: [
+                    const SizedBox(height: 160),
+                    const Icon(Icons.cloud_off_rounded,
+                        color: Colors.white38, size: 42),
+                    const SizedBox(height: 12),
+                    const Text(
+                      'โหลดข้อมูลแดชบอร์ดไม่สำเร็จ',
+                      textAlign: TextAlign.center,
+                      style: TextStyle(color: Colors.white, fontSize: 16),
+                    ),
+                    const SizedBox(height: 8),
+                    Text(
+                      '$error',
+                      textAlign: TextAlign.center,
+                      style: const TextStyle(color: Colors.white54, fontSize: 12),
+                    ),
+                  ],
+                ),
+                data: (data) {
+                  final visible = _filterTransactions(data.items, _range);
+                  final income = visible
+                      .where((item) => item.isIncome)
+                      .fold<int>(0, (sum, item) => sum + item.amount);
+                  final expense = visible
+                      .where((item) => !item.isIncome)
+                      .fold<int>(0, (sum, item) => sum + item.amount);
 
-            return ListView(
-              physics: const AlwaysScrollableScrollPhysics(),
-              padding: const EdgeInsets.fromLTRB(16, 8, 16, 116),
-              children: [
-                _RangeSelector(
-                  selected: _range,
-                  onChanged: (range) => setState(() => _range = range),
-                ),
-                const SizedBox(height: 16),
-                _TrendCard(transactions: visible, range: _range),
-                const SizedBox(height: 14),
-                _SummaryRow(income: income, expense: expense),
-                const SizedBox(height: 24),
-                _SectionHeader(
-                  title: 'สัดส่วนตามหมวดหมู่',
-                  trailing: _TypeSwitch(
-                    showIncome: _showIncomeCategories,
-                    onChanged: (value) =>
-                        setState(() => _showIncomeCategories = value),
-                  ),
-                ),
-                const SizedBox(height: 12),
-                _CategoryBreakdown(
-                  transactions: visible,
-                  showIncome: _showIncomeCategories,
-                ),
-                const SizedBox(height: 24),
-                const _SectionHeader(title: 'รายการในช่วงเวลานี้'),
-                const SizedBox(height: 12),
-                _TransactionList(transactions: visible),
-              ],
-            );
-          },
-        ),
+                  return ListView(
+                    physics: const AlwaysScrollableScrollPhysics(),
+                    padding: const EdgeInsets.fromLTRB(16, 8, 16, 116),
+                    children: [
+                      _RangeSelector(
+                        selected: _range,
+                        onChanged: (range) => setState(() => _range = range),
+                      ),
+                      const SizedBox(height: 16),
+                      _TrendCard(transactions: visible, range: _range),
+                      const SizedBox(height: 14),
+                      _SummaryRow(income: income, expense: expense),
+                      const SizedBox(height: 24),
+                      _SectionHeader(
+                        title: 'สัดส่วนตามหมวดหมู่',
+                        trailing: _TypeSwitch(
+                          showIncome: _showIncomeCategories,
+                          onChanged: (value) =>
+                              setState(() => _showIncomeCategories = value),
+                        ),
+                      ),
+                      const SizedBox(height: 12),
+                      _CategoryBreakdown(
+                        transactions: visible,
+                        showIncome: _showIncomeCategories,
+                      ),
+                      const SizedBox(height: 24),
+                      const _SectionHeader(title: 'รายการในช่วงเวลานี้'),
+                      const SizedBox(height: 12),
+                      _TransactionList(transactions: visible),
+                    ],
+                  );
+                },
+              ),
+            ),
+          ),
+        ],
       ),
-      floatingActionButton: FloatingActionButton(
-        onPressed: () async {
-          await context.push('/slip');
-          ref.invalidate(dashboardProvider);
-        },
-        backgroundColor: AppColors.primary,
-        foregroundColor: Colors.black,
-        shape: const CircleBorder(),
-        child: const Icon(Icons.add_rounded, size: 30),
-      ),
-      floatingActionButtonLocation: FloatingActionButtonLocation.centerDocked,
-      bottomNavigationBar: const _DashboardBottomNav(),
+      floatingActionButton: const AppFloatingActionButton(),
+      floatingActionButtonLocation: kFixedCenterDockedFabLocation,
+      bottomNavigationBar: const AppBottomNavigationBar(currentTab: AppTab.dashboard),
     );
   }
 }
@@ -936,85 +928,81 @@ class _TransactionList extends StatelessWidget {
   }
 }
 
-class _DashboardBottomNav extends StatelessWidget {
-  const _DashboardBottomNav();
+// ─────────────────────────────────────────────────────────────────────────────
+// Top Green Header Widget
+// ─────────────────────────────────────────────────────────────────────────────
+class _GreenHeader extends StatelessWidget {
+  const _GreenHeader({required this.name, required this.streak});
+  final String name;
+  final int streak;
 
   @override
   Widget build(BuildContext context) {
-    return BottomAppBar(
-      color: const Color(0xFF1A1A1A),
-      elevation: 8,
-      notchMargin: 8,
-      shape: const CircularNotchedRectangle(),
-      height: 74,
-      padding: EdgeInsets.zero,
-      child: Row(
-        mainAxisAlignment: MainAxisAlignment.spaceAround,
-        children: [
-          _BottomItem(
-            icon: Icons.home_outlined,
-            label: 'หน้าหลัก',
-            onTap: () => context.go('/'),
-          ),
-          const _BottomItem(
-            icon: Icons.dashboard_rounded,
-            label: 'แดชบอร์ด',
-            active: true,
-          ),
-          const SizedBox(width: 48),
-          _BottomItem(
-            icon: Icons.chat_bubble_outline_rounded,
-            label: 'พี่เงิน',
-            onTap: () => context.push('/chat'),
-          ),
-          _BottomItem(
-            icon: Icons.grid_view_rounded,
-            label: 'เมนู',
-            onTap: () => context.push('/menu'),
-          ),
-        ],
-      ),
-    );
-  }
-}
-
-class _BottomItem extends StatelessWidget {
-  const _BottomItem({
-    required this.icon,
-    required this.label,
-    this.active = false,
-    this.onTap,
-  });
-
-  final IconData icon;
-  final String label;
-  final bool active;
-  final VoidCallback? onTap;
-
-  @override
-  Widget build(BuildContext context) {
-    final color = active ? AppColors.primary : Colors.white60;
-    return InkWell(
-      onTap: onTap,
-      borderRadius: BorderRadius.circular(14),
-      child: Padding(
-        padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 8),
-        child: Column(
-          mainAxisSize: MainAxisSize.min,
-          children: [
-            Icon(icon, color: color, size: 26),
-            const SizedBox(height: 3),
-            Text(
-              label,
-              style: TextStyle(
-                color: color,
-                fontSize: 10,
-                fontWeight: active ? FontWeight.w700 : FontWeight.w500,
-              ),
-            ),
-          ],
+    final topPad = MediaQuery.of(context).padding.top;
+    return Container(
+      width: double.infinity,
+      padding: EdgeInsets.fromLTRB(20, topPad + 16, 20, 24),
+      decoration: const BoxDecoration(
+        gradient: LinearGradient(
+          colors: [Color(0xFF06120A), Color(0xFF334E3D), Color(0xFF3CAE63)],
+          begin: Alignment.topCenter,
+          end: Alignment.bottomCenter,
+        ),
+        borderRadius: BorderRadius.only(
+          bottomLeft: Radius.circular(32),
+          bottomRight: Radius.circular(32),
         ),
       ),
+      child: Row(
+        children: [
+              Container(
+                width: 48,
+                height: 48,
+                decoration: const BoxDecoration(
+                  shape: BoxShape.circle,
+                  color: Color(0xFF5E6E85),
+                ),
+                child: const Icon(Icons.person, color: Colors.white, size: 30),
+              ),
+              const SizedBox(width: 14),
+              Expanded(
+                child: Column(
+                  crossAxisAlignment: CrossAxisAlignment.start,
+                  children: [
+                    Text(
+                      name,
+                      style: const TextStyle(
+                        color: Colors.white,
+                        fontSize: 18,
+                        fontWeight: FontWeight.w600,
+                      ),
+                      overflow: TextOverflow.ellipsis,
+                    ),
+                    const SizedBox(height: 6),
+                    Container(
+                      padding:
+                          const EdgeInsets.symmetric(horizontal: 12, vertical: 4),
+                      decoration: BoxDecoration(
+                        color: Colors.white.withOpacity(0.2),
+                        borderRadius: BorderRadius.circular(12),
+                      ),
+                      child: Text(
+                        'ใช้งานต่อเนื่อง $streak วัน',
+                        style: const TextStyle(
+                          color: Colors.white,
+                          fontSize: 12,
+                          fontWeight: FontWeight.bold,
+                        ),
+                      ),
+                    ),
+                  ],
+                ),
+              ),
+              const NotifBell(),
+            ],
+          ),
     );
   }
 }
+
+
