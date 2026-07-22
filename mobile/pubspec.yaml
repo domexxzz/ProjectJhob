@@ -28,6 +28,7 @@ dependencies:
   flutter_facebook_auth: ^6.2.0
   url_launcher: ^6.3.0
   image_cropper: ^12.2.1 # หรือเวอร์ชันล่าสุด
+  local_auth: ^3.0.2
 
 dev_dependencies:
   flutter_lints: ^4.0.0

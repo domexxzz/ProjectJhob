@@ -4,6 +4,7 @@ import 'package:go_router/go_router.dart';
 
 import '../../app/theme.dart';
 import 'notifications_repository.dart';
+import '../settings/settings_screen.dart';
 
 /// กระดิ่งแจ้งเตือน + badge จำนวนยังไม่อ่าน → เข้า Notification Center
 /// ใช้ร่วมกันทั้ง Dashboard และ Menu
@@ -12,15 +13,23 @@ class NotifBell extends ConsumerWidget {
 
   @override
   Widget build(BuildContext context, WidgetRef ref) {
-    final unread = ref.watch(notificationsProvider).valueOrNull?.unreadCount ?? 0;
+    final enabled = ref.watch(appSettingsProvider).notifications;
+    final unread =
+        ref.watch(notificationsProvider).valueOrNull?.unreadCount ?? 0;
     return Stack(
       clipBehavior: Clip.none,
       children: [
         IconButton(
           onPressed: () => context.push('/notifications'),
-          icon: const Icon(Icons.notifications_outlined, color: Colors.white, size: 26),
+          icon: Icon(
+            enabled
+                ? Icons.notifications_outlined
+                : Icons.notifications_off_outlined,
+            color: enabled ? Colors.white : Colors.white54,
+            size: 26,
+          ),
         ),
-        if (unread > 0)
+        if (enabled && unread > 0)
           Positioned(
             right: 6,
             top: 6,
@@ -35,7 +44,10 @@ class NotifBell extends ConsumerWidget {
               child: Text(
                 unread > 9 ? '9+' : '$unread',
                 textAlign: TextAlign.center,
-                style: const TextStyle(color: Colors.white, fontSize: 10, fontWeight: FontWeight.bold),
+                style: const TextStyle(
+                    color: Colors.white,
+                    fontSize: 10,
+                    fontWeight: FontWeight.bold),
               ),
             ),
           ),

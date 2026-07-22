@@ -15,12 +15,22 @@ class ChatRepository {
         .toList();
   }
 
-  Future<ChatMessage> send(String message, {String? imageBase64}) async {
+  Future<ChatMessage> send(
+    String message, {
+    String? imageBase64,
+    bool includeFinancialContext = true,
+    bool personalizedRecommendations = true,
+    bool storeConversationHistory = true,
+  }) async {
     final res = await _dio.post('/chat', data: {
       'message': message,
       if (imageBase64 != null) 'imageBase64': imageBase64,
+      'includeFinancialContext': includeFinancialContext,
+      'personalizedRecommendations': personalizedRecommendations,
+      'storeConversationHistory': storeConversationHistory,
     });
-    return ChatMessage.fromJson((res.data as Map<String, dynamic>)['message'] as Map<String, dynamic>);
+    return ChatMessage.fromJson(
+        (res.data as Map<String, dynamic>)['message'] as Map<String, dynamic>);
   }
 
   /// ส่งรูป (data URL) ให้ backend OCR ด้วย Typhoon OCR → คืนข้อความที่อ่านได้

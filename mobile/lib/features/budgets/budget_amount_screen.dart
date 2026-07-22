@@ -2,12 +2,13 @@ import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:go_router/go_router.dart';
-import 'package:intl/intl.dart'; 
+import 'package:intl/intl.dart';
 
 import '../../app/theme.dart';
 import '../../core/money.dart';
 import '../transactions/transaction.dart';
 import '../transactions/transactions_repository.dart';
+import '../settings/settings_screen.dart';
 
 class BudgetAmountScreen extends ConsumerStatefulWidget {
   const BudgetAmountScreen({super.key});
@@ -20,7 +21,7 @@ class _BudgetAmountScreenState extends ConsumerState<BudgetAmountScreen> {
   final _amountController = TextEditingController();
   String? _categoryId;
   String _period = 'monthly'; // 'monthly' | 'weekly' | 'custom'
-  
+
   DateTimeRange? _customDateRange;
   bool _saving = false;
 
@@ -33,10 +34,11 @@ class _BudgetAmountScreenState extends ConsumerState<BudgetAmountScreen> {
   Future<void> _selectCustomDateRange() async {
     final DateTimeRange? picked = await showDateRangePicker(
       context: context,
-      initialDateRange: _customDateRange ?? DateTimeRange(
-        start: DateTime.now(),
-        end: DateTime.now().add(const Duration(days: 7)),
-      ),
+      initialDateRange: _customDateRange ??
+          DateTimeRange(
+            start: DateTime.now(),
+            end: DateTime.now().add(const Duration(days: 7)),
+          ),
       firstDate: DateTime(2020),
       lastDate: DateTime(2030),
       builder: (context, child) {
@@ -66,13 +68,13 @@ class _BudgetAmountScreenState extends ConsumerState<BudgetAmountScreen> {
   Future<void> _save() async {
     final rawAmount = _amountController.text.replaceAll(',', '');
     final amountBaht = num.tryParse(rawAmount);
-    
+
     if (_categoryId == null) {
       _showMessage('กรุณาเลือกหมวดงบประมาณ');
       return;
     }
     if (amountBaht == null || amountBaht <= 0) {
-      _showMessage('กรุณากรอกวงเงินที่มากกว่า 0 บาท');
+      _showMessage('กรุณากรอกวงเงินที่มากกว่า 0 ${Money.symbol}');
       return;
     }
     if (_period == 'custom' && _customDateRange == null) {
@@ -82,17 +84,17 @@ class _BudgetAmountScreenState extends ConsumerState<BudgetAmountScreen> {
 
     setState(() => _saving = true);
     try {
-      final amountSatang = (amountBaht * 100).toInt();
-      
+      final amountSatang = Money.toSatang(amountBaht);
+
       await ref.read(transactionsRepoProvider).createBudget(
             categoryId: _categoryId!,
             amount: amountSatang,
             period: _period,
           );
-      
+
       ref.invalidate(budgetsListProvider);
       ref.invalidate(dashboardProvider);
-      
+
       if (mounted) {
         _showMessage('สร้างงบประมาณสำเร็จแล้ว');
         context.pop();
@@ -116,6 +118,10 @@ class _BudgetAmountScreenState extends ConsumerState<BudgetAmountScreen> {
 
   @override
   Widget build(BuildContext context) {
+    final moneySettings = ref.watch(
+      appSettingsProvider.select((s) => (s.currency, s.usdRate)),
+    );
+    Money.configure(moneySettings.$1, thbToUsdRate: moneySettings.$2);
     final categoriesAsync = ref.watch(categoriesProvider);
     final dateFormat = DateFormat('dd MMM yyyy');
     final isAmountEmpty = _amountController.text.trim().isEmpty;
@@ -124,14 +130,9 @@ class _BudgetAmountScreenState extends ConsumerState<BudgetAmountScreen> {
       backgroundColor: AppColors.bg, // ใช้พื้นหลังเดียวกับ Goal
       appBar: AppBar(
         leading: IconButton(
-          icon: const Icon(Icons.arrow_back, color: Colors.white, size: 24),
-          onPressed: () {
-            if (Navigator.of(context).canPop() || context.canPop()) {
-              context.pop();
-            } else {
-              context.go('/');
-            }
-          },
+          icon: const Icon(Icons.arrow_back_ios_new_rounded,
+              color: AppColors.primary), // ไอคอนเดียวกับ Goal
+          onPressed: () => context.pop(),
         ),
         title: const Text(
           'ตั้งค่าวงเงินงบประมาณ',
@@ -147,10 +148,13 @@ class _BudgetAmountScreenState extends ConsumerState<BudgetAmountScreen> {
           children: [
             const Text(
               'งบประมาณที่ต้องการตั้ง',
-              style: TextStyle(color: Colors.white60, fontSize: 14, fontWeight: FontWeight.w500),
+              style: TextStyle(
+                  color: Colors.white60,
+                  fontSize: 14,
+                  fontWeight: FontWeight.w500),
             ),
             const SizedBox(height: 12),
-            
+
             // กล่องกรอกเงินดีไซน์เดียวกับ DepositGoalScreen (Goal)
             Container(
               padding: const EdgeInsets.symmetric(horizontal: 20, vertical: 16),
@@ -161,17 +165,24 @@ class _BudgetAmountScreenState extends ConsumerState<BudgetAmountScreen> {
               ),
               child: Row(
                 children: [
-                  const Text(
-                    '฿',
-                    style: TextStyle(fontSize: 32, fontWeight: FontWeight.bold, color: AppColors.primary),
+                  Text(
+                    Money.symbol,
+                    style: const TextStyle(
+                        fontSize: 32,
+                        fontWeight: FontWeight.bold,
+                        color: AppColors.primary),
                   ),
                   const SizedBox(width: 16),
                   Expanded(
                     child: TextField(
                       controller: _amountController,
-                      keyboardType: const TextInputType.numberWithOptions(decimal: true),
+                      keyboardType:
+                          const TextInputType.numberWithOptions(decimal: true),
                       autofocus: true,
-                      style: const TextStyle(fontSize: 32, fontWeight: FontWeight.bold, color: Colors.white),
+                      style: const TextStyle(
+                          fontSize: 32,
+                          fontWeight: FontWeight.bold,
+                          color: Colors.white),
                       decoration: const InputDecoration(
                         hintText: '0.00',
                         hintStyle: TextStyle(color: Colors.white24),
@@ -182,7 +193,8 @@ class _BudgetAmountScreenState extends ConsumerState<BudgetAmountScreen> {
                         fillColor: Colors.transparent,
                       ),
                       inputFormatters: [
-                        FilteringTextInputFormatter.allow(RegExp(r'^\d*\.?\d{0,2}')),
+                        FilteringTextInputFormatter.allow(
+                            RegExp(r'^\d*\.?\d{0,2}')),
                       ],
                       onChanged: (val) => setState(() {}),
                     ),
@@ -194,7 +206,10 @@ class _BudgetAmountScreenState extends ConsumerState<BudgetAmountScreen> {
 
             const Text(
               'เลือกหมวดหมู่สำหรับงบนี้',
-              style: TextStyle(color: Colors.white60, fontSize: 14, fontWeight: FontWeight.w500),
+              style: TextStyle(
+                  color: Colors.white60,
+                  fontSize: 14,
+                  fontWeight: FontWeight.w500),
             ),
             const SizedBox(height: 12),
             categoriesAsync.when(
@@ -223,15 +238,20 @@ class _BudgetAmountScreenState extends ConsumerState<BudgetAmountScreen> {
                   },
                 );
               },
-              loading: () => const Center(child: CircularProgressIndicator(color: AppColors.primary)),
-              error: (err, stack) => _LoadError(onRetry: () => ref.invalidate(categoriesProvider)),
+              loading: () => const Center(
+                  child: CircularProgressIndicator(color: AppColors.primary)),
+              error: (err, stack) =>
+                  _LoadError(onRetry: () => ref.invalidate(categoriesProvider)),
             ),
             const SizedBox(height: 32),
 
             // ── เลือกระยะเวลารอบงบประมาณ ──
             const Text(
               'ระยะเวลาที่ต้องการควบคุม',
-              style: TextStyle(color: Colors.white60, fontSize: 14, fontWeight: FontWeight.w500),
+              style: TextStyle(
+                  color: Colors.white60,
+                  fontSize: 14,
+                  fontWeight: FontWeight.w500),
             ),
             const SizedBox(height: 12),
             Row(
@@ -261,12 +281,13 @@ class _BudgetAmountScreenState extends ConsumerState<BudgetAmountScreen> {
                 ),
               ],
             ),
-            
+
             if (_period == 'custom' && _customDateRange != null) ...[
               const SizedBox(height: 14),
               Container(
                 width: double.infinity,
-                padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 12),
+                padding:
+                    const EdgeInsets.symmetric(horizontal: 16, vertical: 12),
                 decoration: BoxDecoration(
                   color: AppColors.surface,
                   borderRadius: BorderRadius.circular(12),
@@ -274,19 +295,26 @@ class _BudgetAmountScreenState extends ConsumerState<BudgetAmountScreen> {
                 ),
                 child: Row(
                   children: [
-                    const Icon(Icons.calendar_month_rounded, color: AppColors.primary, size: 20),
+                    const Icon(Icons.calendar_month_rounded,
+                        color: AppColors.primary, size: 20),
                     const SizedBox(width: 10),
                     Expanded(
                       child: Text(
                         'ช่วงเวลา: ${dateFormat.format(_customDateRange!.start)} - ${dateFormat.format(_customDateRange!.end)}',
-                        style: const TextStyle(color: Colors.white, fontSize: 13, fontWeight: FontWeight.w500),
+                        style: const TextStyle(
+                            color: Colors.white,
+                            fontSize: 13,
+                            fontWeight: FontWeight.w500),
                       ),
                     ),
                     InkWell(
                       onTap: _selectCustomDateRange,
                       child: const Text(
                         'เปลี่ยนวัน',
-                        style: TextStyle(color: AppColors.primary, fontSize: 13, fontWeight: FontWeight.bold),
+                        style: TextStyle(
+                            color: AppColors.primary,
+                            fontSize: 13,
+                            fontWeight: FontWeight.bold),
                       ),
                     )
                   ],
@@ -306,7 +334,8 @@ class _BudgetAmountScreenState extends ConsumerState<BudgetAmountScreen> {
               ? const SizedBox(
                   width: 20,
                   height: 20,
-                  child: CircularProgressIndicator(color: Colors.black, strokeWidth: 2),
+                  child: CircularProgressIndicator(
+                      color: Colors.black, strokeWidth: 2),
                 )
               : const Text('สร้างงบประมาณ'),
         ),
@@ -416,8 +445,12 @@ class _LoadError extends StatelessWidget {
     return Center(
       child: Column(
         children: [
-          const Text('ไม่สามารถโหลดข้อมูลหมวดหมู่ได้', style: TextStyle(color: Colors.white60)),
-          TextButton(onPressed: onRetry, child: const Text('ลองใหม่อีกครั้ง', style: TextStyle(color: AppColors.primary))),
+          const Text('ไม่สามารถโหลดข้อมูลหมวดหมู่ได้',
+              style: TextStyle(color: Colors.white60)),
+          TextButton(
+              onPressed: onRetry,
+              child: const Text('ลองใหม่อีกครั้ง',
+                  style: TextStyle(color: AppColors.primary))),
         ],
       ),
     );
@@ -432,7 +465,8 @@ class _EmptyCategories extends StatelessWidget {
     return const Center(
       child: Padding(
         padding: EdgeInsets.symmetric(vertical: 24),
-        child: Text('ไม่มีหมวดหมู่ให้เลือกในขณะนี้', style: TextStyle(color: Colors.white38)),
+        child: Text('ไม่มีหมวดหมู่ให้เลือกในขณะนี้',
+            style: TextStyle(color: Colors.white38)),
       ),
     );
   }

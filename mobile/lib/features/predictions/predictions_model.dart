@@ -96,7 +96,8 @@ class PredictionsResponse {
           .map((item) => PredictionAlert.fromJson(item as Map<String, dynamic>))
           .toList(),
       anomalies: (json['anomalies'] as List<dynamic>)
-          .map((item) => PredictionAnomaly.fromJson(item as Map<String, dynamic>))
+          .map((item) =>
+              PredictionAnomaly.fromJson(item as Map<String, dynamic>))
           .toList(),
     );
   }

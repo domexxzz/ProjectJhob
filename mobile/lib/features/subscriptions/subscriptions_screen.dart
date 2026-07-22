@@ -5,20 +5,25 @@ import 'package:go_router/go_router.dart';
 import 'package:url_launcher/url_launcher.dart';
 
 import '../../app/theme.dart';
+import '../../widgets/app_bottom_nav_bar.dart';
 import '../../core/money.dart';
 import 'subscriptions_repository.dart';
 import '../notifications/notifications_repository.dart';
 import '../predictions/predictions_service.dart';
 import '../transactions/transactions_repository.dart';
+import '../settings/settings_screen.dart';
 
 class SubscriptionsScreen extends ConsumerWidget {
   const SubscriptionsScreen({super.key});
 
-  String _fmtDate(DateTime d) =>
-      '${d.day}/${d.month}/${d.year}';
+  String _fmtDate(DateTime d) => '${d.day}/${d.month}/${d.year}';
 
   @override
   Widget build(BuildContext context, WidgetRef ref) {
+    final moneySettings = ref.watch(
+      appSettingsProvider.select((s) => (s.currency, s.usdRate)),
+    );
+    Money.configure(moneySettings.$1, thbToUsdRate: moneySettings.$2);
     final async = ref.watch(subscriptionsProvider);
 
     return Scaffold(
@@ -26,6 +31,7 @@ class SubscriptionsScreen extends ConsumerWidget {
       appBar: AppBar(
         backgroundColor: const Color(0xFF121212),
         elevation: 0,
+        centerTitle: true,
         leading: IconButton(
           icon: const Icon(Icons.arrow_back, color: Colors.white, size: 24),
           onPressed: () {
@@ -36,11 +42,13 @@ class SubscriptionsScreen extends ConsumerWidget {
             }
           },
         ),
-        title: const Text('Subscription', style: TextStyle(color: Colors.white)),
+        title:
+            const Text('Subscription', style: TextStyle(color: Colors.white)),
         actions: [
           IconButton(
             tooltip: 'นำเข้าจาก Gmail',
-            icon: const Icon(Icons.mark_email_read_outlined, color: AppColors.primary),
+            icon: const Icon(Icons.mark_email_read_outlined,
+                color: AppColors.primary),
             onPressed: () => _importGmail(context, ref),
           ),
         ],
@@ -52,23 +60,31 @@ class SubscriptionsScreen extends ConsumerWidget {
           await ref.read(subscriptionsProvider.future);
         },
         child: async.when(
-          loading: () => const Center(child: CircularProgressIndicator(color: AppColors.primary)),
+          loading: () => const Center(
+              child: CircularProgressIndicator(color: AppColors.primary)),
           error: (e, _) => ListView(children: [
             const SizedBox(height: 120),
-            Center(child: Text('โหลดไม่ได้: $e', style: const TextStyle(color: Colors.redAccent))),
+            Center(
+                child: Text('โหลดไม่ได้: $e',
+                    style: const TextStyle(color: Colors.redAccent))),
           ]),
           data: (data) => ListView(
-            padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 8),
+            padding: const EdgeInsets.fromLTRB(16, 8, 16, 110),
             children: [
               _TotalCard(totalMonthly: data.totalMonthly),
               const SizedBox(height: 20),
               const Text('รายการสมัครสมาชิก',
-                  style: TextStyle(color: Colors.white, fontSize: 18, fontWeight: FontWeight.bold)),
+                  style: TextStyle(
+                      color: Colors.white,
+                      fontSize: 18,
+                      fontWeight: FontWeight.bold)),
               const SizedBox(height: 12),
               if (data.items.isEmpty)
                 const Padding(
                   padding: EdgeInsets.symmetric(vertical: 32),
-                  child: Center(child: Text('ยังไม่มีรายการสมัครสมาชิก', style: TextStyle(color: Colors.white54))),
+                  child: Center(
+                      child: Text('ยังไม่มีรายการสมัครสมาชิก',
+                          style: TextStyle(color: Colors.white54))),
                 )
               else
                 ...data.items.map((s) => _SubCard(
@@ -81,7 +97,8 @@ class SubscriptionsScreen extends ConsumerWidget {
                 onPressed: () => _openForm(context, ref),
                 style: OutlinedButton.styleFrom(
                   side: BorderSide(color: AppColors.primary.withOpacity(0.5)),
-                  shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(12)),
+                  shape: RoundedRectangleBorder(
+                      borderRadius: BorderRadius.circular(12)),
                   padding: const EdgeInsets.symmetric(vertical: 16),
                   backgroundColor: const Color(0xFF142B1A),
                 ),
@@ -91,7 +108,10 @@ class SubscriptionsScreen extends ConsumerWidget {
                     Icon(Icons.add_circle_outline, color: AppColors.primary),
                     SizedBox(width: 8),
                     Text('เพิ่ม Subscription',
-                        style: TextStyle(color: AppColors.primary, fontSize: 16, fontWeight: FontWeight.bold)),
+                        style: TextStyle(
+                            color: AppColors.primary,
+                            fontSize: 16,
+                            fontWeight: FontWeight.bold)),
                   ],
                 ),
               ),
@@ -99,10 +119,14 @@ class SubscriptionsScreen extends ConsumerWidget {
           ),
         ),
       ),
+      floatingActionButton: const AppFloatingActionButton(),
+      floatingActionButtonLocation: kFixedCenterDockedFabLocation,
+      bottomNavigationBar: const AppBottomNavigationBar(currentTab: AppTab.none),
     );
   }
 
-  void _openForm(BuildContext context, WidgetRef ref, {Subscription? existing}) {
+  void _openForm(BuildContext context, WidgetRef ref,
+      {Subscription? existing}) {
     showModalBottomSheet(
       context: context,
       isScrollControlled: true,
@@ -111,7 +135,8 @@ class SubscriptionsScreen extends ConsumerWidget {
         borderRadius: BorderRadius.vertical(top: Radius.circular(20)),
       ),
       builder: (_) => Padding(
-        padding: EdgeInsets.only(bottom: MediaQuery.of(context).viewInsets.bottom),
+        padding:
+            EdgeInsets.only(bottom: MediaQuery.of(context).viewInsets.bottom),
         child: _SubscriptionForm(existing: existing),
       ),
     );
@@ -128,7 +153,7 @@ class SubscriptionsScreen extends ConsumerWidget {
       builder: (sheetContext) => _GmailSyncMockup(
         onMockSelected: (email) async {
           Navigator.pop(sheetContext); // ปิดแผ่นตัวเลือกโดยใช้ sheetContext
-          
+
           // แสดง Loading สเต็ปแรก (ใช้ context หลักของหน้าจอเพื่อให้ปลอดภัยหลัง sheet ปิดตัว)
           showDialog(
             context: context,
@@ -147,7 +172,8 @@ class SubscriptionsScreen extends ConsumerWidget {
             context: context,
             barrierDismissible: false,
             builder: (_) => const _LoadingDialog(
-              message: 'เข้าสู่ระบบสำเร็จ! กำลังสแกนหาจดหมายใบเสร็จค่าบริการรายเดือน (Subscription)...',
+              message:
+                  'เข้าสู่ระบบสำเร็จ! กำลังสแกนหาจดหมายใบเสร็จค่าบริการรายเดือน (Subscription)...',
             ),
           );
 
@@ -192,22 +218,28 @@ class SubscriptionsScreen extends ConsumerWidget {
               context: context,
               builder: (context) => AlertDialog(
                 backgroundColor: const Color(0xFF1E1E1E),
-                shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(16)),
+                shape: RoundedRectangleBorder(
+                    borderRadius: BorderRadius.circular(16)),
                 title: const Row(
                   children: [
                     Icon(Icons.check_circle_outline, color: AppColors.primary),
                     SizedBox(width: 8),
-                    Text('ซิงค์ข้อมูลสำเร็จ', style: TextStyle(color: Colors.white, fontSize: 16)),
+                    Text('ซิงค์ข้อมูลสำเร็จ',
+                        style: TextStyle(color: Colors.white, fontSize: 16)),
                   ],
                 ),
                 content: const Text(
                   'เชื่อมต่อ Gmail บัญชีจำลองสำเร็จ! ตรวจพบค่าบริการรายเดือน (Subscription) ทั้งหมด 3 รายการ:\n\n- Netflix Premium\n- Spotify Family\n- YouTube Premium\n\nระบบสแกนและนำเข้าสรุปยอดเป็นรายจ่ายคงที่ให้อัตโนมัติแล้วครับ 💳',
-                  style: TextStyle(color: Colors.white70, fontSize: 13, height: 1.4),
+                  style: TextStyle(
+                      color: Colors.white70, fontSize: 13, height: 1.4),
                 ),
                 actions: [
                   TextButton(
                     onPressed: () => Navigator.pop(context),
-                    child: const Text('ตกลง', style: TextStyle(color: AppColors.primary, fontWeight: FontWeight.bold)),
+                    child: const Text('ตกลง',
+                        style: TextStyle(
+                            color: AppColors.primary,
+                            fontWeight: FontWeight.bold)),
                   )
                 ],
               ),
@@ -223,28 +255,34 @@ class SubscriptionsScreen extends ConsumerWidget {
         },
         onRealAuthSelected: () async {
           Navigator.pop(sheetContext); // ปิดแผ่นตัวเลือกโดยใช้ sheetContext
-          
+
           final messenger = ScaffoldMessenger.of(context);
           try {
-            final url = await ref.read(subscriptionsRepoProvider).gmailAuthUrl();
+            final url =
+                await ref.read(subscriptionsRepoProvider).gmailAuthUrl();
             final ok = await launchUrl(
               Uri.parse(url),
               webOnlyWindowName: '_blank', // เปิดแท็บใหม่บนเว็บ
               mode: LaunchMode.externalApplication,
             );
             if (!ok) {
-              messenger.showSnackBar(const SnackBar(content: Text('เปิดหน้ายินยอม Google ไม่ได้')));
+              messenger.showSnackBar(const SnackBar(
+                  content: Text('เปิดหน้ายินยอม Google ไม่ได้')));
               return;
             }
             messenger.showSnackBar(const SnackBar(
-              content: Text('เปิดหน้ายินยอม Google แล้ว 📧 · เสร็จแล้วกลับมาที่นี่ ลากลงเพื่อรีเฟรช'),
+              content: Text(
+                  'เปิดหน้ายินยอม Google แล้ว 📧 · เสร็จแล้วกลับมาที่นี่ ลากลงเพื่อรีเฟรช'),
               duration: Duration(seconds: 5),
             ));
           } catch (e) {
             final msg = e is DioException
-                ? (e.response?.data is Map ? (e.response!.data['message'] ?? e.message) : e.message)
+                ? (e.response?.data is Map
+                    ? (e.response!.data['message'] ?? e.message)
+                    : e.message)
                 : e;
-            messenger.showSnackBar(SnackBar(content: Text('นำเข้าไม่สำเร็จ: $msg')));
+            messenger
+                .showSnackBar(SnackBar(content: Text('นำเข้าไม่สำเร็จ: $msg')));
           }
         },
       ),
@@ -271,10 +309,14 @@ class _TotalCard extends StatelessWidget {
       child: Column(
         crossAxisAlignment: CrossAxisAlignment.start,
         children: [
-          const Text('รวมค่าบริการต่อเดือน', style: TextStyle(color: Colors.white70, fontSize: 13)),
+          const Text('รวมค่าบริการต่อเดือน',
+              style: TextStyle(color: Colors.white70, fontSize: 13)),
           const SizedBox(height: 6),
           Text(Money.formatBaht(totalMonthly),
-              style: const TextStyle(color: Colors.white, fontSize: 30, fontWeight: FontWeight.bold)),
+              style: const TextStyle(
+                  color: Colors.white,
+                  fontSize: 30,
+                  fontWeight: FontWeight.bold)),
         ],
       ),
     );
@@ -282,7 +324,8 @@ class _TotalCard extends StatelessWidget {
 }
 
 class _SubCard extends StatelessWidget {
-  const _SubCard({required this.sub, required this.dateText, required this.onTap});
+  const _SubCard(
+      {required this.sub, required this.dateText, required this.onTap});
   final Subscription sub;
   final String dateText;
   final VoidCallback onTap;
@@ -305,8 +348,11 @@ class _SubCard extends StatelessWidget {
             Container(
               width: 44,
               height: 44,
-              decoration: const BoxDecoration(color: Colors.black26, shape: BoxShape.circle),
-              child: Center(child: Text(sub.logo ?? '💳', style: const TextStyle(fontSize: 22))),
+              decoration: const BoxDecoration(
+                  color: Colors.black26, shape: BoxShape.circle),
+              child: Center(
+                  child: Text(sub.logo ?? '💳',
+                      style: const TextStyle(fontSize: 22))),
             ),
             const SizedBox(width: 12),
             Expanded(
@@ -314,9 +360,14 @@ class _SubCard extends StatelessWidget {
                 crossAxisAlignment: CrossAxisAlignment.start,
                 children: [
                   Text(sub.name,
-                      style: const TextStyle(color: Colors.white, fontWeight: FontWeight.bold, fontSize: 15)),
+                      style: const TextStyle(
+                          color: Colors.white,
+                          fontWeight: FontWeight.bold,
+                          fontSize: 15)),
                   const SizedBox(height: 2),
-                  Text('ตัดเงินถัดไป $dateText', style: const TextStyle(color: Colors.white54, fontSize: 12)),
+                  Text('ตัดเงินถัดไป $dateText',
+                      style:
+                          const TextStyle(color: Colors.white54, fontSize: 12)),
                 ],
               ),
             ),
@@ -324,8 +375,13 @@ class _SubCard extends StatelessWidget {
               crossAxisAlignment: CrossAxisAlignment.end,
               children: [
                 Text(Money.formatBaht(sub.amount),
-                    style: const TextStyle(color: Colors.white, fontWeight: FontWeight.w900, fontSize: 16)),
-                Text('/$perLabel', style: const TextStyle(color: Colors.white54, fontSize: 11)),
+                    style: const TextStyle(
+                        color: Colors.white,
+                        fontWeight: FontWeight.w900,
+                        fontSize: 16)),
+                Text('/$perLabel',
+                    style:
+                        const TextStyle(color: Colors.white54, fontSize: 11)),
               ],
             ),
             const Icon(Icons.chevron_right, color: Colors.white54),
@@ -357,7 +413,8 @@ class _SubscriptionFormState extends ConsumerState<_SubscriptionForm> {
     super.initState();
     final e = widget.existing;
     _name = TextEditingController(text: e?.name ?? '');
-    _amount = TextEditingController(text: e != null ? (e.amount / 100).round().toString() : '');
+    _amount =
+        TextEditingController(text: e != null ? Money.format(e.amount) : '');
     _logo = TextEditingController(text: e?.logo ?? '');
     if (e != null) {
       _cycle = e.cycle;
@@ -409,7 +466,8 @@ class _SubscriptionFormState extends ConsumerState<_SubscriptionForm> {
     } catch (err) {
       if (mounted) {
         setState(() => _saving = false);
-        ScaffoldMessenger.of(context).showSnackBar(SnackBar(content: Text('บันทึกไม่สำเร็จ: $err')));
+        ScaffoldMessenger.of(context)
+            .showSnackBar(SnackBar(content: Text('บันทึกไม่สำเร็จ: $err')));
       }
     }
   }
@@ -425,7 +483,8 @@ class _SubscriptionFormState extends ConsumerState<_SubscriptionForm> {
     } catch (err) {
       if (mounted) {
         setState(() => _saving = false);
-        ScaffoldMessenger.of(context).showSnackBar(SnackBar(content: Text('ลบไม่สำเร็จ: $err')));
+        ScaffoldMessenger.of(context)
+            .showSnackBar(SnackBar(content: Text('ลบไม่สำเร็จ: $err')));
       }
     }
   }
@@ -463,24 +522,39 @@ class _SubscriptionFormState extends ConsumerState<_SubscriptionForm> {
         crossAxisAlignment: CrossAxisAlignment.start,
         children: [
           Text(isEdit ? 'แก้ไข Subscription' : 'เพิ่ม Subscription',
-              style: const TextStyle(color: Colors.white, fontSize: 18, fontWeight: FontWeight.bold)),
+              style: const TextStyle(
+                  color: Colors.white,
+                  fontSize: 18,
+                  fontWeight: FontWeight.bold)),
           const SizedBox(height: 16),
-          TextField(controller: _name, style: const TextStyle(color: Colors.white), decoration: _dec('ชื่อ (เช่น Netflix)')),
+          TextField(
+              controller: _name,
+              style: const TextStyle(color: Colors.white),
+              decoration: _dec('ชื่อ (เช่น Netflix)')),
           const SizedBox(height: 12),
           TextField(
             controller: _amount,
             keyboardType: TextInputType.number,
             style: const TextStyle(color: Colors.white),
-            decoration: _dec('จำนวนเงิน (บาท)'),
+            decoration: _dec('จำนวนเงิน (${Money.symbol})'),
           ),
           const SizedBox(height: 12),
-          TextField(controller: _logo, style: const TextStyle(color: Colors.white), decoration: _dec('ไอคอน/emoji (ไม่บังคับ)')),
+          TextField(
+              controller: _logo,
+              style: const TextStyle(color: Colors.white),
+              decoration: _dec('ไอคอน/emoji (ไม่บังคับ)')),
           const SizedBox(height: 12),
           Row(
             children: [
-              _CycleChip(label: 'รายเดือน', selected: _cycle == 'monthly', onTap: () => setState(() => _cycle = 'monthly')),
+              _CycleChip(
+                  label: 'รายเดือน',
+                  selected: _cycle == 'monthly',
+                  onTap: () => setState(() => _cycle = 'monthly')),
               const SizedBox(width: 8),
-              _CycleChip(label: 'รายปี', selected: _cycle == 'yearly', onTap: () => setState(() => _cycle = 'yearly')),
+              _CycleChip(
+                  label: 'รายปี',
+                  selected: _cycle == 'yearly',
+                  onTap: () => setState(() => _cycle = 'yearly')),
             ],
           ),
           const SizedBox(height: 12),
@@ -494,9 +568,11 @@ class _SubscriptionFormState extends ConsumerState<_SubscriptionForm> {
               ),
               child: Row(
                 children: [
-                  const Icon(Icons.calendar_today, color: Colors.white54, size: 18),
+                  const Icon(Icons.calendar_today,
+                      color: Colors.white54, size: 18),
                   const SizedBox(width: 10),
-                  Text('ตัดเงินถัดไป: ${_nextBilling.day}/${_nextBilling.month}/${_nextBilling.year}',
+                  Text(
+                      'ตัดเงินถัดไป: ${_nextBilling.day}/${_nextBilling.month}/${_nextBilling.year}',
                       style: const TextStyle(color: Colors.white)),
                 ],
               ),
@@ -513,7 +589,8 @@ class _SubscriptionFormState extends ConsumerState<_SubscriptionForm> {
                       side: const BorderSide(color: Color(0xFFF03E3E)),
                       padding: const EdgeInsets.symmetric(vertical: 14),
                     ),
-                    child: const Text('ลบ', style: TextStyle(color: Color(0xFFF03E3E))),
+                    child: const Text('ลบ',
+                        style: TextStyle(color: Color(0xFFF03E3E))),
                   ),
                 ),
                 const SizedBox(width: 12),
@@ -527,8 +604,15 @@ class _SubscriptionFormState extends ConsumerState<_SubscriptionForm> {
                     padding: const EdgeInsets.symmetric(vertical: 14),
                   ),
                   child: _saving
-                      ? const SizedBox(width: 20, height: 20, child: CircularProgressIndicator(strokeWidth: 2, color: Colors.white))
-                      : const Text('บันทึก', style: TextStyle(color: Colors.white, fontWeight: FontWeight.bold)),
+                      ? const SizedBox(
+                          width: 20,
+                          height: 20,
+                          child: CircularProgressIndicator(
+                              strokeWidth: 2, color: Colors.white))
+                      : const Text('บันทึก',
+                          style: TextStyle(
+                              color: Colors.white,
+                              fontWeight: FontWeight.bold)),
                 ),
               ),
             ],
@@ -540,7 +624,8 @@ class _SubscriptionFormState extends ConsumerState<_SubscriptionForm> {
 }
 
 class _CycleChip extends StatelessWidget {
-  const _CycleChip({required this.label, required this.selected, required this.onTap});
+  const _CycleChip(
+      {required this.label, required this.selected, required this.onTap});
   final String label;
   final bool selected;
   final VoidCallback onTap;
@@ -555,7 +640,10 @@ class _CycleChip extends StatelessWidget {
           color: selected ? AppColors.primary : const Color(0xFF2A2A2A),
           borderRadius: BorderRadius.circular(20),
         ),
-        child: Text(label, style: TextStyle(color: selected ? Colors.white : Colors.white54, fontWeight: FontWeight.w600)),
+        child: Text(label,
+            style: TextStyle(
+                color: selected ? Colors.white : Colors.white54,
+                fontWeight: FontWeight.w600)),
       ),
     );
   }
@@ -582,18 +670,23 @@ class _GmailSyncMockup extends StatelessWidget {
           children: [
             Row(
               children: [
-                const Icon(Icons.mail_outline, color: AppColors.primary, size: 24),
+                const Icon(Icons.mail_outline,
+                    color: AppColors.primary, size: 24),
                 const SizedBox(width: 10),
                 const Text(
                   'เชื่อมต่อ Gmail เพื่อวิเคราะห์บิล',
-                  style: TextStyle(color: Colors.white, fontSize: 18, fontWeight: FontWeight.bold),
+                  style: TextStyle(
+                      color: Colors.white,
+                      fontSize: 18,
+                      fontWeight: FontWeight.bold),
                 ),
               ],
             ),
             const SizedBox(height: 8),
             const Text(
               'เลือกซิงค์กับบัญชี Gmail จำลองเพื่อการนำเสนอผลงาน (จะได้รับข้อมูล Subscription 3 รายการทันที) หรือเลือกเชื่อมต่อด้วย OAuth 2.0 จริง',
-              style: TextStyle(color: Colors.white54, fontSize: 12, height: 1.45),
+              style:
+                  TextStyle(color: Colors.white54, fontSize: 12, height: 1.45),
             ),
             const SizedBox(height: 20),
             // บัญชีจำลอง 1
@@ -619,7 +712,8 @@ class _GmailSyncMockup extends StatelessWidget {
               onTap: onRealAuthSelected,
               borderRadius: BorderRadius.circular(12),
               child: Container(
-                padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 14),
+                padding:
+                    const EdgeInsets.symmetric(horizontal: 16, vertical: 14),
                 decoration: BoxDecoration(
                   border: Border.all(color: AppColors.primary.withOpacity(0.4)),
                   borderRadius: BorderRadius.circular(12),
@@ -627,15 +721,20 @@ class _GmailSyncMockup extends StatelessWidget {
                 ),
                 child: const Row(
                   children: [
-                    Icon(Icons.lock_outline, color: AppColors.primary, size: 18),
+                    Icon(Icons.lock_outline,
+                        color: AppColors.primary, size: 18),
                     SizedBox(width: 12),
                     Expanded(
                       child: Text(
                         'ใช้บัญชีอื่น (เชื่อมต่อ OAuth 2.0 จริง)',
-                        style: TextStyle(color: AppColors.primary, fontWeight: FontWeight.bold, fontSize: 13),
+                        style: TextStyle(
+                            color: AppColors.primary,
+                            fontWeight: FontWeight.bold,
+                            fontSize: 13),
                       ),
                     ),
-                    Icon(Icons.chevron_right, color: AppColors.primary, size: 18),
+                    Icon(Icons.chevron_right,
+                        color: AppColors.primary, size: 18),
                   ],
                 ),
               ),
@@ -680,7 +779,10 @@ class _AccountTile extends StatelessWidget {
               radius: 18,
               child: Text(
                 avatarText,
-                style: const TextStyle(color: Colors.white, fontSize: 14, fontWeight: FontWeight.bold),
+                style: const TextStyle(
+                    color: Colors.white,
+                    fontSize: 14,
+                    fontWeight: FontWeight.bold),
               ),
             ),
             const SizedBox(width: 14),
@@ -688,13 +790,20 @@ class _AccountTile extends StatelessWidget {
               child: Column(
                 crossAxisAlignment: CrossAxisAlignment.start,
                 children: [
-                  Text(name, style: const TextStyle(color: Colors.white, fontWeight: FontWeight.w600, fontSize: 13)),
+                  Text(name,
+                      style: const TextStyle(
+                          color: Colors.white,
+                          fontWeight: FontWeight.w600,
+                          fontSize: 13)),
                   const SizedBox(height: 2),
-                  Text(email, style: const TextStyle(color: Colors.white38, fontSize: 11)),
+                  Text(email,
+                      style:
+                          const TextStyle(color: Colors.white38, fontSize: 11)),
                 ],
               ),
             ),
-            const Icon(Icons.arrow_forward_ios_rounded, color: Colors.white24, size: 14),
+            const Icon(Icons.arrow_forward_ios_rounded,
+                color: Colors.white24, size: 14),
           ],
         ),
       ),
@@ -719,13 +828,15 @@ class _LoadingDialog extends StatelessWidget {
             const SizedBox(
               width: 24,
               height: 24,
-              child: CircularProgressIndicator(color: AppColors.primary, strokeWidth: 3),
+              child: CircularProgressIndicator(
+                  color: AppColors.primary, strokeWidth: 3),
             ),
             const SizedBox(width: 20),
             Expanded(
               child: Text(
                 message,
-                style: const TextStyle(color: Colors.white70, fontSize: 12, height: 1.45),
+                style: const TextStyle(
+                    color: Colors.white70, fontSize: 12, height: 1.45),
               ),
             ),
           ],
@@ -734,3 +845,5 @@ class _LoadingDialog extends StatelessWidget {
     );
   }
 }
+
+

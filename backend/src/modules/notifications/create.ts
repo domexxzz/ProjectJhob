@@ -12,6 +12,18 @@ export async function createNotification(
   body: string,
   data?: Record<string, unknown>,
 ) {
+  const preferences = await prisma.user.findUnique({
+    where: { id: userId },
+    select: { notificationsEnabled: true, budgetAlertsEnabled: true },
+  });
+  if (!preferences?.notificationsEnabled) return null;
+  if (
+    !preferences.budgetAlertsEnabled &&
+    (type === 'budget_near' || type === 'budget_over')
+  ) {
+    return null;
+  }
+
   const since = new Date(Date.now() - 20 * 60 * 60 * 1000);
   const dup = await prisma.notification.findFirst({ where: { userId, type, title, createdAt: { gte: since } } });
   if (dup) {

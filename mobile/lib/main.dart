@@ -5,6 +5,9 @@ import 'package:intl/date_symbol_data_local.dart';
 
 import 'app/router.dart';
 import 'app/theme.dart';
+import 'features/privacy/app_security_gate.dart';
+import 'features/settings/settings_screen.dart';
+import 'core/money.dart';
 
 Future<void> main() async {
   WidgetsFlutterBinding.ensureInitialized();
@@ -50,11 +53,15 @@ class FinanceCoachApp extends ConsumerWidget {
   @override
   Widget build(BuildContext context, WidgetRef ref) {
     final router = ref.watch(routerProvider);
+    final settings = ref.watch(appSettingsProvider);
+    Money.configure(settings.currency, thbToUsdRate: settings.usdRate);
     return MaterialApp.router(
       title: 'พี่เงิน',
       debugShowCheckedModeBanner: false,
       theme: buildTheme(),
       routerConfig: router,
+      builder: (context, child) =>
+          AppSecurityGate(child: child ?? const SizedBox.shrink()),
     );
   }
 }

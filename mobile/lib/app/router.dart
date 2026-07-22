@@ -26,6 +26,8 @@ import '../features/notifications/notifications_screen.dart';
 import '../features/menu/menu_screen.dart';
 import '../features/predictions/predictions_screen.dart';
 import '../features/goals/set_deadline_screen.dart';
+import '../features/privacy/privacy_screen.dart';
+import '../features/settings/settings_screen.dart';
 
 /// Set เป็น true หลังจากผ่าน Welcome3 แล้วกด "เริ่มต้นใช้งาน"
 /// ใช้ควบคุม redirect ไม่ให้ข้าม Login page เมื่อมี token เดิมค้างอยู่
@@ -98,7 +100,11 @@ final routerProvider = Provider<GoRouter>((ref) {
           path: '/budgets/duration',
           builder: (_, __) => const BudgetDurationScreen()),
       GoRoute(path: '/profile', builder: (_, __) => const ProfileScreen()),
+      GoRoute(
+          path: '/profile/edit', builder: (_, __) => const EditProfileScreen()),
       GoRoute(path: '/menu', builder: (_, __) => const MenuScreen()),
+      GoRoute(path: '/privacy', builder: (_, __) => const PrivacyScreen()),
+      GoRoute(path: '/settings', builder: (_, __) => const SettingsScreen()),
       GoRoute(
           path: '/subscriptions',
           builder: (_, __) => const SubscriptionsScreen()),

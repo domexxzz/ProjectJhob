@@ -4,6 +4,8 @@ import 'package:go_router/go_router.dart';
 
 import '../../app/theme.dart';
 import '../../core/money.dart';
+import '../privacy/privacy_screen.dart';
+import '../settings/settings_screen.dart';
 import '../transactions/transaction.dart';
 import '../transactions/transactions_repository.dart'; // ตรวจสอบตำแหน่งอ้างอิงของ Provider งบประมาณตามโปรเจกต์ของคุณ
 
@@ -19,18 +21,17 @@ class _BudgetEditScreenState extends ConsumerState<BudgetEditScreen> {
   final _formKey = GlobalKey<FormState>();
   late TextEditingController _nameController;
   late TextEditingController _amountController;
+  bool _didApplyDisplayCurrency = false;
 
   @override
   void initState() {
     super.initState();
     // ดึงค่าเริ่มต้นจาก status ที่ส่งเข้ามาแสดงผลใน Input Field
-    _nameController = TextEditingController(text: widget.status.category?.nameTh ?? '');
-    
+    _nameController =
+        TextEditingController(text: widget.status.category?.nameTh ?? '');
+
     // แปลงจำนวนเงินสตางค์กลับเป็นหน่วยบาทเพื่อแสดงผลในช่องกรอกเงินแบบเข้าใจง่าย
-    final double bahtAmount = widget.status.amount / 100;
-    _amountController = TextEditingController(
-      text: bahtAmount % 1 == 0 ? bahtAmount.toInt().toString() : bahtAmount.toString(),
-    );
+    _amountController = TextEditingController();
   }
 
   @override
@@ -42,22 +43,37 @@ class _BudgetEditScreenState extends ConsumerState<BudgetEditScreen> {
 
   @override
   Widget build(BuildContext context) {
+    final moneySettings = ref.watch(
+      appSettingsProvider.select((s) => (s.currency, s.usdRate)),
+    );
+    Money.configure(moneySettings.$1, thbToUsdRate: moneySettings.$2);
+    if (!_didApplyDisplayCurrency) {
+      _amountController.text = Money.format(widget.status.amount);
+      _didApplyDisplayCurrency = true;
+    }
+    final personalized =
+        ref.watch(privacySettingsProvider).personalizedRecommendations;
     // คำนวณเปอร์เซ็นต์แบบ Real-time ตามตัวเลขที่ผู้ใช้กรอกเข้ามาใหม่
     final double inputtedBaht = double.tryParse(_amountController.text) ?? 0;
-    final int targetAmountInSubunits = (inputtedBaht * 100).toInt();
+    final int targetAmountInSubunits = Money.toSatang(inputtedBaht);
 
-    final pct = targetAmountInSubunits > 0 
-        ? (widget.status.spent / targetAmountInSubunits).clamp(0.0, 9.9) 
+    final pct = targetAmountInSubunits > 0
+        ? (widget.status.spent / targetAmountInSubunits).clamp(0.0, 9.9)
         : 0.0;
-        
-    final color = pct >= 1.0 
+
+    final color = pct >= 1.0
         ? const Color(0xFFFF5959) // แดงนีออนสุดพรีเมียม
-        : (pct >= 0.8 ? const Color(0xFFFFD54F) : const Color(0xFF4CD97B)); // เหลือง / เขียวนีออน
-        
-    final remaining = (targetAmountInSubunits - widget.status.spent).clamp(0, double.infinity).toInt() ~/ 100;
+        : (pct >= 0.8
+            ? const Color(0xFFFFD54F)
+            : const Color(0xFF4CD97B)); // เหลือง / เขียวนีออน
+
+    final remaining = (targetAmountInSubunits - widget.status.spent)
+        .clamp(0, double.infinity)
+        .toInt();
 
     return Scaffold(
-      backgroundColor: const Color(0xFF16191D), // ธีม Premium Dark UI แบบเดียวกับ EditGoalScreen
+      backgroundColor: const Color(
+          0xFF16191D), // ธีม Premium Dark UI แบบเดียวกับ EditGoalScreen
       body: Form(
         key: _formKey,
         child: SingleChildScrollView(
@@ -77,20 +93,33 @@ class _BudgetEditScreenState extends ConsumerState<BudgetEditScreen> {
                   children: [
                     Align(
                       alignment: Alignment.centerLeft,
-                      child: IconButton(
-                        onPressed: () {
-                          if (Navigator.of(context).canPop() || context.canPop()) {
-                            context.pop();
-                          } else {
-                            context.go('/');
-                          }
-                        },
-                        icon: const Icon(Icons.arrow_back, color: Colors.white, size: 24),
+                      child: GestureDetector(
+                        onTap: () => context.pop(),
+                        child: Container(
+                          padding: const EdgeInsets.all(10),
+                          decoration: BoxDecoration(
+                            shape: BoxShape.circle,
+                            color: const Color(0xFF3CAE63),
+                            boxShadow: [
+                              BoxShadow(
+                                color: const Color(0xFF3CAE63).withOpacity(0.4),
+                                blurRadius: 12,
+                                spreadRadius: 2,
+                              ),
+                            ],
+                          ),
+                          child: const Icon(Icons.arrow_back_rounded,
+                              color: Colors.white, size: 24),
+                        ),
                       ),
                     ),
                     const Text(
                       'แก้ไขงบประมาณ',
-                      style: TextStyle(fontWeight: FontWeight.bold, fontSize: 24, color: Colors.white, letterSpacing: 0.5),
+                      style: TextStyle(
+                          fontWeight: FontWeight.bold,
+                          fontSize: 24,
+                          color: Colors.white,
+                          letterSpacing: 0.5),
                     ),
                   ],
                 ),
@@ -119,7 +148,8 @@ class _BudgetEditScreenState extends ConsumerState<BudgetEditScreen> {
                         ],
                       ),
                       child: Center(
-                        child: Text(widget.status.category?.icon ?? '📊', style: const TextStyle(fontSize: 56)),
+                        child: Text(widget.status.category?.icon ?? '📊',
+                            style: const TextStyle(fontSize: 56)),
                       ),
                     ),
                     const SizedBox(height: 16),
@@ -127,11 +157,18 @@ class _BudgetEditScreenState extends ConsumerState<BudgetEditScreen> {
                       mainAxisAlignment: MainAxisAlignment.center,
                       children: [
                         Text(
-                          _nameController.text.isNotEmpty ? _nameController.text : 'หมวดหมู่',
-                          style: TextStyle(color: color, fontSize: 18, fontWeight: FontWeight.bold, letterSpacing: 0.5),
+                          _nameController.text.isNotEmpty
+                              ? _nameController.text
+                              : 'หมวดหมู่',
+                          style: TextStyle(
+                              color: color,
+                              fontSize: 18,
+                              fontWeight: FontWeight.bold,
+                              letterSpacing: 0.5),
                         ),
                         const SizedBox(width: 8),
-                        const Icon(Icons.edit_note_rounded, color: Colors.white60, size: 22),
+                        const Icon(Icons.edit_note_rounded,
+                            color: Colors.white60, size: 22),
                       ],
                     ),
                   ],
@@ -147,26 +184,38 @@ class _BudgetEditScreenState extends ConsumerState<BudgetEditScreen> {
                     // ช่องแก้ไขชื่อ/หัวข้อของงบประมาณ[cite: 29]
                     Text(
                       'ชื่อหมวดหมู่หรือรายการงบประมาณ',
-                      style: TextStyle(color: Colors.white.withOpacity(0.5), fontSize: 14, fontWeight: FontWeight.w500),
+                      style: TextStyle(
+                          color: Colors.white.withOpacity(0.5),
+                          fontSize: 14,
+                          fontWeight: FontWeight.w500),
                     ),
                     const SizedBox(height: 8),
                     TextFormField(
                       controller: _nameController,
-                      style: const TextStyle(fontSize: 17, fontWeight: FontWeight.bold, color: Colors.white),
+                      style: const TextStyle(
+                          fontSize: 17,
+                          fontWeight: FontWeight.bold,
+                          color: Colors.white),
                       decoration: InputDecoration(
                         filled: true,
                         fillColor: const Color(0xFF22272F),
-                        prefixIcon: const Icon(Icons.edit_note_rounded, color: Color(0xFF4CD97B), size: 26),
+                        prefixIcon: const Icon(Icons.edit_note_rounded,
+                            color: Color(0xFF4CD97B), size: 26),
                         suffixIcon: IconButton(
-                          icon: const Icon(Icons.clear_rounded, color: Colors.white38, size: 20),
-                          onPressed: () => setState(() => _nameController.clear()),
+                          icon: const Icon(Icons.clear_rounded,
+                              color: Colors.white38, size: 20),
+                          onPressed: () =>
+                              setState(() => _nameController.clear()),
                         ),
-                        contentPadding: const EdgeInsets.symmetric(horizontal: 16, vertical: 16),
+                        contentPadding: const EdgeInsets.symmetric(
+                            horizontal: 16, vertical: 16),
                         hintText: 'กรอกชื่อหมวดหมู่ใหม่...',
-                        hintStyle: TextStyle(color: Colors.white.withOpacity(0.25)),
+                        hintStyle:
+                            TextStyle(color: Colors.white.withOpacity(0.25)),
                         focusedBorder: OutlineInputBorder(
                           borderRadius: BorderRadius.circular(16),
-                          borderSide: const BorderSide(color: Color(0xFF4CD97B), width: 1.5),
+                          borderSide: const BorderSide(
+                              color: Color(0xFF4CD97B), width: 1.5),
                         ),
                         enabledBorder: OutlineInputBorder(
                           borderRadius: BorderRadius.circular(16),
@@ -174,11 +223,13 @@ class _BudgetEditScreenState extends ConsumerState<BudgetEditScreen> {
                         ),
                         errorBorder: OutlineInputBorder(
                           borderRadius: BorderRadius.circular(16),
-                          borderSide: const BorderSide(color: Color(0xFFFF5959), width: 1.5),
+                          borderSide: const BorderSide(
+                              color: Color(0xFFFF5959), width: 1.5),
                         ),
                         focusedErrorBorder: OutlineInputBorder(
                           borderRadius: BorderRadius.circular(16),
-                          borderSide: const BorderSide(color: Color(0xFFFF5959), width: 1.5),
+                          borderSide: const BorderSide(
+                              color: Color(0xFFFF5959), width: 1.5),
                         ),
                       ),
                       onChanged: (val) => setState(() {}),
@@ -194,25 +245,39 @@ class _BudgetEditScreenState extends ConsumerState<BudgetEditScreen> {
                     // ช่องแก้ไขและกำหนดยอดเงินเป้าหมายของงบประมาณ[cite: 29]
                     Text(
                       'ยอดเงินงบประมาณสูงสุดที่ตั้งไว้',
-                      style: TextStyle(color: Colors.white.withOpacity(0.5), fontSize: 14, fontWeight: FontWeight.w500),
+                      style: TextStyle(
+                          color: Colors.white.withOpacity(0.5),
+                          fontSize: 14,
+                          fontWeight: FontWeight.w500),
                     ),
                     const SizedBox(height: 8),
                     TextFormField(
                       controller: _amountController,
-                      keyboardType: const TextInputType.numberWithOptions(decimal: true),
-                      style: const TextStyle(fontSize: 18, fontWeight: FontWeight.bold, color: Color(0xFF4CD97B)),
+                      keyboardType:
+                          const TextInputType.numberWithOptions(decimal: true),
+                      style: const TextStyle(
+                          fontSize: 18,
+                          fontWeight: FontWeight.bold,
+                          color: Color(0xFF4CD97B)),
                       decoration: InputDecoration(
                         filled: true,
                         fillColor: const Color(0xFF22272F),
-                        prefixIcon: const Icon(Icons.stars_rounded, color: Color(0xFF3CAE63), size: 24),
-                        suffixText: '฿',
-                        suffixStyle: const TextStyle(color: Colors.white54, fontSize: 18, fontWeight: FontWeight.bold),
-                        contentPadding: const EdgeInsets.symmetric(horizontal: 16, vertical: 16),
+                        prefixIcon: const Icon(Icons.stars_rounded,
+                            color: Color(0xFF3CAE63), size: 24),
+                        suffixText: Money.symbol,
+                        suffixStyle: const TextStyle(
+                            color: Colors.white54,
+                            fontSize: 18,
+                            fontWeight: FontWeight.bold),
+                        contentPadding: const EdgeInsets.symmetric(
+                            horizontal: 16, vertical: 16),
                         hintText: 'ตั้งจำนวนเงินงบประมาณ...',
-                        hintStyle: TextStyle(color: Colors.white.withOpacity(0.25)),
+                        hintStyle:
+                            TextStyle(color: Colors.white.withOpacity(0.25)),
                         focusedBorder: OutlineInputBorder(
                           borderRadius: BorderRadius.circular(16),
-                          borderSide: const BorderSide(color: Color(0xFF4CD97B), width: 1.5),
+                          borderSide: const BorderSide(
+                              color: Color(0xFF4CD97B), width: 1.5),
                         ),
                         enabledBorder: OutlineInputBorder(
                           borderRadius: BorderRadius.circular(16),
@@ -220,16 +285,20 @@ class _BudgetEditScreenState extends ConsumerState<BudgetEditScreen> {
                         ),
                         errorBorder: OutlineInputBorder(
                           borderRadius: BorderRadius.circular(16),
-                          borderSide: const BorderSide(color: Color(0xFFFF5959), width: 1.5),
+                          borderSide: const BorderSide(
+                              color: Color(0xFFFF5959), width: 1.5),
                         ),
                         focusedErrorBorder: OutlineInputBorder(
                           borderRadius: BorderRadius.circular(16),
-                          borderSide: const BorderSide(color: Color(0xFFFF5959), width: 1.5),
+                          borderSide: const BorderSide(
+                              color: Color(0xFFFF5959), width: 1.5),
                         ),
                       ),
                       onChanged: (val) => setState(() {}),
                       validator: (value) {
-                        if (value == null || double.tryParse(value) == null || double.parse(value) <= 0) {
+                        if (value == null ||
+                            double.tryParse(value) == null ||
+                            double.parse(value) <= 0) {
                           return 'กรุณากรอกจำนวนเงินงบประมาณที่มากกว่า 0';
                         }
                         return null;
@@ -258,15 +327,24 @@ class _BudgetEditScreenState extends ConsumerState<BudgetEditScreen> {
                           colors: [Color(0xFF1B3227), Color(0xFF0F241B)],
                         ),
                         borderRadius: BorderRadius.circular(22),
-                        border: Border.all(color: const Color(0xFF3CAE63).withOpacity(0.2)),
+                        border: Border.all(
+                            color: const Color(0xFF3CAE63).withOpacity(0.2)),
                       ),
                       child: Column(
                         children: [
                           Row(
                             mainAxisAlignment: MainAxisAlignment.spaceBetween,
                             children: const [
-                              Text('ใช้ไปแล้ว', style: TextStyle(color: Color(0xAAFFFFFF), fontSize: 14, fontWeight: FontWeight.w500)),
-                              Text('ใช้ได้ไม่เกิน', style: TextStyle(color: Color(0xAAFFFFFF), fontSize: 14, fontWeight: FontWeight.w500)),
+                              Text('ใช้ไปแล้ว',
+                                  style: TextStyle(
+                                      color: Color(0xAAFFFFFF),
+                                      fontSize: 14,
+                                      fontWeight: FontWeight.w500)),
+                              Text('ใช้ได้ไม่เกิน',
+                                  style: TextStyle(
+                                      color: Color(0xAAFFFFFF),
+                                      fontSize: 14,
+                                      fontWeight: FontWeight.w500)),
                             ],
                           ),
                           const SizedBox(height: 8),
@@ -275,20 +353,28 @@ class _BudgetEditScreenState extends ConsumerState<BudgetEditScreen> {
                             crossAxisAlignment: CrossAxisAlignment.end,
                             children: [
                               Text(
-                                '${Money.format(widget.status.spent)} ฿',
-                                style: TextStyle(color: color, fontWeight: FontWeight.bold, fontSize: 24),
+                                Money.formatBaht(widget.status.spent),
+                                style: TextStyle(
+                                    color: color,
+                                    fontWeight: FontWeight.bold,
+                                    fontSize: 24),
                               ),
                               Column(
                                 crossAxisAlignment: CrossAxisAlignment.end,
                                 children: [
                                   Text(
-                                    'เหลืออีก ${Money.format(remaining * 100)} ฿',
-                                    style: TextStyle(color: Colors.white.withOpacity(0.5), fontSize: 12),
+                                    'เหลืออีก ${Money.formatBaht(remaining)}',
+                                    style: TextStyle(
+                                        color: Colors.white.withOpacity(0.5),
+                                        fontSize: 12),
                                   ),
                                   const SizedBox(height: 2),
                                   Text(
                                     '${(pct * 100).toInt()} %',
-                                    style: TextStyle(color: color, fontSize: 16, fontWeight: FontWeight.bold),
+                                    style: TextStyle(
+                                        color: color,
+                                        fontSize: 16,
+                                        fontWeight: FontWeight.bold),
                                   ),
                                 ],
                               ),
@@ -303,7 +389,8 @@ class _BudgetEditScreenState extends ConsumerState<BudgetEditScreen> {
                               child: LinearProgressIndicator(
                                 value: pct.clamp(0.0, 1.0),
                                 backgroundColor: Colors.white.withOpacity(0.12),
-                                valueColor: AlwaysStoppedAnimation<Color>(color),
+                                valueColor:
+                                    AlwaysStoppedAnimation<Color>(color),
                               ),
                             ),
                           ),
@@ -324,55 +411,69 @@ class _BudgetEditScreenState extends ConsumerState<BudgetEditScreen> {
                     const SizedBox(height: 24),
 
                     // ส่วนแนะนำอัจฉริยะ (AI Smart Assistant Card)
-                    const Text(
-                      'แนะนำสำหรับคุณ',
-                      style: TextStyle(color: Colors.white, fontSize: 18, fontWeight: FontWeight.bold, letterSpacing: 0.3),
-                    ),
-                    const SizedBox(height: 12),
-                    Container(
-                      padding: const EdgeInsets.all(16),
-                      decoration: BoxDecoration(
-                        gradient: const LinearGradient(
-                          begin: Alignment.topLeft,
-                          end: Alignment.bottomRight,
-                          colors: [Color(0xFF0C241B), Color(0xFF071812)],
+                    if (personalized)
+                      const Text(
+                        'แนะนำสำหรับคุณ',
+                        style: TextStyle(
+                            color: Colors.white,
+                            fontSize: 18,
+                            fontWeight: FontWeight.bold,
+                            letterSpacing: 0.3),
+                      ),
+                    if (personalized) const SizedBox(height: 12),
+                    if (personalized)
+                      Container(
+                        padding: const EdgeInsets.all(16),
+                        decoration: BoxDecoration(
+                          gradient: const LinearGradient(
+                            begin: Alignment.topLeft,
+                            end: Alignment.bottomRight,
+                            colors: [Color(0xFF0C241B), Color(0xFF071812)],
+                          ),
+                          borderRadius: BorderRadius.circular(18),
+                          border: Border.all(
+                              color: const Color(0xFF3CAE63).withOpacity(0.15)),
                         ),
-                        borderRadius: BorderRadius.circular(18),
-                        border: Border.all(color: const Color(0xFF3CAE63).withOpacity(0.15)),
-                      ),
-                      child: Row(
-                        children: [
-                          Container(
-                            width: 50,
-                            height: 50,
-                            decoration: const BoxDecoration(
-                              shape: BoxShape.circle,
-                              color: Color(0xFF133526),
+                        child: Row(
+                          children: [
+                            Container(
+                              width: 50,
+                              height: 50,
+                              decoration: const BoxDecoration(
+                                shape: BoxShape.circle,
+                                color: Color(0xFF133526),
+                              ),
+                              child: const Icon(Icons.smart_toy_rounded,
+                                  color: Color(0xFF4CD97B), size: 28),
                             ),
-                            child: const Icon(Icons.smart_toy_rounded, color: Color(0xFF4CD97B), size: 28),
-                          ),
-                          const SizedBox(width: 14),
-                          Expanded(
-                            child: Column(
-                              crossAxisAlignment: CrossAxisAlignment.start,
-                              children: [
-                                const Text(
-                                  'พี่เงินขอแนะนำ',
-                                  style: TextStyle(fontWeight: FontWeight.bold, color: Colors.white, fontSize: 15),
-                                ),
-                                const SizedBox(height: 4),
-                                Text(
-                                  'เหลือเวลาอีก 10 วัน เรามาวางแผนกันใหม่',
-                                  style: TextStyle(color: Colors.white.withOpacity(0.5), fontSize: 13),
-                                )
-                              ],
+                            const SizedBox(width: 14),
+                            Expanded(
+                              child: Column(
+                                crossAxisAlignment: CrossAxisAlignment.start,
+                                children: [
+                                  const Text(
+                                    'พี่เงินขอแนะนำ',
+                                    style: TextStyle(
+                                        fontWeight: FontWeight.bold,
+                                        color: Colors.white,
+                                        fontSize: 15),
+                                  ),
+                                  const SizedBox(height: 4),
+                                  Text(
+                                    'เหลือเวลาอีก 10 วัน เรามาวางแผนกันใหม่',
+                                    style: TextStyle(
+                                        color: Colors.white.withOpacity(0.5),
+                                        fontSize: 13),
+                                  )
+                                ],
+                              ),
                             ),
-                          ),
-                          const Icon(Icons.arrow_forward_ios_rounded, color: Colors.white30, size: 14),
-                        ],
+                            const Icon(Icons.arrow_forward_ios_rounded,
+                                color: Colors.white30, size: 14),
+                          ],
+                        ),
                       ),
-                    ),
-                    const SizedBox(height: 48),
+                    SizedBox(height: personalized ? 48 : 24),
 
                     // ปุ่มลบ และ ยืนยันการแก้ไข สไตล์ปุ่มพรีเมียมแบบคู่ขนานด้านล่าง[cite: 29]
                     Row(
@@ -385,11 +486,16 @@ class _BudgetEditScreenState extends ConsumerState<BudgetEditScreen> {
                                 _deleteBudget();
                               },
                               style: ElevatedButton.styleFrom(
-                                backgroundColor: const Color(0xFFFF5959), 
+                                backgroundColor: const Color(0xFFFF5959),
                                 elevation: 0,
-                                shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(16)),
+                                shape: RoundedRectangleBorder(
+                                    borderRadius: BorderRadius.circular(16)),
                               ),
-                              child: const Text('ลบ', style: TextStyle(color: Colors.white, fontWeight: FontWeight.bold, fontSize: 16)),
+                              child: const Text('ลบ',
+                                  style: TextStyle(
+                                      color: Colors.white,
+                                      fontWeight: FontWeight.bold,
+                                      fontSize: 16)),
                             ),
                           ),
                         ),
@@ -404,11 +510,15 @@ class _BudgetEditScreenState extends ConsumerState<BudgetEditScreen> {
                               style: ElevatedButton.styleFrom(
                                 backgroundColor: const Color(0xFF3CAE63),
                                 elevation: 0,
-                                shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(16)),
+                                shape: RoundedRectangleBorder(
+                                    borderRadius: BorderRadius.circular(16)),
                               ),
                               child: const Text(
                                 'ยืนยันการแก้ไข',
-                                style: TextStyle(color: Colors.white, fontWeight: FontWeight.bold, fontSize: 16),
+                                style: TextStyle(
+                                    color: Colors.white,
+                                    fontWeight: FontWeight.bold,
+                                    fontSize: 16),
                               ),
                             ),
                           ),
@@ -426,22 +536,22 @@ class _BudgetEditScreenState extends ConsumerState<BudgetEditScreen> {
     );
   }
 
- // ฟังก์ชันบันทึกและแก้ไขข้อมูลงบประมาณ (เพิ่ม async หลังชื่อฟังก์ชัน)
+  // ฟังก์ชันบันทึกและแก้ไขข้อมูลงบประมาณ (เพิ่ม async หลังชื่อฟังก์ชัน)
   Future<void> _saveBudget() async {
     if (_formKey.currentState!.validate()) {
       final double bahtAmount = double.tryParse(_amountController.text) ?? 0;
-      final int targetSubunits = (bahtAmount * 100).toInt();
+      final int targetSubunits = Money.toSatang(bahtAmount);
 
-      // บันทึกและอัปเดตข้อมูลผ่าน Repository 
+      // บันทึกและอัปเดตข้อมูลผ่าน Repository
       await ref.read(transactionsRepoProvider).updateBudget(
-        widget.status.id, 
-        amount: targetSubunits,
-      );
-      
+            widget.status.id,
+            amount: targetSubunits,
+          );
+
       // สั่งให้รีเฟรชค่าในแอปพลิเคชัน
       ref.invalidate(budgetsListProvider);
       ref.invalidate(dashboardProvider);
-      
+
       // ปิดหน้าจอแก้ไข
       if (mounted) context.pop();
     }
@@ -450,11 +560,11 @@ class _BudgetEditScreenState extends ConsumerState<BudgetEditScreen> {
   // ฟังก์ชันลบข้อมูลผ่าน Repository (เพิ่ม async หลังชื่อฟังก์ชัน)
   Future<void> _deleteBudget() async {
     await ref.read(transactionsRepoProvider).deleteBudget(widget.status.id);
-    
+
     // สั่งให้รีเฟรชค่าในแอปพลิเคชัน
     ref.invalidate(budgetsListProvider);
     ref.invalidate(dashboardProvider);
-    
+
     // ปิดหน้าจอแก้ไข
     if (mounted) context.pop();
   }
@@ -487,13 +597,20 @@ class _BudgetEditScreenState extends ConsumerState<BudgetEditScreen> {
               child: Column(
                 crossAxisAlignment: CrossAxisAlignment.start,
                 children: [
-                  Text(title, style: const TextStyle(color: Colors.white, fontSize: 16, fontWeight: FontWeight.w600)),
+                  Text(title,
+                      style: const TextStyle(
+                          color: Colors.white,
+                          fontSize: 16,
+                          fontWeight: FontWeight.w600)),
                   const SizedBox(height: 4),
-                  Text(subtitle, style: TextStyle(color: Colors.white.withOpacity(0.45), fontSize: 13)),
+                  Text(subtitle,
+                      style: TextStyle(
+                          color: Colors.white.withOpacity(0.45), fontSize: 13)),
                 ],
               ),
             ),
-            const Icon(Icons.arrow_forward_ios_rounded, color: Colors.white30, size: 14),
+            const Icon(Icons.arrow_forward_ios_rounded,
+                color: Colors.white30, size: 14),
           ],
         ),
       ),
