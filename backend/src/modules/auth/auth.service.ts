@@ -5,22 +5,26 @@ import { HttpError } from '../../lib/http';
 type UserRow = {
   id: string;
   email: string;
+  phone?: string | null;
   displayName: string | null;
   monthlyIncome: number;
   level: number;
   streak: number;
   avatarUrl?: string | null;
+  createdAt?: Date;
 };
 
 export function publicUser(u: UserRow) {
   return {
     id: u.id,
     email: u.email,
+    phone: u.phone ?? null,
     displayName: u.displayName,
     monthlyIncome: u.monthlyIncome,
     level: u.level,
     streak: u.streak,
     avatarUrl: u.avatarUrl ?? null,
+    createdAt: u.createdAt?.toISOString() ?? null,
   };
 }
 

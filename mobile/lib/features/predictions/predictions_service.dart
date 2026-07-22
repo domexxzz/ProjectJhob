@@ -12,7 +12,8 @@ class PredictionsRepository {
   Future<PredictionsResponse> getPredictions() async {
     try {
       final response = await _dio.get('/predictions');
-      return PredictionsResponse.fromJson(response.data as Map<String, dynamic>);
+      return PredictionsResponse.fromJson(
+          response.data as Map<String, dynamic>);
     } catch (e) {
       rethrow;
     }

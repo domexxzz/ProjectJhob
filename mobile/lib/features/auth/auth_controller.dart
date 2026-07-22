@@ -4,31 +4,43 @@ import 'package:google_sign_in/google_sign_in.dart';
 import 'package:flutter_facebook_auth/flutter_facebook_auth.dart';
 
 import '../../core/api/api_client.dart';
+import '../settings/settings_screen.dart';
 
 class AppUser {
   AppUser({
     required this.id,
     required this.email,
+    this.phone,
     this.displayName,
     this.monthlyIncome = 0,
     this.level = 1,
     this.streak = 0,
+    this.avatarUrl,
+    this.createdAt,
   });
 
   final String id;
   final String email;
+  final String? phone;
   final String? displayName;
   final int monthlyIncome;
   final int level;
   final int streak;
+  final String? avatarUrl;
+  final DateTime? createdAt;
 
   factory AppUser.fromJson(Map<String, dynamic> j) => AppUser(
         id: j['id'] as String,
         email: j['email'] as String,
+        phone: j['phone'] as String?,
         displayName: j['displayName'] as String?,
         monthlyIncome: (j['monthlyIncome'] ?? 0) as int,
         level: (j['level'] ?? 1) as int,
         streak: (j['streak'] ?? 0) as int,
+        avatarUrl: j['avatarUrl'] as String?,
+        createdAt: j['createdAt'] != null
+            ? DateTime.tryParse(j['createdAt'] as String)
+            : null,
       );
 }
 
@@ -40,7 +52,11 @@ class AuthState {
 
   bool get isAuthenticated => user != null;
 
-  AuthState copyWith({AppUser? user, bool? loading, String? error, bool clearError = false}) =>
+  AuthState copyWith(
+          {AppUser? user,
+          bool? loading,
+          String? error,
+          bool clearError = false}) =>
       AuthState(
         user: user ?? this.user,
         loading: loading ?? this.loading,
@@ -62,7 +78,11 @@ class AuthController extends StateNotifier<AuthState> {
     if (token == null) return;
     try {
       final res = await _dio.get('/auth/me');
-      state = state.copyWith(user: AppUser.fromJson(res.data['user'] as Map<String, dynamic>));
+      state = state.copyWith(
+          user: AppUser.fromJson(res.data['user'] as Map<String, dynamic>));
+      await _ref
+          .read(appSettingsProvider.notifier)
+          .refreshNotificationPreferences();
     } catch (_) {
       await _tokens.clear();
     }
@@ -78,17 +98,53 @@ class AuthController extends StateNotifier<AuthState> {
         if (displayName.isNotEmpty) 'displayName': displayName,
       });
 
+  Future<bool> updateProfile({
+    required String displayName,
+    required String email,
+    String? phone,
+    required int monthlyIncome,
+    String? avatarUrl,
+  }) async {
+    state = state.copyWith(loading: true, clearError: true);
+    try {
+      final res = await _dio.patch('/auth/me', data: {
+        'displayName': displayName.trim(),
+        'email': email.trim(),
+        'phone': phone?.trim(),
+        'monthlyIncome': monthlyIncome,
+        if (avatarUrl != null) 'avatarUrl': avatarUrl,
+      });
+      state = AuthState(
+        user: AppUser.fromJson(res.data['user'] as Map<String, dynamic>),
+      );
+      return true;
+    } on DioException catch (e) {
+      final data = e.response?.data;
+      final msg = data is Map ? data['error']?.toString() : null;
+      state = state.copyWith(
+        loading: false,
+        error: msg ?? 'บันทึกข้อมูลไม่สำเร็จ กรุณาลองใหม่',
+      );
+      return false;
+    }
+  }
+
   Future<bool> _authRequest(String path, Map<String, dynamic> body) async {
     state = state.copyWith(loading: true, clearError: true);
     try {
       final res = await _dio.post(path, data: body);
       await _tokens.write(res.data['token'] as String);
-      state = AuthState(user: AppUser.fromJson(res.data['user'] as Map<String, dynamic>));
+      state = AuthState(
+          user: AppUser.fromJson(res.data['user'] as Map<String, dynamic>));
+      await _ref
+          .read(appSettingsProvider.notifier)
+          .refreshNotificationPreferences();
       return true;
     } on DioException catch (e) {
       final data = e.response?.data;
       final msg = data is Map ? data['error']?.toString() : null;
-      state = state.copyWith(loading: false, error: msg ?? 'เชื่อมต่อเซิร์ฟเวอร์ไม่สำเร็จ');
+      state = state.copyWith(
+          loading: false, error: msg ?? 'เชื่อมต่อเซิร์ฟเวอร์ไม่สำเร็จ');
       return false;
     }
   }
@@ -104,7 +160,8 @@ class AuthController extends StateNotifier<AuthState> {
       }
       final auth = await account.authentication;
       final idToken = auth.idToken; // มือถือให้ idToken
-      final accessToken = auth.accessToken; // เว็บให้ accessToken (idToken เป็น null)
+      final accessToken =
+          auth.accessToken; // เว็บให้ accessToken (idToken เป็น null)
       if (idToken == null && accessToken == null) {
         state = state.copyWith(loading: false, error: 'ไม่ได้รับ Google token');
         return false;
@@ -114,7 +171,8 @@ class AuthController extends StateNotifier<AuthState> {
         if (accessToken != null) 'accessToken': accessToken,
       });
     } catch (e) {
-      state = state.copyWith(loading: false, error: 'ล็อกอิน Google ไม่สำเร็จ ลองใหม่อีกครั้ง');
+      state = state.copyWith(
+          loading: false, error: 'ล็อกอิน Google ไม่สำเร็จ ลองใหม่อีกครั้ง');
       return false;
     }
   }
@@ -123,15 +181,20 @@ class AuthController extends StateNotifier<AuthState> {
   Future<bool> loginWithFacebook() async {
     state = state.copyWith(loading: true, clearError: true);
     try {
-      final result = await FacebookAuth.instance.login(permissions: const ['email', 'public_profile']);
+      final result = await FacebookAuth.instance
+          .login(permissions: const ['email', 'public_profile']);
       final token = result.accessToken;
       if (result.status != LoginStatus.success || token == null) {
-        state = state.copyWith(loading: false, error: result.message ?? 'ยกเลิก/ล็อกอิน Facebook ไม่สำเร็จ');
+        state = state.copyWith(
+            loading: false,
+            error: result.message ?? 'ยกเลิก/ล็อกอิน Facebook ไม่สำเร็จ');
         return false;
       }
       return _authRequest('/auth/facebook', {'accessToken': token.token});
     } catch (e) {
-      state = state.copyWith(loading: false, error: 'ล็อกอิน Facebook ไม่สำเร็จ (ตรวจการตั้งค่า OAuth)');
+      state = state.copyWith(
+          loading: false,
+          error: 'ล็อกอิน Facebook ไม่สำเร็จ (ตรวจการตั้งค่า OAuth)');
       return false;
     }
   }
@@ -146,5 +209,5 @@ class AuthController extends StateNotifier<AuthState> {
   }
 }
 
-final authControllerProvider =
-    StateNotifierProvider<AuthController, AuthState>((ref) => AuthController(ref));
+final authControllerProvider = StateNotifierProvider<AuthController, AuthState>(
+    (ref) => AuthController(ref));

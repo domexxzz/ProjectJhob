@@ -13,7 +13,7 @@ import '../../app/theme.dart';
 import '../../core/api/api_client.dart';
 import 'chat_message.dart';
 import 'chat_repository.dart';
-import '../../widgets/app_bottom_nav_bar.dart';
+import '../privacy/privacy_screen.dart';
 
 enum CoachMood { idle, listening, thinking }
 
@@ -103,8 +103,14 @@ class _ChatScreenState extends ConsumerState<ChatScreen> {
     });
     _scrollToBottom();
     try {
-      final reply =
-          await ref.read(chatRepoProvider).send(msg, imageBase64: imageBase64);
+      final privacy = ref.read(privacySettingsProvider);
+      final reply = await ref.read(chatRepoProvider).send(
+            msg,
+            imageBase64: imageBase64,
+            includeFinancialContext: privacy.allowFinancialAnalysis,
+            personalizedRecommendations: privacy.personalizedRecommendations,
+            storeConversationHistory: privacy.shareForAiImprovement,
+          );
       if (!mounted) return;
       setState(() {
         _messages.add(reply);
@@ -223,14 +229,9 @@ class _ChatScreenState extends ConsumerState<ChatScreen> {
             }
           },
         ),
-        title: RichText(
-          text: const TextSpan(
-            style: TextStyle(fontSize: 22, fontWeight: FontWeight.bold),
-            children: [
-              TextSpan(text: 'พี่', style: TextStyle(color: Colors.white)),
-              TextSpan(text: 'เงิน', style: TextStyle(color: Color(0xFF3CAE63))),
-            ],
-          ),
+        title: const Text(
+          'พี่เงิน',
+          style: TextStyle(fontSize: 18, fontWeight: FontWeight.w800),
         ),
       ),
       body: SafeArea(

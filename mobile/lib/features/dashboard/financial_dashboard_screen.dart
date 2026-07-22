@@ -6,10 +6,9 @@ import 'package:intl/intl.dart';
 
 import '../../app/theme.dart';
 import '../../core/money.dart';
-import '../auth/auth_controller.dart';
-import '../notifications/notif_bell.dart';
 import '../transactions/transaction.dart';
 import '../transactions/transactions_repository.dart';
+import '../settings/settings_screen.dart';
 import '../../widgets/app_bottom_nav_bar.dart';
 
 enum _DashboardRange { day, week, month, year }
@@ -29,94 +28,100 @@ class _FinancialDashboardScreenState
 
   @override
   Widget build(BuildContext context) {
-    final user = ref.watch(authControllerProvider).user;
+    final moneySettings = ref.watch(
+      appSettingsProvider.select((s) => (s.currency, s.usdRate)),
+    );
+    Money.configure(moneySettings.$1, thbToUsdRate: moneySettings.$2);
     final dashboard = ref.watch(dashboardProvider);
 
     return Scaffold(
       backgroundColor: const Color(0xFF0D0F0E),
-      body: Column(
-        children: [
-          _GreenHeader(
-            name: user?.displayName ?? 'Chnitsara Nansthit',
-            streak: user?.streak ?? 0,
+      appBar: AppBar(
+        backgroundColor: const Color(0xFF0D0F0E),
+        surfaceTintColor: Colors.transparent,
+        centerTitle: true,
+        title: const Text(
+          'แดชบอร์ด',
+          style: TextStyle(fontSize: 18, fontWeight: FontWeight.w700),
+        ),
+        leading: IconButton(
+          onPressed: () => context.pop(),
+          icon: const Icon(Icons.arrow_back_rounded),
+        ),
+      ),
+      body: RefreshIndicator(
+        color: AppColors.primary,
+        onRefresh: () async {
+          ref.invalidate(dashboardProvider);
+          await ref.read(dashboardProvider.future);
+        },
+        child: dashboard.when(
+          loading: () => const Center(
+            child: CircularProgressIndicator(color: AppColors.primary),
           ),
-          Expanded(
-            child: RefreshIndicator(
-              color: AppColors.primary,
-              onRefresh: () async {
-                ref.invalidate(dashboardProvider);
-                await ref.read(dashboardProvider.future);
-              },
-              child: dashboard.when(
-                loading: () => const Center(
-                  child: CircularProgressIndicator(color: AppColors.primary),
-                ),
-                error: (error, _) => ListView(
-                  padding: const EdgeInsets.all(24),
-                  children: [
-                    const SizedBox(height: 160),
-                    const Icon(Icons.cloud_off_rounded,
-                        color: Colors.white38, size: 42),
-                    const SizedBox(height: 12),
-                    const Text(
-                      'โหลดข้อมูลแดชบอร์ดไม่สำเร็จ',
-                      textAlign: TextAlign.center,
-                      style: TextStyle(color: Colors.white, fontSize: 16),
-                    ),
-                    const SizedBox(height: 8),
-                    Text(
-                      '$error',
-                      textAlign: TextAlign.center,
-                      style: const TextStyle(color: Colors.white54, fontSize: 12),
-                    ),
-                  ],
-                ),
-                data: (data) {
-                  final visible = _filterTransactions(data.items, _range);
-                  final income = visible
-                      .where((item) => item.isIncome)
-                      .fold<int>(0, (sum, item) => sum + item.amount);
-                  final expense = visible
-                      .where((item) => !item.isIncome)
-                      .fold<int>(0, (sum, item) => sum + item.amount);
-
-                  return ListView(
-                    physics: const AlwaysScrollableScrollPhysics(),
-                    padding: const EdgeInsets.fromLTRB(16, 8, 16, 116),
-                    children: [
-                      _RangeSelector(
-                        selected: _range,
-                        onChanged: (range) => setState(() => _range = range),
-                      ),
-                      const SizedBox(height: 16),
-                      _TrendCard(transactions: visible, range: _range),
-                      const SizedBox(height: 14),
-                      _SummaryRow(income: income, expense: expense),
-                      const SizedBox(height: 24),
-                      _SectionHeader(
-                        title: 'สัดส่วนตามหมวดหมู่',
-                        trailing: _TypeSwitch(
-                          showIncome: _showIncomeCategories,
-                          onChanged: (value) =>
-                              setState(() => _showIncomeCategories = value),
-                        ),
-                      ),
-                      const SizedBox(height: 12),
-                      _CategoryBreakdown(
-                        transactions: visible,
-                        showIncome: _showIncomeCategories,
-                      ),
-                      const SizedBox(height: 24),
-                      const _SectionHeader(title: 'รายการในช่วงเวลานี้'),
-                      const SizedBox(height: 12),
-                      _TransactionList(transactions: visible),
-                    ],
-                  );
-                },
+          error: (error, _) => ListView(
+            padding: const EdgeInsets.all(24),
+            children: [
+              const SizedBox(height: 160),
+              const Icon(Icons.cloud_off_rounded,
+                  color: Colors.white38, size: 42),
+              const SizedBox(height: 12),
+              const Text(
+                'โหลดข้อมูลแดชบอร์ดไม่สำเร็จ',
+                textAlign: TextAlign.center,
+                style: TextStyle(color: Colors.white, fontSize: 16),
               ),
-            ),
+              const SizedBox(height: 8),
+              Text(
+                '$error',
+                textAlign: TextAlign.center,
+                style: const TextStyle(color: Colors.white54, fontSize: 12),
+              ),
+            ],
           ),
-        ],
+          data: (data) {
+            final visible = _filterTransactions(data.items, _range);
+            final income = visible
+                .where((item) => item.isIncome)
+                .fold<int>(0, (sum, item) => sum + item.amount);
+            final expense = visible
+                .where((item) => !item.isIncome)
+                .fold<int>(0, (sum, item) => sum + item.amount);
+
+            return ListView(
+              physics: const AlwaysScrollableScrollPhysics(),
+              padding: const EdgeInsets.fromLTRB(16, 8, 16, 116),
+              children: [
+                _RangeSelector(
+                  selected: _range,
+                  onChanged: (range) => setState(() => _range = range),
+                ),
+                const SizedBox(height: 16),
+                _TrendCard(transactions: visible, range: _range),
+                const SizedBox(height: 14),
+                _SummaryRow(income: income, expense: expense),
+                const SizedBox(height: 24),
+                _SectionHeader(
+                  title: 'สัดส่วนตามหมวดหมู่',
+                  trailing: _TypeSwitch(
+                    showIncome: _showIncomeCategories,
+                    onChanged: (value) =>
+                        setState(() => _showIncomeCategories = value),
+                  ),
+                ),
+                const SizedBox(height: 12),
+                _CategoryBreakdown(
+                  transactions: visible,
+                  showIncome: _showIncomeCategories,
+                ),
+                const SizedBox(height: 24),
+                const _SectionHeader(title: 'รายการในช่วงเวลานี้'),
+                const SizedBox(height: 12),
+                _TransactionList(transactions: visible),
+              ],
+            );
+          },
+        ),
       ),
       floatingActionButton: const AppFloatingActionButton(),
       floatingActionButtonLocation: kFixedCenterDockedFabLocation,
@@ -295,7 +300,7 @@ class _TrendCard extends StatelessWidget {
                           getTooltipColor: (_) => const Color(0xFF242826),
                           getTooltipItems: (spots) => spots
                               .map((spot) => LineTooltipItem(
-                                    '฿${NumberFormat('#,##0').format(spot.y)}',
+                                    '${Money.symbol}${NumberFormat('#,##0').format(spot.y)}',
                                     TextStyle(
                                       color: spot.barIndex == 0
                                           ? AppColors.income
@@ -386,7 +391,7 @@ class _TrendCard extends StatelessWidget {
       case _DashboardRange.year:
         index = date.month - 1;
     }
-    final amount = item.amount / 100;
+    final amount = Money.displayValue(item.amount);
     if (item.isIncome) {
       income[index] += amount;
     } else {
@@ -924,83 +929,6 @@ class _TransactionList extends StatelessWidget {
           ),
         );
       }).toList(),
-    );
-  }
-}
-
-// ─────────────────────────────────────────────────────────────────────────────
-// Top Green Header Widget
-// ─────────────────────────────────────────────────────────────────────────────
-class _GreenHeader extends StatelessWidget {
-  const _GreenHeader({required this.name, required this.streak});
-  final String name;
-  final int streak;
-
-  @override
-  Widget build(BuildContext context) {
-    final topPad = MediaQuery.of(context).padding.top;
-    return Container(
-      width: double.infinity,
-      padding: EdgeInsets.fromLTRB(20, topPad + 16, 20, 24),
-      decoration: const BoxDecoration(
-        gradient: LinearGradient(
-          colors: [Color(0xFF06120A), Color(0xFF334E3D), Color(0xFF3CAE63)],
-          begin: Alignment.topCenter,
-          end: Alignment.bottomCenter,
-        ),
-        borderRadius: BorderRadius.only(
-          bottomLeft: Radius.circular(32),
-          bottomRight: Radius.circular(32),
-        ),
-      ),
-      child: Row(
-        children: [
-              Container(
-                width: 48,
-                height: 48,
-                decoration: const BoxDecoration(
-                  shape: BoxShape.circle,
-                  color: Color(0xFF5E6E85),
-                ),
-                child: const Icon(Icons.person, color: Colors.white, size: 30),
-              ),
-              const SizedBox(width: 14),
-              Expanded(
-                child: Column(
-                  crossAxisAlignment: CrossAxisAlignment.start,
-                  children: [
-                    Text(
-                      name,
-                      style: const TextStyle(
-                        color: Colors.white,
-                        fontSize: 18,
-                        fontWeight: FontWeight.w600,
-                      ),
-                      overflow: TextOverflow.ellipsis,
-                    ),
-                    const SizedBox(height: 6),
-                    Container(
-                      padding:
-                          const EdgeInsets.symmetric(horizontal: 12, vertical: 4),
-                      decoration: BoxDecoration(
-                        color: Colors.white.withOpacity(0.2),
-                        borderRadius: BorderRadius.circular(12),
-                      ),
-                      child: Text(
-                        'ใช้งานต่อเนื่อง $streak วัน',
-                        style: const TextStyle(
-                          color: Colors.white,
-                          fontSize: 12,
-                          fontWeight: FontWeight.bold,
-                        ),
-                      ),
-                    ),
-                  ],
-                ),
-              ),
-              const NotifBell(),
-            ],
-          ),
     );
   }
 }

@@ -5,6 +5,7 @@ import 'package:go_router/go_router.dart';
 import '../../app/theme.dart';
 import '../auth/auth_controller.dart';
 import '../notifications/notif_bell.dart';
+import '../profile/profile_avatar.dart';
 import '../../widgets/app_bottom_nav_bar.dart';
 
 /// หน้า เมนู (P15) — ทางเข้า บัญชี / การตั้งค่า / ความเป็นส่วนตัว / Subscription
@@ -20,7 +21,10 @@ class MenuScreen extends ConsumerWidget {
       body: Column(
         children: [
           _MenuHeader(
-              name: user?.displayName ?? 'เพื่อน', streak: user?.streak ?? 0),
+            name: user?.displayName ?? 'เพื่อน',
+            streak: user?.streak ?? 0,
+            avatarUrl: user?.avatarUrl,
+          ),
           Expanded(
             child: SingleChildScrollView(
               padding: const EdgeInsets.fromLTRB(16, 24, 16, 100),
@@ -42,7 +46,7 @@ class MenuScreen extends ConsumerWidget {
                           icon: Icons.settings,
                           title: 'การตั้งค่า',
                           subtitle: 'ตั้งค่าบัญชี,\nตั้งค่าการแจ้งเตือน',
-                          onTap: () => _soon(context),
+                          onTap: () => context.push('/settings'),
                         ),
                       ),
                     ],
@@ -56,7 +60,7 @@ class MenuScreen extends ConsumerWidget {
                           title: 'ความเป็นส่วนตัว',
                           subtitle:
                               'การจัดการรหัสผ่าน,\nและตั้งค่าความเป็นส่วนตัว',
-                          onTap: () => _soon(context),
+                          onTap: () => context.push('/privacy'),
                         ),
                       ),
                       const SizedBox(width: 14),
@@ -81,18 +85,17 @@ class MenuScreen extends ConsumerWidget {
       bottomNavigationBar: const AppBottomNavigationBar(currentTab: AppTab.menu),
     );
   }
-
-  void _soon(BuildContext context) {
-    ScaffoldMessenger.of(context).showSnackBar(
-      const SnackBar(content: Text('อยู่ระหว่างพัฒนา (Sprint 7) 🔧')),
-    );
-  }
 }
 
 class _MenuHeader extends StatelessWidget {
-  const _MenuHeader({required this.name, required this.streak});
+  const _MenuHeader({
+    required this.name,
+    required this.streak,
+    required this.avatarUrl,
+  });
   final String name;
   final int streak;
+  final String? avatarUrl;
 
   @override
   Widget build(BuildContext context) {
@@ -110,17 +113,7 @@ class _MenuHeader extends StatelessWidget {
       ),
       child: Row(
         children: [
-          Container(
-            width: 44,
-            height: 44,
-            decoration: BoxDecoration(
-              shape: BoxShape.circle,
-              color: Colors.grey.shade700,
-              border: Border.all(
-                  color: AppColors.primary.withOpacity(0.5), width: 2),
-            ),
-            child: const Icon(Icons.person, color: Colors.white70, size: 26),
-          ),
+          ProfileAvatar(imageUrl: avatarUrl, size: 44),
           const SizedBox(width: 12),
           Expanded(
             child: Column(
@@ -136,10 +129,10 @@ class _MenuHeader extends StatelessWidget {
                   padding:
                       const EdgeInsets.symmetric(horizontal: 10, vertical: 3),
                   decoration: BoxDecoration(
-                    color: AppColors.primary.withOpacity(0.25),
+                    color: AppColors.primary.withValues(alpha: 0.25),
                     borderRadius: BorderRadius.circular(12),
-                    border:
-                        Border.all(color: AppColors.primary.withOpacity(0.4)),
+                    border: Border.all(
+                        color: AppColors.primary.withValues(alpha: 0.4)),
                   ),
                   child: Text('ใช้งานต่อเนื่อง $streak วัน',
                       style: const TextStyle(
@@ -178,7 +171,7 @@ class _MenuCard extends StatelessWidget {
         decoration: BoxDecoration(
           color: const Color(0xFF262626),
           borderRadius: BorderRadius.circular(18),
-          border: Border.all(color: Colors.white.withOpacity(0.06)),
+          border: Border.all(color: Colors.white.withValues(alpha: 0.06)),
         ),
         child: Column(
           crossAxisAlignment: CrossAxisAlignment.start,
@@ -187,7 +180,7 @@ class _MenuCard extends StatelessWidget {
               width: 46,
               height: 46,
               decoration: BoxDecoration(
-                color: Colors.white.withOpacity(0.92),
+                color: Colors.white.withValues(alpha: 0.92),
                 borderRadius: BorderRadius.circular(12),
               ),
               child: Icon(icon, color: const Color(0xFF1A1A1A), size: 24),

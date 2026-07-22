@@ -3,10 +3,12 @@ import 'package:flutter/foundation.dart' show kIsWeb;
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:go_router/go_router.dart';
-import 'package:image_picker/image_picker.dart'; 
+import 'package:image_picker/image_picker.dart';
 import 'package:intl/intl.dart';
 
 import '../../core/money.dart';
+import '../privacy/privacy_screen.dart';
+import '../settings/settings_screen.dart';
 import 'goals_provider.dart';
 
 class EditGoalScreen extends ConsumerStatefulWidget {
@@ -27,9 +29,9 @@ class _EditGoalScreenState extends ConsumerState<EditGoalScreen> {
   DateTime? _endDate;
   String _selectedType = 'short';
   String _selectedEmoji = '🌴';
-  
+
   // ตัวแปรเก็บไฟล์รูปภาพที่เลือก
-  XFile? _selectedImageFile; 
+  XFile? _selectedImageFile;
   final ImagePicker _picker = ImagePicker();
 
   final List<String> _emojiList = ['🏔️', '🏠', '🌴', '💻', '💍'];
@@ -38,18 +40,18 @@ class _EditGoalScreenState extends ConsumerState<EditGoalScreen> {
   void initState() {
     super.initState();
     _nameController = TextEditingController();
-    _targetController = TextEditingController(); 
+    _targetController = TextEditingController();
 
     if (widget.goalId != null) {
       WidgetsBinding.instance.addPostFrameCallback((_) {
-        final goal = ref.read(goalsProvider).firstWhere((g) => g.id == widget.goalId);
+        final goal =
+            ref.read(goalsProvider).firstWhere((g) => g.id == widget.goalId);
         setState(() {
           _nameController.text = goal.name;
-          
+
           // เปลี่ยนจาก .round() เป็นเช็คทศนิยม เพื่อรองรับเงินที่เป็นเศษสตางค์ได้อย่างถูกต้อง
-          final double bahtAmount = goal.target / 100;
-          _targetController.text = bahtAmount % 1 == 0 ? bahtAmount.toInt().toString() : bahtAmount.toString();
-          
+          _targetController.text = Money.format(goal.target);
+
           _selectedDate = goal.deadline;
           _startDate = goal.startDate;
           _endDate = goal.deadline;
@@ -94,17 +96,22 @@ class _EditGoalScreenState extends ConsumerState<EditGoalScreen> {
       barrierDismissible: false,
       builder: (BuildContext context) {
         double scale = 1.0;
-        final TransformationController transformController = TransformationController();
+        final TransformationController transformController =
+            TransformationController();
 
         return StatefulBuilder(
           builder: (context, setDialogState) {
             return AlertDialog(
               backgroundColor: const Color(0xFF1D222B),
-              shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(24)),
+              shape: RoundedRectangleBorder(
+                  borderRadius: BorderRadius.circular(24)),
               title: const Text(
                 'ปรับแต่งตำแหน่งรูปภาพ',
                 textAlign: TextAlign.center,
-                style: TextStyle(color: Colors.white, fontSize: 18, fontWeight: FontWeight.bold),
+                style: TextStyle(
+                    color: Colors.white,
+                    fontSize: 18,
+                    fontWeight: FontWeight.bold),
               ),
               content: Column(
                 mainAxisSize: MainAxisSize.min,
@@ -115,7 +122,8 @@ class _EditGoalScreenState extends ConsumerState<EditGoalScreen> {
                     height: 220,
                     decoration: BoxDecoration(
                       shape: BoxShape.circle,
-                      border: Border.all(color: const Color(0xFF4CD97B), width: 3),
+                      border:
+                          Border.all(color: const Color(0xFF4CD97B), width: 3),
                       boxShadow: [
                         BoxShadow(
                           color: const Color(0xFF4CD97B).withOpacity(0.3),
@@ -136,8 +144,10 @@ class _EditGoalScreenState extends ConsumerState<EditGoalScreen> {
                         });
                       },
                       child: kIsWeb
-                          ? Image.network(pickedFile.path, fit: BoxFit.cover, width: 220, height: 220)
-                          : Image.file(File(pickedFile.path), fit: BoxFit.cover, width: 220, height: 220),
+                          ? Image.network(pickedFile.path,
+                              fit: BoxFit.cover, width: 220, height: 220)
+                          : Image.file(File(pickedFile.path),
+                              fit: BoxFit.cover, width: 220, height: 220),
                     ),
                   ),
                   const SizedBox(height: 16),
@@ -165,14 +175,16 @@ class _EditGoalScreenState extends ConsumerState<EditGoalScreen> {
                   ),
                 ],
               ),
-              actionsPadding: const EdgeInsets.only(bottom: 20, left: 16, right: 16),
+              actionsPadding:
+                  const EdgeInsets.only(bottom: 20, left: 16, right: 16),
               actions: [
                 Row(
                   children: [
                     Expanded(
                       child: TextButton(
                         onPressed: () => Navigator.pop(context),
-                        child: const Text('ยกเลิก', style: TextStyle(color: Colors.white54)),
+                        child: const Text('ยกเลิก',
+                            style: TextStyle(color: Colors.white54)),
                       ),
                     ),
                     const SizedBox(width: 12),
@@ -180,7 +192,8 @@ class _EditGoalScreenState extends ConsumerState<EditGoalScreen> {
                       child: ElevatedButton(
                         style: ElevatedButton.styleFrom(
                           backgroundColor: const Color(0xFF3CAE63),
-                          shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(12)),
+                          shape: RoundedRectangleBorder(
+                              borderRadius: BorderRadius.circular(12)),
                         ),
                         onPressed: () {
                           setState(() {
@@ -188,7 +201,10 @@ class _EditGoalScreenState extends ConsumerState<EditGoalScreen> {
                           });
                           Navigator.pop(context);
                         },
-                        child: const Text('บันทึก', style: TextStyle(color: Colors.white, fontWeight: FontWeight.bold)),
+                        child: const Text('บันทึก',
+                            style: TextStyle(
+                                color: Colors.white,
+                                fontWeight: FontWeight.bold)),
                       ),
                     ),
                   ],
@@ -204,7 +220,8 @@ class _EditGoalScreenState extends ConsumerState<EditGoalScreen> {
   // คำนวณจำนวนเดือนจากช่วงวันที่ แล้วแปลงเป็นประเภทเป้าหมายอัตโนมัติ
   // 0-6 เดือน = ระยะสั้น, 6-12 เดือน = ระยะกลาง, มากกว่า 12 เดือน = ระยะยาว
   String _autoDetectGoalType(DateTime start, DateTime end) {
-    final int months = ((end.year - start.year) * 12) + (end.month - start.month);
+    final int months =
+        ((end.year - start.year) * 12) + (end.month - start.month);
     if (months <= 6) {
       return 'short';
     } else if (months <= 12) {
@@ -229,20 +246,29 @@ class _EditGoalScreenState extends ConsumerState<EditGoalScreen> {
 
   @override
   Widget build(BuildContext context) {
+    final moneySettings = ref.watch(
+      appSettingsProvider.select((s) => (s.currency, s.usdRate)),
+    );
+    Money.configure(moneySettings.$1, thbToUsdRate: moneySettings.$2);
+    final personalized =
+        ref.watch(privacySettingsProvider).personalizedRecommendations;
     final goals = ref.watch(goalsProvider);
     final int currentSavings = widget.goalId != null
-        ? (goals.firstWhere((g) => g.id == widget.goalId, orElse: () => goals.first).current)
+        ? (goals
+            .firstWhere((g) => g.id == widget.goalId, orElse: () => goals.first)
+            .current)
         : 0;
-        
+
     // แก้ไขบัคตรงนี้: เปลี่ยนมาใช้ double.tryParse เพื่อไม่ให้ระบบเออร์เรอร์เวลาลบตัวเลขหรือใส่จุดทศนิยม
     final double bahtVal = double.tryParse(_targetController.text) ?? 0;
-    final int targetVal = (bahtVal * 100).toInt();
-    
+    final int targetVal = Money.toSatang(bahtVal);
+
     final int remaining = (targetVal - currentSavings).clamp(0, targetVal);
-    final double progress = targetVal > 0 ? (currentSavings / targetVal).clamp(0.0, 1.0) : 0.0;
+    final double progress =
+        targetVal > 0 ? (currentSavings / targetVal).clamp(0.0, 1.0) : 0.0;
 
     return Scaffold(
-      backgroundColor: const Color(0xFF16191D), 
+      backgroundColor: const Color(0xFF16191D),
       body: SingleChildScrollView(
         physics: const BouncingScrollPhysics(),
         child: Column(
@@ -260,20 +286,33 @@ class _EditGoalScreenState extends ConsumerState<EditGoalScreen> {
                 children: [
                   Align(
                     alignment: Alignment.centerLeft,
-                    child: IconButton(
-                      onPressed: () {
-                        if (Navigator.of(context).canPop() || context.canPop()) {
-                          context.pop();
-                        } else {
-                          context.go('/');
-                        }
-                      },
-                      icon: const Icon(Icons.arrow_back, color: Colors.white, size: 24),
+                    child: GestureDetector(
+                      onTap: () => context.pop(),
+                      child: Container(
+                        padding: const EdgeInsets.all(10),
+                        decoration: BoxDecoration(
+                          shape: BoxShape.circle,
+                          color: const Color(0xFF3CAE63),
+                          boxShadow: [
+                            BoxShadow(
+                              color: const Color(0xFF3CAE63).withOpacity(0.4),
+                              blurRadius: 12,
+                              spreadRadius: 2,
+                            ),
+                          ],
+                        ),
+                        child: const Icon(Icons.arrow_back_rounded,
+                            color: Colors.white, size: 24),
+                      ),
                     ),
                   ),
-                  Text(
-                    widget.goalId != null ? 'แก้ไขเป้าหมาย' : 'เพิ่มเป้าหมาย',
-                    style: const TextStyle(fontWeight: FontWeight.bold, fontSize: 24, color: Colors.white, letterSpacing: 0.5),
+                  const Text(
+                    'แก้ไขเป้าหมาย',
+                    style: TextStyle(
+                        fontWeight: FontWeight.bold,
+                        fontSize: 24,
+                        color: Colors.white,
+                        letterSpacing: 0.5),
                   ),
                 ],
               ),
@@ -298,13 +337,17 @@ class _EditGoalScreenState extends ConsumerState<EditGoalScreen> {
                                   image: DecorationImage(
                                     image: kIsWeb
                                         ? NetworkImage(_selectedImageFile!.path)
-                                        : FileImage(File(_selectedImageFile!.path)) as ImageProvider,
+                                        : FileImage(
+                                                File(_selectedImageFile!.path))
+                                            as ImageProvider,
                                     fit: BoxFit.cover,
                                   ),
-                                  border: Border.all(color: const Color(0xFF4CD97B), width: 3),
+                                  border: Border.all(
+                                      color: const Color(0xFF4CD97B), width: 3),
                                   boxShadow: [
                                     BoxShadow(
-                                      color: const Color(0xFF4CD97B).withOpacity(0.4),
+                                      color: const Color(0xFF4CD97B)
+                                          .withOpacity(0.4),
                                       blurRadius: 25,
                                       spreadRadius: 6,
                                     )
@@ -315,7 +358,8 @@ class _EditGoalScreenState extends ConsumerState<EditGoalScreen> {
                           : SingleChildScrollView(
                               scrollDirection: Axis.horizontal,
                               physics: const BouncingScrollPhysics(),
-                              padding: const EdgeInsets.symmetric(horizontal: 40),
+                              padding:
+                                  const EdgeInsets.symmetric(horizontal: 40),
                               child: Row(
                                 mainAxisAlignment: MainAxisAlignment.center,
                                 children: _emojiList.map((emoji) {
@@ -328,25 +372,37 @@ class _EditGoalScreenState extends ConsumerState<EditGoalScreen> {
                                       });
                                     },
                                     child: AnimatedContainer(
-                                      duration: const Duration(milliseconds: 250),
-                                      margin: const EdgeInsets.symmetric(horizontal: 8),
+                                      duration:
+                                          const Duration(milliseconds: 250),
+                                      margin: const EdgeInsets.symmetric(
+                                          horizontal: 8),
                                       width: isSelected ? 124 : 80,
                                       height: isSelected ? 124 : 80,
                                       decoration: BoxDecoration(
                                         shape: BoxShape.circle,
-                                        color: isSelected ? null : const Color(0xFF22272F),
+                                        color: isSelected
+                                            ? null
+                                            : const Color(0xFF22272F),
                                         gradient: isSelected
                                             ? const LinearGradient(
-                                                colors: [Color(0xFFE2F1FC), Color(0xFFBDD7EE)],
+                                                colors: [
+                                                  Color(0xFFE2F1FC),
+                                                  Color(0xFFBDD7EE)
+                                                ],
                                               )
                                             : null,
                                         border: isSelected
-                                            ? Border.all(color: const Color(0xFF4CD97B), width: 3)
-                                            : Border.all(color: Colors.white12, width: 1.5),
+                                            ? Border.all(
+                                                color: const Color(0xFF4CD97B),
+                                                width: 3)
+                                            : Border.all(
+                                                color: Colors.white12,
+                                                width: 1.5),
                                         boxShadow: isSelected
                                             ? [
                                                 BoxShadow(
-                                                  color: const Color(0xFF4CD97B).withOpacity(0.4),
+                                                  color: const Color(0xFF4CD97B)
+                                                      .withOpacity(0.4),
                                                   blurRadius: 25,
                                                   spreadRadius: 6,
                                                 )
@@ -355,8 +411,9 @@ class _EditGoalScreenState extends ConsumerState<EditGoalScreen> {
                                       ),
                                       alignment: Alignment.center,
                                       child: Text(
-                                        emoji, 
-                                        style: TextStyle(fontSize: isSelected ? 56 : 38),
+                                        emoji,
+                                        style: TextStyle(
+                                            fontSize: isSelected ? 56 : 38),
                                       ),
                                     ),
                                   );
@@ -366,7 +423,7 @@ class _EditGoalScreenState extends ConsumerState<EditGoalScreen> {
                     ),
                   ),
                   const SizedBox(height: 12),
-                  
+
                   // ปุ่มแก้ไขรูปภาพ
                   Row(
                     mainAxisAlignment: MainAxisAlignment.center,
@@ -374,26 +431,32 @@ class _EditGoalScreenState extends ConsumerState<EditGoalScreen> {
                       GestureDetector(
                         onTap: _pickImage,
                         child: Container(
-                          padding: const EdgeInsets.symmetric(horizontal: 18, vertical: 8),
+                          padding: const EdgeInsets.symmetric(
+                              horizontal: 18, vertical: 8),
                           decoration: BoxDecoration(
-                            color: const Color(0xFF22272F),
-                            borderRadius: BorderRadius.circular(20),
-                            border: Border.all(color: Colors.white10),
-                            boxShadow: [
-                              BoxShadow(
-                                color: Colors.black.withOpacity(0.2),
-                                blurRadius: 8,
-                                offset: const Offset(0, 3),
-                              )
-                            ]
-                          ),
+                              color: const Color(0xFF22272F),
+                              borderRadius: BorderRadius.circular(20),
+                              border: Border.all(color: Colors.white10),
+                              boxShadow: [
+                                BoxShadow(
+                                  color: Colors.black.withOpacity(0.2),
+                                  blurRadius: 8,
+                                  offset: const Offset(0, 3),
+                                )
+                              ]),
                           child: Row(
                             children: [
-                              const Icon(Icons.add_a_photo_rounded, color: Color(0xFF4CD97B), size: 20),
+                              const Icon(Icons.add_a_photo_rounded,
+                                  color: Color(0xFF4CD97B), size: 20),
                               const SizedBox(width: 8),
                               Text(
-                                _selectedImageFile != null ? 'ครอป / เปลี่ยนรูปภาพ' : 'อัปโหลดและครอปรูปภาพ',
-                                style: const TextStyle(color: Colors.white, fontSize: 13, fontWeight: FontWeight.bold),
+                                _selectedImageFile != null
+                                    ? 'ครอป / เปลี่ยนรูปภาพ'
+                                    : 'อัปโหลดและครอปรูปภาพ',
+                                style: const TextStyle(
+                                    color: Colors.white,
+                                    fontSize: 13,
+                                    fontWeight: FontWeight.bold),
                               ),
                             ],
                           ),
@@ -404,10 +467,11 @@ class _EditGoalScreenState extends ConsumerState<EditGoalScreen> {
                   const SizedBox(height: 6),
                   Text(
                     'ปรับแต่งและครอปรูปภาพให้เป็นทรงกลมพรีเมียมได้ทันที',
-                    style: TextStyle(color: Colors.white.withOpacity(0.4), fontSize: 13),
+                    style: TextStyle(
+                        color: Colors.white.withOpacity(0.4), fontSize: 13),
                   ),
                   const SizedBox(height: 20),
-                  
+
                   // ฟอร์มข้อมูลหลัก
                   Padding(
                     padding: const EdgeInsets.symmetric(horizontal: 24),
@@ -419,38 +483,52 @@ class _EditGoalScreenState extends ConsumerState<EditGoalScreen> {
                           // 1. ช่องกรอกชื่อเป้าหมาย
                           Text(
                             'ชื่อเป้าหมายของคุณ',
-                            style: TextStyle(color: Colors.white.withOpacity(0.5), fontSize: 14, fontWeight: FontWeight.w500),
+                            style: TextStyle(
+                                color: Colors.white.withOpacity(0.5),
+                                fontSize: 14,
+                                fontWeight: FontWeight.w500),
                           ),
                           const SizedBox(height: 8),
                           TextFormField(
                             controller: _nameController,
-                            style: const TextStyle(fontSize: 17, fontWeight: FontWeight.bold, color: Colors.white),
+                            style: const TextStyle(
+                                fontSize: 17,
+                                fontWeight: FontWeight.bold,
+                                color: Colors.white),
                             decoration: InputDecoration(
                               filled: true,
                               fillColor: const Color(0xFF22272F),
-                              prefixIcon: const Icon(Icons.edit_note_rounded, color: Color(0xFF4CD97B), size: 26),
+                              prefixIcon: const Icon(Icons.edit_note_rounded,
+                                  color: Color(0xFF4CD97B), size: 26),
                               suffixIcon: IconButton(
-                                icon: const Icon(Icons.clear_rounded, color: Colors.white38, size: 20),
+                                icon: const Icon(Icons.clear_rounded,
+                                    color: Colors.white38, size: 20),
                                 onPressed: () => _nameController.clear(),
                               ),
-                              contentPadding: const EdgeInsets.symmetric(horizontal: 16, vertical: 16),
+                              contentPadding: const EdgeInsets.symmetric(
+                                  horizontal: 16, vertical: 16),
                               hintText: 'กรอกชื่อเป้าหมายใหม่...',
-                              hintStyle: TextStyle(color: Colors.white.withOpacity(0.25)),
+                              hintStyle: TextStyle(
+                                  color: Colors.white.withOpacity(0.25)),
                               focusedBorder: OutlineInputBorder(
                                 borderRadius: BorderRadius.circular(16),
-                                borderSide: const BorderSide(color: Color(0xFF4CD97B), width: 1.5),
+                                borderSide: const BorderSide(
+                                    color: Color(0xFF4CD97B), width: 1.5),
                               ),
                               enabledBorder: OutlineInputBorder(
                                 borderRadius: BorderRadius.circular(16),
-                                borderSide: const BorderSide(color: Colors.white10),
+                                borderSide:
+                                    const BorderSide(color: Colors.white10),
                               ),
                               errorBorder: OutlineInputBorder(
                                 borderRadius: BorderRadius.circular(16),
-                                borderSide: const BorderSide(color: Color(0xFFFF5959), width: 1.5),
+                                borderSide: const BorderSide(
+                                    color: Color(0xFFFF5959), width: 1.5),
                               ),
                               focusedErrorBorder: OutlineInputBorder(
                                 borderRadius: BorderRadius.circular(16),
-                                borderSide: const BorderSide(color: Color(0xFFFF5959), width: 1.5),
+                                borderSide: const BorderSide(
+                                    color: Color(0xFFFF5959), width: 1.5),
                               ),
                             ),
                             validator: (value) {
@@ -465,43 +543,62 @@ class _EditGoalScreenState extends ConsumerState<EditGoalScreen> {
                           // 2. ช่องกรอกเงินตั้งเป้าหมาย
                           Text(
                             'เงินตั้งเป้าหมายทั้งหมด',
-                            style: TextStyle(color: Colors.white.withOpacity(0.5), fontSize: 14, fontWeight: FontWeight.w500),
+                            style: TextStyle(
+                                color: Colors.white.withOpacity(0.5),
+                                fontSize: 14,
+                                fontWeight: FontWeight.w500),
                           ),
                           const SizedBox(height: 8),
                           TextFormField(
                             controller: _targetController,
-                            keyboardType: const TextInputType.numberWithOptions(decimal: true),
-                            style: const TextStyle(fontSize: 18, fontWeight: FontWeight.bold, color: Color(0xFF4CD97B)),
+                            keyboardType: const TextInputType.numberWithOptions(
+                                decimal: true),
+                            style: const TextStyle(
+                                fontSize: 18,
+                                fontWeight: FontWeight.bold,
+                                color: Color(0xFF4CD97B)),
                             decoration: InputDecoration(
                               filled: true,
                               fillColor: const Color(0xFF22272F),
-                              prefixIcon: const Icon(Icons.stars_rounded, color: Color(0xFF3CAE63), size: 24),
-                              suffixText: '฿',
-                              suffixStyle: const TextStyle(color: Colors.white54, fontSize: 18, fontWeight: FontWeight.bold),
-                              contentPadding: const EdgeInsets.symmetric(horizontal: 16, vertical: 16),
+                              prefixIcon: const Icon(Icons.stars_rounded,
+                                  color: Color(0xFF3CAE63), size: 24),
+                              suffixText: Money.symbol,
+                              suffixStyle: const TextStyle(
+                                  color: Colors.white54,
+                                  fontSize: 18,
+                                  fontWeight: FontWeight.bold),
+                              contentPadding: const EdgeInsets.symmetric(
+                                  horizontal: 16, vertical: 16),
                               hintText: 'ตั้งเป้าหมายจำนวนเงิน...',
-                              hintStyle: TextStyle(color: Colors.white.withOpacity(0.25)),
+                              hintStyle: TextStyle(
+                                  color: Colors.white.withOpacity(0.25)),
                               focusedBorder: OutlineInputBorder(
                                 borderRadius: BorderRadius.circular(16),
-                                borderSide: const BorderSide(color: Color(0xFF4CD97B), width: 1.5),
+                                borderSide: const BorderSide(
+                                    color: Color(0xFF4CD97B), width: 1.5),
                               ),
                               enabledBorder: OutlineInputBorder(
                                 borderRadius: BorderRadius.circular(16),
-                                borderSide: const BorderSide(color: Colors.white10),
+                                borderSide:
+                                    const BorderSide(color: Colors.white10),
                               ),
                               errorBorder: OutlineInputBorder(
                                 borderRadius: BorderRadius.circular(16),
-                                borderSide: const BorderSide(color: Color(0xFFFF5959), width: 1.5),
+                                borderSide: const BorderSide(
+                                    color: Color(0xFFFF5959), width: 1.5),
                               ),
                               focusedErrorBorder: OutlineInputBorder(
                                 borderRadius: BorderRadius.circular(16),
-                                borderSide: const BorderSide(color: Color(0xFFFF5959), width: 1.5),
+                                borderSide: const BorderSide(
+                                    color: Color(0xFFFF5959), width: 1.5),
                               ),
                             ),
                             onChanged: (val) => setState(() {}),
                             validator: (value) {
                               // แก้ไขบัคตรงนี้: ปรับมาตรวจเช็คด้วย double.tryParse เพื่อป้องกัน Error ตอนกรอกเลขหรือจุดทศนิยม
-                              if (value == null || double.tryParse(value) == null || double.parse(value) <= 0) {
+                              if (value == null ||
+                                  double.tryParse(value) == null ||
+                                  double.parse(value) <= 0) {
                                 return 'กรุณากรอกจำนวนเงินเป้าหมายที่มากกว่า 0';
                               }
                               return null;
@@ -536,15 +633,24 @@ class _EditGoalScreenState extends ConsumerState<EditGoalScreen> {
                           colors: [Color(0xFF1B3227), Color(0xFF0F241B)],
                         ),
                         borderRadius: BorderRadius.circular(22),
-                        border: Border.all(color: const Color(0xFF3CAE63).withOpacity(0.2)),
+                        border: Border.all(
+                            color: const Color(0xFF3CAE63).withOpacity(0.2)),
                       ),
                       child: Column(
                         children: [
                           Row(
                             mainAxisAlignment: MainAxisAlignment.spaceBetween,
                             children: const [
-                              Text('ออมแล้ว', style: TextStyle(color: Color(0xAAFFFFFF), fontSize: 14, fontWeight: FontWeight.w500)),
-                              Text('จากเป้าหมายทั้งหมด', style: TextStyle(color: Color(0xAAFFFFFF), fontSize: 14, fontWeight: FontWeight.w500)),
+                              Text('ออมแล้ว',
+                                  style: TextStyle(
+                                      color: Color(0xAAFFFFFF),
+                                      fontSize: 14,
+                                      fontWeight: FontWeight.w500)),
+                              Text('จากเป้าหมายทั้งหมด',
+                                  style: TextStyle(
+                                      color: Color(0xAAFFFFFF),
+                                      fontSize: 14,
+                                      fontWeight: FontWeight.w500)),
                             ],
                           ),
                           const SizedBox(height: 8),
@@ -553,20 +659,28 @@ class _EditGoalScreenState extends ConsumerState<EditGoalScreen> {
                             crossAxisAlignment: CrossAxisAlignment.end,
                             children: [
                               Text(
-                                '${Money.format(currentSavings)} ฿',
-                                style: const TextStyle(color: Color(0xFF4CD97B), fontWeight: FontWeight.bold, fontSize: 24),
+                                Money.formatBaht(currentSavings),
+                                style: const TextStyle(
+                                    color: Color(0xFF4CD97B),
+                                    fontWeight: FontWeight.bold,
+                                    fontSize: 24),
                               ),
                               Column(
                                 crossAxisAlignment: CrossAxisAlignment.end,
                                 children: [
                                   Text(
-                                    'เหลืออีก ${Money.format(remaining)} ฿',
-                                    style: TextStyle(color: Colors.white.withOpacity(0.5), fontSize: 12),
+                                    'เหลืออีก ${Money.formatBaht(remaining)}',
+                                    style: TextStyle(
+                                        color: Colors.white.withOpacity(0.5),
+                                        fontSize: 12),
                                   ),
                                   const SizedBox(height: 2),
                                   Text(
                                     '${(progress * 100).toStringAsFixed(0)} %',
-                                    style: const TextStyle(color: Color(0xFF4CD97B), fontSize: 16, fontWeight: FontWeight.bold),
+                                    style: const TextStyle(
+                                        color: Color(0xFF4CD97B),
+                                        fontSize: 16,
+                                        fontWeight: FontWeight.bold),
                                   ),
                                 ],
                               ),
@@ -580,7 +694,8 @@ class _EditGoalScreenState extends ConsumerState<EditGoalScreen> {
                               child: LinearProgressIndicator(
                                 value: progress,
                                 backgroundColor: Colors.white.withOpacity(0.12),
-                                valueColor: const AlwaysStoppedAnimation<Color>(Color(0xFF3CAE63)),
+                                valueColor: const AlwaysStoppedAnimation<Color>(
+                                    Color(0xFF3CAE63)),
                               ),
                             ),
                           ),
@@ -589,7 +704,7 @@ class _EditGoalScreenState extends ConsumerState<EditGoalScreen> {
                     ),
                   ),
                   const SizedBox(height: 14),
-                  
+
                   _buildMenuRowCard(
                     icon: Icons.calendar_month_rounded,
                     title: 'กำหนดระยะเวลา',
@@ -597,7 +712,8 @@ class _EditGoalScreenState extends ConsumerState<EditGoalScreen> {
                         ? "${DateFormat('d MMMM', 'th').format(_startDate!)} - ${DateFormat('d MMMM yyyy', 'th').format(_endDate!)}"
                         : 'เลือกกำหนดระยะเวลา',
                     onTap: () async {
-                      final Map<String, DateTime?>? result = await context.push<Map<String, DateTime?>>(
+                      final Map<String, DateTime?>? result =
+                          await context.push<Map<String, DateTime?>>(
                         '/goals/duration',
                         extra: {'startDate': _startDate, 'endDate': _endDate},
                       );
@@ -608,94 +724,112 @@ class _EditGoalScreenState extends ConsumerState<EditGoalScreen> {
                           _selectedDate = result['endDate'];
                           // ให้ระบบเลือกประเภทเป้าหมายให้อัตโนมัติตามระยะเวลาที่เลือก
                           if (_startDate != null && _endDate != null) {
-                            _selectedType = _autoDetectGoalType(_startDate!, _endDate!);
+                            _selectedType =
+                                _autoDetectGoalType(_startDate!, _endDate!);
                           }
                         });
                       }
                     },
                   ),
                   const SizedBox(height: 14),
-                  
+
                   _buildMenuRowCard(
                     icon: Icons.flag_rounded,
                     title: 'ประเภทเป้าหมาย',
                     subtitle: _getTypeLabel(_selectedType),
-                    onTap: null, // แสดงเพื่อบอกระยะเวลาเท่านั้น ไม่สามารถกดเลือกได้
+                    onTap: () => _showTypeSelectionBottomSheet(),
                   ),
                   const SizedBox(height: 24),
-                  
-                  const Text(
-                    'แนะนำสำหรับคุณ',
-                    style: TextStyle(color: Colors.white, fontSize: 18, fontWeight: FontWeight.bold, letterSpacing: 0.3),
-                  ),
-                  const SizedBox(height: 12),
-                  
+
+                  if (personalized)
+                    const Text(
+                      'แนะนำสำหรับคุณ',
+                      style: TextStyle(
+                          color: Colors.white,
+                          fontSize: 18,
+                          fontWeight: FontWeight.bold,
+                          letterSpacing: 0.3),
+                    ),
+                  if (personalized) const SizedBox(height: 12),
+
                   // AI Smart Assistant Card
-                  Container(
-                    padding: const EdgeInsets.all(16),
-                    decoration: BoxDecoration(
-                      gradient: const LinearGradient(
-                        begin: Alignment.topLeft,
-                        end: Alignment.bottomRight,
-                        colors: [Color(0xFF0C241B), Color(0xFF071812)],
+                  if (personalized)
+                    Container(
+                      padding: const EdgeInsets.all(16),
+                      decoration: BoxDecoration(
+                        gradient: const LinearGradient(
+                          begin: Alignment.topLeft,
+                          end: Alignment.bottomRight,
+                          colors: [Color(0xFF0C241B), Color(0xFF071812)],
+                        ),
+                        borderRadius: BorderRadius.circular(18),
+                        border: Border.all(
+                            color: const Color(0xFF3CAE63).withOpacity(0.15)),
                       ),
-                      borderRadius: BorderRadius.circular(18),
-                      border: Border.all(color: const Color(0xFF3CAE63).withOpacity(0.15)),
-                    ),
-                    child: Row(
-                      children: [
-                        Container(
-                          width: 50,
-                          height: 50,
-                          decoration: const BoxDecoration(
-                            shape: BoxShape.circle,
-                            color: Color(0xFF133526),
+                      child: Row(
+                        children: [
+                          Container(
+                            width: 50,
+                            height: 50,
+                            decoration: const BoxDecoration(
+                              shape: BoxShape.circle,
+                              color: Color(0xFF133526),
+                            ),
+                            child: const Icon(Icons.smart_toy_rounded,
+                                color: Color(0xFF4CD97B), size: 28),
                           ),
-                          child: const Icon(Icons.smart_toy_rounded, color: Color(0xFF4CD97B), size: 28),
-                        ),
-                        const SizedBox(width: 14),
-                        Expanded(
-                          child: Column(
-                            crossAxisAlignment: CrossAxisAlignment.start,
-                            children: [
-                              const Text(
-                                'พี่เงินขอแนะนำ',
-                                style: TextStyle(fontWeight: FontWeight.bold, color: Colors.white, fontSize: 15),
-                              ),
-                              const SizedBox(height: 4),
-                              Text(
-                                'มีเวลาอีก 3 เดือน ให้แบ่งเก็บเดือนละ 1000 บาท',
-                                style: TextStyle(color: Colors.white.withOpacity(0.5), fontSize: 13),
-                               )
-                            ],
-                          ),
-                        ),
-                        const Icon(Icons.arrow_forward_ios_rounded, color: Colors.white30, size: 14),
-                      ],
-                    ),
-                  ),
-                  const SizedBox(height: 48),
-                  
-                  // ปุ่มลบ และ ยืนยันการบันทึก/แก้ไข
-                  Row(
-                    children: [
-                      if (widget.goalId != null) ...[
-                        Expanded(
-                          child: SizedBox(
-                            height: 56,
-                            child: ElevatedButton(
-                              onPressed: () => _deleteGoal(),
-                              style: ElevatedButton.styleFrom(
-                                backgroundColor: const Color(0xFFFF5959), 
-                                elevation: 0,
-                                shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(16)),
-                              ),
-                              child: const Text('ลบ', style: TextStyle(color: Colors.white, fontWeight: FontWeight.bold, fontSize: 16)),
+                          const SizedBox(width: 14),
+                          Expanded(
+                            child: Column(
+                              crossAxisAlignment: CrossAxisAlignment.start,
+                              children: [
+                                const Text(
+                                  'พี่เงินขอแนะนำ',
+                                  style: TextStyle(
+                                      fontWeight: FontWeight.bold,
+                                      color: Colors.white,
+                                      fontSize: 15),
+                                ),
+                                const SizedBox(height: 4),
+                                Text(
+                                  'มีเวลาอีก 3 เดือน ให้แบ่งเก็บเดือนละ ${Money.formatBaht(100000)}',
+                                  style: TextStyle(
+                                      color: Colors.white.withOpacity(0.5),
+                                      fontSize: 13),
+                                )
+                              ],
                             ),
                           ),
+                          const Icon(Icons.arrow_forward_ios_rounded,
+                              color: Colors.white30, size: 14),
+                        ],
+                      ),
+                    ),
+                  SizedBox(height: personalized ? 48 : 24),
+
+                  // ปุ่มลบ และ ยืนยันการแก้ไข
+                  Row(
+                    children: [
+                      Expanded(
+                        child: SizedBox(
+                          height: 56,
+                          child: ElevatedButton(
+                            onPressed: () => _deleteGoal(),
+                            style: ElevatedButton.styleFrom(
+                              backgroundColor: const Color(0xFFFF5959),
+                              elevation: 0,
+                              shape: RoundedRectangleBorder(
+                                  borderRadius: BorderRadius.circular(16)),
+                            ),
+                            child: const Text('ลบ',
+                                style: TextStyle(
+                                    color: Colors.white,
+                                    fontWeight: FontWeight.bold,
+                                    fontSize: 16)),
+                          ),
                         ),
-                        const SizedBox(width: 14),
-                      ],
+                      ),
+                      const SizedBox(width: 14),
                       Expanded(
                         child: SizedBox(
                           height: 56,
@@ -704,11 +838,15 @@ class _EditGoalScreenState extends ConsumerState<EditGoalScreen> {
                             style: ElevatedButton.styleFrom(
                               backgroundColor: const Color(0xFF3CAE63),
                               elevation: 0,
-                              shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(16)),
+                              shape: RoundedRectangleBorder(
+                                  borderRadius: BorderRadius.circular(16)),
                             ),
-                            child: Text(
-                              widget.goalId != null ? 'ยืนยันการแก้ไข' : 'บันทึกเป้าหมาย',
-                              style: const TextStyle(color: Colors.white, fontWeight: FontWeight.bold, fontSize: 16),
+                            child: const Text(
+                              'ยืนยันการแก้ไข',
+                              style: TextStyle(
+                                  color: Colors.white,
+                                  fontWeight: FontWeight.bold,
+                                  fontSize: 16),
                             ),
                           ),
                         ),
@@ -729,7 +867,7 @@ class _EditGoalScreenState extends ConsumerState<EditGoalScreen> {
     required IconData icon,
     required String title,
     required String subtitle,
-    VoidCallback? onTap,
+    required VoidCallback onTap,
   }) {
     return GestureDetector(
       onTap: onTap,
@@ -752,14 +890,20 @@ class _EditGoalScreenState extends ConsumerState<EditGoalScreen> {
               child: Column(
                 crossAxisAlignment: CrossAxisAlignment.start,
                 children: [
-                  Text(title, style: const TextStyle(color: Colors.white, fontSize: 16, fontWeight: FontWeight.w600)),
+                  Text(title,
+                      style: const TextStyle(
+                          color: Colors.white,
+                          fontSize: 16,
+                          fontWeight: FontWeight.w600)),
                   const SizedBox(height: 4),
-                  Text(subtitle, style: TextStyle(color: Colors.white.withOpacity(0.45), fontSize: 13)),
+                  Text(subtitle,
+                      style: TextStyle(
+                          color: Colors.white.withOpacity(0.45), fontSize: 13)),
                 ],
               ),
             ),
-            if (onTap != null)
-              const Icon(Icons.arrow_forward_ios_rounded, color: Colors.white30, size: 14),
+            const Icon(Icons.arrow_forward_ios_rounded,
+                color: Colors.white30, size: 14),
           ],
         ),
       ),
@@ -770,7 +914,8 @@ class _EditGoalScreenState extends ConsumerState<EditGoalScreen> {
     showModalBottomSheet(
       context: context,
       backgroundColor: const Color(0xFF1D222B),
-      shape: const RoundedRectangleBorder(borderRadius: BorderRadius.vertical(top: Radius.circular(24))),
+      shape: const RoundedRectangleBorder(
+          borderRadius: BorderRadius.vertical(top: Radius.circular(24))),
       builder: (context) {
         return SafeArea(
           child: Column(
@@ -778,19 +923,35 @@ class _EditGoalScreenState extends ConsumerState<EditGoalScreen> {
             children: [
               const Padding(
                 padding: EdgeInsets.symmetric(vertical: 22),
-                child: Text('เลือกประเภทเป้าหมาย', style: TextStyle(fontWeight: FontWeight.bold, fontSize: 17, color: Colors.white)),
+                child: Text('เลือกประเภทเป้าหมาย',
+                    style: TextStyle(
+                        fontWeight: FontWeight.bold,
+                        fontSize: 17,
+                        color: Colors.white)),
               ),
               ListTile(
-                title: const Text('ระยะสั้น (ภายใน 0-12 เดือน)', style: TextStyle(color: Colors.white)),
-                onTap: () { setState(() => _selectedType = 'short'); Navigator.pop(context); },
+                title: const Text('ระยะสั้น (ภายใน 0-12 เดือน)',
+                    style: TextStyle(color: Colors.white)),
+                onTap: () {
+                  setState(() => _selectedType = 'short');
+                  Navigator.pop(context);
+                },
               ),
               ListTile(
-                title: const Text('ระยะกลาง (1 ปี)', style: TextStyle(color: Colors.white)),
-                onTap: () { setState(() => _selectedType = 'medium'); Navigator.pop(context); },
+                title: const Text('ระยะกลาง (1 ปี)',
+                    style: TextStyle(color: Colors.white)),
+                onTap: () {
+                  setState(() => _selectedType = 'medium');
+                  Navigator.pop(context);
+                },
               ),
               ListTile(
-                title: const Text('ระยะยาว (1 ปีขึ้นไป)', style: TextStyle(color: Colors.white)),
-                onTap: () { setState(() => _selectedType = 'long'); Navigator.pop(context); },
+                title: const Text('ระยะยาว (1 ปีขึ้นไป)',
+                    style: TextStyle(color: Colors.white)),
+                onTap: () {
+                  setState(() => _selectedType = 'long');
+                  Navigator.pop(context);
+                },
               ),
               const SizedBox(height: 16),
             ],
@@ -803,38 +964,34 @@ class _EditGoalScreenState extends ConsumerState<EditGoalScreen> {
   void _saveGoal() {
     if (_formKey.currentState!.validate()) {
       final name = _nameController.text.trim();
-      
-      // ให้ระบบคำนวณและซิงก์ประเภทเป้าหมายจากช่วงวันที่อัตโนมัติก่อนบันทึก
-      if (_startDate != null && _endDate != null) {
-        _selectedType = _autoDetectGoalType(_startDate!, _endDate!);
-      }
 
+      // แก้ไขบัคตรงนี้: แปลงค่าเป็น double ก่อนแล้วค่อยคูณ 100 เพื่อเซฟหน่วยสตางค์เข้า Database/Provider ได้อย่างเสถียร
       final double bahtVal = double.tryParse(_targetController.text) ?? 0;
-      final int targetVal = (bahtVal * 100).toInt();
-      
+      final int targetVal = Money.toSatang(bahtVal);
+
       final imagePath = _selectedImageFile?.path;
-      
+
       if (widget.goalId != null) {
         ref.read(goalsProvider.notifier).updateGoal(
-          widget.goalId!,
-          name,
-          targetVal,
-          _selectedDate,
-          _selectedType,
-          _selectedEmoji,
-          imagePath,
-          startDate: _startDate,
-        );
+              widget.goalId!,
+              name,
+              targetVal,
+              _selectedDate,
+              _selectedType,
+              _selectedEmoji,
+              imagePath,
+              startDate: _startDate,
+            );
       } else {
         ref.read(goalsProvider.notifier).addGoal(
-          name,
-          targetVal,
-          _selectedDate,
-          _selectedType,
-          _selectedEmoji,
-          imagePath,
-          startDate: _startDate,
-        );
+              name,
+              targetVal,
+              _selectedDate,
+              _selectedType,
+              _selectedEmoji,
+              imagePath,
+              startDate: _startDate,
+            );
       }
       context.pop();
     }

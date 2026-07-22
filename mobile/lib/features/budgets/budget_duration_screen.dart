@@ -23,7 +23,11 @@ class _BudgetDurationScreenState extends State<BudgetDurationScreen> {
         backgroundColor: const Color(0xFF121212),
         elevation: 0,
         centerTitle: true,
-        title: const Text('กำหนดระยะเวลา', style: TextStyle(color: Colors.white, fontWeight: FontWeight.bold, fontSize: 18)),
+        title: const Text('กำหนดระยะเวลา',
+            style: TextStyle(
+                color: Colors.white,
+                fontWeight: FontWeight.bold,
+                fontSize: 18)),
         leading: IconButton(
           icon: const Icon(Icons.arrow_back, color: Colors.white, size: 24),
           onPressed: () {
@@ -59,7 +63,8 @@ class _BudgetDurationScreenState extends State<BudgetDurationScreen> {
                               spreadRadius: 10,
                             )
                           ],
-                          border: Border.all(color: AppColors.primary, width: 2),
+                          border:
+                              Border.all(color: AppColors.primary, width: 2),
                         ),
                         child: const Center(
                           child: Text('🏝️', style: TextStyle(fontSize: 48)),
@@ -68,7 +73,10 @@ class _BudgetDurationScreenState extends State<BudgetDurationScreen> {
                       const SizedBox(height: 16),
                       const Text(
                         'เที่ยวต่างประเทศ',
-                        style: TextStyle(color: AppColors.primary, fontSize: 18, fontWeight: FontWeight.bold),
+                        style: TextStyle(
+                            color: AppColors.primary,
+                            fontSize: 18,
+                            fontWeight: FontWeight.bold),
                       ),
                     ],
                   ),
@@ -95,7 +103,8 @@ class _BudgetDurationScreenState extends State<BudgetDurationScreen> {
                               color: Color(0xFF262626),
                               shape: BoxShape.circle,
                             ),
-                            child: const Icon(Icons.chevron_left, color: Colors.white, size: 20),
+                            child: const Icon(Icons.chevron_left,
+                                color: Colors.white, size: 20),
                           ),
                           Row(
                             children: [
@@ -106,32 +115,44 @@ class _BudgetDurationScreenState extends State<BudgetDurationScreen> {
                                   });
                                 },
                                 child: Container(
-                                  padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 8),
+                                  padding: const EdgeInsets.symmetric(
+                                      horizontal: 12, vertical: 8),
                                   decoration: BoxDecoration(
                                     color: const Color(0xFF262626),
                                     borderRadius: BorderRadius.circular(8),
                                   ),
                                   child: Row(
                                     children: const [
-                                      Text('April', style: TextStyle(color: Colors.white, fontWeight: FontWeight.bold, fontSize: 16)),
+                                      Text('April',
+                                          style: TextStyle(
+                                              color: Colors.white,
+                                              fontWeight: FontWeight.bold,
+                                              fontSize: 16)),
                                       SizedBox(width: 4),
-                                      Icon(Icons.arrow_drop_down, color: AppColors.primary),
+                                      Icon(Icons.arrow_drop_down,
+                                          color: AppColors.primary),
                                     ],
                                   ),
                                 ),
                               ),
                               const SizedBox(width: 8),
                               Container(
-                                padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 8),
+                                padding: const EdgeInsets.symmetric(
+                                    horizontal: 12, vertical: 8),
                                 decoration: BoxDecoration(
                                   color: const Color(0xFF262626),
                                   borderRadius: BorderRadius.circular(8),
                                 ),
                                 child: Row(
                                   children: const [
-                                    Text('2026', style: TextStyle(color: Colors.white, fontWeight: FontWeight.bold, fontSize: 16)),
+                                    Text('2026',
+                                        style: TextStyle(
+                                            color: Colors.white,
+                                            fontWeight: FontWeight.bold,
+                                            fontSize: 16)),
                                     SizedBox(width: 4),
-                                    Icon(Icons.arrow_drop_down, color: AppColors.primary),
+                                    Icon(Icons.arrow_drop_down,
+                                        color: AppColors.primary),
                                   ],
                                 ),
                               ),
@@ -143,7 +164,8 @@ class _BudgetDurationScreenState extends State<BudgetDurationScreen> {
                               color: Color(0xFF262626),
                               shape: BoxShape.circle,
                             ),
-                            child: const Icon(Icons.chevron_right, color: Colors.white, size: 20),
+                            child: const Icon(Icons.chevron_right,
+                                color: Colors.white, size: 20),
                           ),
                         ],
                       ),
@@ -153,13 +175,34 @@ class _BudgetDurationScreenState extends State<BudgetDurationScreen> {
                       Row(
                         mainAxisAlignment: MainAxisAlignment.spaceAround,
                         children: const [
-                          Text('Mo', style: TextStyle(color: Colors.white54, fontWeight: FontWeight.bold)),
-                          Text('Tu', style: TextStyle(color: Colors.white54, fontWeight: FontWeight.bold)),
-                          Text('We', style: TextStyle(color: Colors.white54, fontWeight: FontWeight.bold)),
-                          Text('Th', style: TextStyle(color: Colors.white54, fontWeight: FontWeight.bold)),
-                          Text('Fr', style: TextStyle(color: Colors.white54, fontWeight: FontWeight.bold)),
-                          Text('Sa', style: TextStyle(color: Colors.white54, fontWeight: FontWeight.bold)),
-                          Text('Su', style: TextStyle(color: Colors.white54, fontWeight: FontWeight.bold)),
+                          Text('Mo',
+                              style: TextStyle(
+                                  color: Colors.white54,
+                                  fontWeight: FontWeight.bold)),
+                          Text('Tu',
+                              style: TextStyle(
+                                  color: Colors.white54,
+                                  fontWeight: FontWeight.bold)),
+                          Text('We',
+                              style: TextStyle(
+                                  color: Colors.white54,
+                                  fontWeight: FontWeight.bold)),
+                          Text('Th',
+                              style: TextStyle(
+                                  color: Colors.white54,
+                                  fontWeight: FontWeight.bold)),
+                          Text('Fr',
+                              style: TextStyle(
+                                  color: Colors.white54,
+                                  fontWeight: FontWeight.bold)),
+                          Text('Sa',
+                              style: TextStyle(
+                                  color: Colors.white54,
+                                  fontWeight: FontWeight.bold)),
+                          Text('Su',
+                              style: TextStyle(
+                                  color: Colors.white54,
+                                  fontWeight: FontWeight.bold)),
                         ],
                       ),
                       const SizedBox(height: 12),
@@ -168,7 +211,8 @@ class _BudgetDurationScreenState extends State<BudgetDurationScreen> {
                       GridView.builder(
                         shrinkWrap: true,
                         physics: const NeverScrollableScrollPhysics(),
-                        gridDelegate: const SliverGridDelegateWithFixedCrossAxisCount(
+                        gridDelegate:
+                            const SliverGridDelegateWithFixedCrossAxisCount(
                           crossAxisCount: 7,
                           mainAxisSpacing: 8,
                           crossAxisSpacing: 8,
@@ -177,9 +221,11 @@ class _BudgetDurationScreenState extends State<BudgetDurationScreen> {
                         itemBuilder: (context, index) {
                           // Mock offset for April 2026 (starts on Wed)
                           int day = index - 1; // 0-indexed offset
-                          
+
                           bool isOtherMonth = day < 1 || day > 30;
-                          String text = isOtherMonth ? (day < 1 ? '${29 + day}' : '${day - 30}') : '$day';
+                          String text = isOtherMonth
+                              ? (day < 1 ? '${29 + day}' : '${day - 30}')
+                              : '$day';
                           bool isSelected = day == _selectedDay;
 
                           return GestureDetector(
@@ -192,15 +238,21 @@ class _BudgetDurationScreenState extends State<BudgetDurationScreen> {
                             },
                             child: Container(
                               decoration: BoxDecoration(
-                                color: isSelected ? AppColors.primary : const Color(0xFF262626),
+                                color: isSelected
+                                    ? AppColors.primary
+                                    : const Color(0xFF262626),
                                 borderRadius: BorderRadius.circular(8),
                               ),
                               child: Center(
                                 child: Text(
                                   text,
                                   style: TextStyle(
-                                    color: isOtherMonth ? Colors.white24 : Colors.white,
-                                    fontWeight: isSelected ? FontWeight.bold : FontWeight.normal,
+                                    color: isOtherMonth
+                                        ? Colors.white24
+                                        : Colors.white,
+                                    fontWeight: isSelected
+                                        ? FontWeight.bold
+                                        : FontWeight.normal,
                                     fontSize: 16,
                                   ),
                                 ),
@@ -214,7 +266,7 @@ class _BudgetDurationScreenState extends State<BudgetDurationScreen> {
                 ),
 
                 const Spacer(),
-                
+
                 // Next Button
                 SizedBox(
                   width: 160,
@@ -225,16 +277,21 @@ class _BudgetDurationScreenState extends State<BudgetDurationScreen> {
                     style: ElevatedButton.styleFrom(
                       backgroundColor: AppColors.primary,
                       padding: const EdgeInsets.symmetric(vertical: 16),
-                      shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(12)),
+                      shape: RoundedRectangleBorder(
+                          borderRadius: BorderRadius.circular(12)),
                     ),
-                    child: const Text('ต่อไป', style: TextStyle(color: Colors.white, fontSize: 16, fontWeight: FontWeight.bold)),
+                    child: const Text('ต่อไป',
+                        style: TextStyle(
+                            color: Colors.white,
+                            fontSize: 16,
+                            fontWeight: FontWeight.bold)),
                   ),
                 ),
                 const SizedBox(height: 24),
               ],
             ),
           ),
-          
+
           // Dropdown Mock Overlay
           if (_showDropdown)
             Positioned(
@@ -248,7 +305,10 @@ class _BudgetDurationScreenState extends State<BudgetDurationScreen> {
                     color: Colors.white,
                     borderRadius: BorderRadius.circular(8),
                     boxShadow: [
-                      BoxShadow(color: Colors.black54, blurRadius: 10, offset: Offset(0, 5)),
+                      BoxShadow(
+                          color: Colors.black54,
+                          blurRadius: 10,
+                          offset: Offset(0, 5)),
                     ],
                   ),
                   child: Column(

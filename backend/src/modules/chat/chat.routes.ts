@@ -21,6 +21,9 @@ chatRouter.use(requireAuth);
 const sendSchema = z.object({
   message: z.string().min(1).max(8000),
   imageBase64: z.string().optional(), // ➕ รองรับการส่งรูปแบบ Base64
+  includeFinancialContext: z.boolean().default(true),
+  personalizedRecommendations: z.boolean().default(true),
+  storeConversationHistory: z.boolean().default(true),
 });
 
 // GET /api/v1/chat -> ประวัติแชท
@@ -40,8 +43,34 @@ chatRouter.get(
 chatRouter.post(
   '/',
   asyncHandler(async (req, res) => {
-    const { message, imageBase64 } = sendSchema.parse(req.body);
+    const {
+      message,
+      imageBase64,
+      includeFinancialContext,
+      personalizedRecommendations,
+      storeConversationHistory,
+    } = sendSchema.parse(req.body);
     const userId = req.userId!;
+
+    const saveMessage = async (
+      role: 'user' | 'assistant',
+      content: string,
+      context: string | null,
+    ) => {
+      if (storeConversationHistory) {
+        return prisma.chatMessage.create({
+          data: { userId, role, content, context },
+        });
+      }
+      return {
+        id: `private-${Date.now()}-${role}`,
+        userId,
+        role,
+        content,
+        context,
+        createdAt: new Date(),
+      };
+    };
 
     // rate limit ง่ายๆ: 20 ข้อความ/นาที/คน
     const rlKey = `chat_rl:${userId}`;
@@ -88,24 +117,18 @@ chatRouter.post(
     const scope = checkFinanceScope(message, history, ocrText);
 
     // เก็บข้อความผู้ใช้ โดยเก็บ ocrText และ flag ว่ามีรูปไว้ใน context
-    await prisma.chatMessage.create({
-      data: {
-        userId,
-        role: 'user',
-        content: message,
-        context: ocrText ? JSON.stringify({ hasImage: true, ocrText }) : null,
-      },
-    });
+    await saveMessage(
+      'user',
+      message,
+      ocrText ? JSON.stringify({ hasImage: true, ocrText }) : null,
+    );
 
     if (!scope.allowed) {
-      const saved = await prisma.chatMessage.create({
-        data: {
-          userId,
-          role: 'assistant',
-          content: OUT_OF_SCOPE_REPLY,
-          context: JSON.stringify({ source: 'finance-scope-guard', reason: scope.reason }),
-        },
-      });
+      const saved = await saveMessage(
+        'assistant',
+        OUT_OF_SCOPE_REPLY,
+        JSON.stringify({ source: 'finance-scope-guard', reason: scope.reason }),
+      );
       res.status(201).json({ message: saved, source: 'finance-scope-guard' });
       return;
     }
@@ -122,15 +145,36 @@ chatRouter.post(
       } else {
         ({ reply, attachment } = buildExportReply(userId, exp.kind, exp.format));
       }
-      const saved = await prisma.chatMessage.create({
-        data: { userId, role: 'assistant', content: reply, context: JSON.stringify({ source: 'export', attachment }) },
-      });
+      const saved = await saveMessage(
+        'assistant',
+        reply,
+        JSON.stringify({ source: 'export', attachment }),
+      );
       res.status(201).json({ message: saved, source: 'export', attachment });
       return;
     }
 
     // ประกอบ context จริง โดยใช้เฉพาะบทสนทนาก่อนข้อความปัจจุบัน (ไม่ส่งคำถามซ้ำ)
-    const context = await buildContext(userId);
+    const fullContext = includeFinancialContext
+      ? await buildContext(userId)
+      : {
+          displayName: null,
+          monthlyIncome: 0,
+          thisMonthSpent: 0,
+          thisMonthIncome: 0,
+          budgetRemaining: [],
+          topExpenses: [],
+          goals: [],
+          streakDays: 0,
+        };
+    const context = personalizedRecommendations
+      ? fullContext
+      : {
+          ...fullContext,
+          displayName: null,
+          goals: [],
+          streakDays: 0,
+        };
 
     // ส่งข้อความปัจจุบันพร้อมแนบข้อมูล OCR ล่าสุดเข้าไปคุยกับ LLM
     let currentQuestion = message;
@@ -141,9 +185,11 @@ chatRouter.post(
     const { reply, source } = await generateReply(context, currentQuestion, history);
 
     // เก็บคำตอบ (แนบ snapshot ว่า source อะไร)
-    const saved = await prisma.chatMessage.create({
-      data: { userId, role: 'assistant', content: reply, context: JSON.stringify({ source }) },
-    });
+    const saved = await saveMessage(
+      'assistant',
+      reply,
+      JSON.stringify({ source }),
+    );
 
     res.status(201).json({ message: saved, source });
   }),

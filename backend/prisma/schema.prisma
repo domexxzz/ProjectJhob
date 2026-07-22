@@ -24,6 +24,8 @@ model User {
   level         Int      @default(1)
   streak        Int      @default(0)
   deviceToken   String? // FCM device token (สำหรับ push)
+  notificationsEnabled Boolean @default(true)
+  budgetAlertsEnabled  Boolean @default(true)
   createdAt     DateTime @default(now())
   updatedAt     DateTime @updatedAt
 

@@ -9,6 +9,7 @@ import '../transactions/transaction.dart';
 import '../transactions/transactions_repository.dart';
 import '../notifications/notif_bell.dart';
 import '../goals/goals_provider.dart';
+import '../settings/settings_screen.dart';
 import '../../widgets/app_bottom_nav_bar.dart';
 
 // ─────────────────────────────────────────────────────────────────────────────
@@ -19,6 +20,10 @@ class DashboardScreen extends ConsumerWidget {
 
   @override
   Widget build(BuildContext context, WidgetRef ref) {
+    final moneySettings = ref.watch(
+      appSettingsProvider.select((s) => (s.currency, s.usdRate)),
+    );
+    Money.configure(moneySettings.$1, thbToUsdRate: moneySettings.$2);
     final user = ref.watch(authControllerProvider).user;
     final dashboard = ref.watch(dashboardProvider);
 
@@ -318,8 +323,8 @@ class _GoalsCardState extends ConsumerState<_GoalsCard> {
         return (
           'ระยะสั้น (ใน 0-6 เดือน)',
           Icons.shutter_speed_rounded,
-          const Color(0xFFFFC067).withOpacity(0.15),
-          const Color(0xFFFFC067)
+          const Color(0xFFFBBC05).withOpacity(0.15),
+          const Color(0xFFFBBC05)
         );
     }
   }
@@ -382,7 +387,7 @@ class _GoalsCardState extends ConsumerState<_GoalsCard> {
     return Column(
       children: [
         SizedBox(
-          height: 164, 
+          height: 164,
           child: PageView.builder(
             controller: _pageController,
             onPageChanged: (index) => setState(() => _currentPage = index),
@@ -411,15 +416,15 @@ class _GoalsCardState extends ConsumerState<_GoalsCard> {
                 // short / default
                 gradientColors = [
                   const Color(0xFF1A1A1A),
-                  const Color(0xFF6B4E0A),
-                  const Color(0xFFFFC067)
+                  const Color(0xFF634D0E),
+                  const Color(0xFFD69E0A)
                 ];
-                accentColor = const Color(0xFFFFC067);
+                accentColor = const Color(0xFFFBBC05);
               }
 
               final remaining = g.target - g.current;
               final isSuccess = remaining <= 0;
-              final badge = _getTypeBadgeDetails(g.type); 
+              final badge = _getTypeBadgeDetails(g.type);
 
               return Container(
                 margin: const EdgeInsets.symmetric(horizontal: 2),
@@ -459,7 +464,8 @@ class _GoalsCardState extends ConsumerState<_GoalsCard> {
                             const SizedBox(width: 8),
                             // Badge แสดงประเภทระยะเวลาเป้าหมาย (แก้ไขเรียกผ่านตัวระบุตำแหน่งดัชนี ดึงค่าถูกต้องแน่นอน)
                             Container(
-                              padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 3),
+                              padding: const EdgeInsets.symmetric(
+                                  horizontal: 8, vertical: 3),
                               decoration: BoxDecoration(
                                 color: badge.$3, // badgeBg
                                 borderRadius: BorderRadius.circular(20),
@@ -467,7 +473,9 @@ class _GoalsCardState extends ConsumerState<_GoalsCard> {
                               child: Row(
                                 mainAxisSize: MainAxisSize.min,
                                 children: [
-                                  Icon(badge.$2, size: 11, color: badge.$4), // icon, badgeText
+                                  Icon(badge.$2,
+                                      size: 11,
+                                      color: badge.$4), // icon, badgeText
                                   const SizedBox(width: 3),
                                   Text(
                                     badge.$1, // label
@@ -528,11 +536,11 @@ class _GoalsCardState extends ConsumerState<_GoalsCard> {
                       child: Text(
                         isSuccess
                             ? 'สำเร็จเป้าหมายแล้ว! 🎉'
-                            : 'เหลืออีก ${Money.formatBaht(remaining)} บาท',
-                        style: const TextStyle(
-                            color: Colors.white,
-                            fontSize: 12,
-                            fontWeight: FontWeight.w600),
+                            : 'เหลืออีก ${Money.formatBaht(remaining)}',
+                        style: TextStyle(
+                            color: accentColor,
+                            fontSize: 11,
+                            fontWeight: FontWeight.w500),
                       ),
                     ),
                   ],
@@ -646,15 +654,15 @@ class _BudgetsCard extends ConsumerWidget {
                       String statusLabel;
                       Color statusColor;
 
-                      if (pct >= 0.8 || status.riskLevel == 'danger') {
+                      if (status.riskLevel == 'danger') {
                         statusLabel = 'อันตราย';
-                        statusColor = const Color(0xFFFF4D4F);
-                      } else if (pct >= 0.7 || status.riskLevel == 'warning') {
+                        statusColor = const Color(0xFFFF4B4B);
+                      } else if (status.riskLevel == 'warning') {
                         statusLabel = 'เสี่ยง';
-                        statusColor = const Color(0xFFFFC067);
+                        statusColor = const Color(0xFFFFE568);
                       } else {
                         statusLabel = 'ปลอดภัย';
-                        statusColor = const Color(0xFF37C871);
+                        statusColor = const Color(0xFF3CAE63);
                       }
 
                       final cat = status.category;
@@ -712,10 +720,10 @@ class _BudgetsCard extends ConsumerWidget {
                               alignment: Alignment.centerRight,
                               child: Text(
                                 overBy > 0
-                                    ? 'ใช้เกินไป ${Money.formatBaht(overBy)} บาท'
+                                    ? 'ใช้เกินไป ${Money.formatBaht(overBy)}'
                                     : projectedOver > 0
                                         ? 'คาดว่าจะเกิน ${Money.formatBaht(projectedOver)} เมื่อสิ้นรอบ'
-                                        : 'ใช้ได้อีก ${Money.formatBaht(remaining)} บาท',
+                                        : 'ใช้ได้อีก ${Money.formatBaht(remaining)}',
                                 style: TextStyle(
                                     color: Colors.white.withOpacity(0.5),
                                     fontSize: 11),
@@ -916,5 +924,4 @@ class _ErrorBox extends StatelessWidget {
   }
 }
 
-// ─────────────────────────────────────────────────────────────────────────────
 
