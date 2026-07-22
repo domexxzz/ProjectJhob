@@ -5,8 +5,8 @@ import 'package:flutter_secure_storage/flutter_secure_storage.dart';
 import 'package:shared_preferences/shared_preferences.dart';
 
 /// override ตอนรัน: flutter run --dart-define=API_BASE_URL=http://10.0.2.2:4000
-const String kApiBaseUrl =
-    String.fromEnvironment('API_BASE_URL', defaultValue: 'http://10.0.2.2:4000');
+const String kApiBaseUrl = String.fromEnvironment('API_BASE_URL',
+    defaultValue: 'http://10.0.2.2:4000');
 
 final secureStorageProvider =
     Provider<FlutterSecureStorage>((ref) => const FlutterSecureStorage());
@@ -21,6 +21,8 @@ class TokenStore {
   static const _key = 'auth_token';
 
   Future<String?> read() async {
+    final prefs = await SharedPreferences.getInstance();
+    if (!(prefs.getBool('privacy_auto_login') ?? true)) return null;
     if (kIsWeb) return (await SharedPreferences.getInstance()).getString(_key);
     return _storage.read(key: _key);
   }

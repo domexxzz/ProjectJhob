@@ -44,6 +44,39 @@ notificationsRouter.post(
 
 // POST /api/v1/notifications/token — ลงทะเบียน FCM device token
 const tokenSchema = z.object({ token: z.string().min(1) });
+const triggerSchema = z.object({
+  includeBudgetAlerts: z.boolean().default(true),
+});
+const preferencesSchema = z.object({
+  notificationsEnabled: z.boolean().optional(),
+  budgetAlertsEnabled: z.boolean().optional(),
+});
+
+notificationsRouter.get(
+  '/preferences',
+  asyncHandler(async (req, res) => {
+    const preferences = await prisma.user.findUnique({
+      where: { id: req.userId! },
+      select: { notificationsEnabled: true, budgetAlertsEnabled: true },
+    });
+    if (!preferences) throw new HttpError(404, 'ไม่พบบัญชีผู้ใช้');
+    res.json({ preferences });
+  }),
+);
+
+notificationsRouter.patch(
+  '/preferences',
+  asyncHandler(async (req, res) => {
+    const data = preferencesSchema.parse(req.body);
+    const preferences = await prisma.user.update({
+      where: { id: req.userId! },
+      data,
+      select: { notificationsEnabled: true, budgetAlertsEnabled: true },
+    });
+    res.json({ preferences });
+  }),
+);
+
 notificationsRouter.post(
   '/token',
   asyncHandler(async (req, res) => {
@@ -57,8 +90,9 @@ notificationsRouter.post(
 notificationsRouter.post(
   '/run-triggers',
   asyncHandler(async (req, res) => {
+    const { includeBudgetAlerts } = triggerSchema.parse(req.body ?? {});
     const [budget, prediction] = await Promise.all([
-      runBudgetTriggers(req.userId!),
+      includeBudgetAlerts ? runBudgetTriggers(req.userId!) : Promise.resolve([]),
       runPredictionTriggers(req.userId!), // 🔮 พยากรณ์ AI → แจ้งเตือน (ข้ามเงียบถ้า FastAPI ปิด)
     ]);
     const created = [...budget, ...prediction];

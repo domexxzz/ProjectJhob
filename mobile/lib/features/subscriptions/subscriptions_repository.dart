@@ -85,7 +85,8 @@ class SubscriptionsRepository {
 
   /// นำเข้าจาก Gmail — ส่ง Google access token (scope gmail.readonly) ให้ backend สแกน
   Future<Map<String, dynamic>> importFromGmail(String accessToken) async {
-    final res = await _dio.post('/subscriptions/import-gmail', data: {'accessToken': accessToken});
+    final res = await _dio.post('/subscriptions/import-gmail',
+        data: {'accessToken': accessToken});
     return res.data as Map<String, dynamic>;
   }
 

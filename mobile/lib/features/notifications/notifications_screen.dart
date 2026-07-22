@@ -1,9 +1,11 @@
 import 'package:flutter/material.dart';
+import 'package:flutter/services.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:go_router/go_router.dart';
 
 import '../../app/theme.dart';
 import 'notifications_repository.dart';
+import '../settings/settings_screen.dart';
 
 /// ศูนย์การแจ้งเตือน — รายการแจ้งเตือน + อ่านแล้ว/ยังไม่อ่าน + อ่านทั้งหมด
 /// backend: GET /notifications · PATCH /:id/read · POST /read-all · POST /run-triggers
@@ -13,6 +15,8 @@ class NotificationsScreen extends ConsumerWidget {
   @override
   Widget build(BuildContext context, WidgetRef ref) {
     final async = ref.watch(notificationsProvider);
+    final settings = ref.watch(appSettingsProvider);
+    final settingsNotifier = ref.read(appSettingsProvider.notifier);
     final messenger = ScaffoldMessenger.of(context);
 
     Future<void> refresh() async {
@@ -26,10 +30,17 @@ class NotificationsScreen extends ConsumerWidget {
         backgroundColor: const Color(0xFF121212),
         elevation: 0,
         leading: IconButton(
-          icon: const Icon(Icons.arrow_back, color: Colors.white),
-          onPressed: () => context.pop(),
+          icon: const Icon(Icons.arrow_back, color: Colors.white, size: 24),
+          onPressed: () {
+            if (Navigator.of(context).canPop() || context.canPop()) {
+              context.pop();
+            } else {
+              context.go('/');
+            }
+          },
         ),
-        title: const Text('การแจ้งเตือน', style: TextStyle(color: Colors.white)),
+        title:
+            const Text('การแจ้งเตือน', style: TextStyle(color: Colors.white)),
         actions: [
           // เดโม: ตรวจงบเดี๋ยวนี้ (cron ปิดอยู่ในเดฟ)
           IconButton(
@@ -37,13 +48,32 @@ class NotificationsScreen extends ConsumerWidget {
             icon: const Icon(Icons.bolt_outlined, color: AppColors.primary),
             onPressed: () async {
               try {
-                final n = await ref.read(notificationsRepoProvider).runTriggers();
+                if (!settings.notifications) {
+                  messenger.showSnackBar(const SnackBar(
+                    content: Text('เปิดการแจ้งเตือนก่อนจึงจะตรวจรายการใหม่ได้'),
+                  ));
+                  return;
+                }
+                final n = await ref
+                    .read(notificationsRepoProvider)
+                    .runTriggers(includeBudgetAlerts: settings.budgetAlerts);
                 await refresh();
+                if (n > 0) {
+                  if (settings.notificationSound) {
+                    await SystemSound.play(SystemSoundType.alert);
+                  }
+                  if (settings.vibration) {
+                    await HapticFeedback.mediumImpact();
+                  }
+                }
                 messenger.showSnackBar(SnackBar(
-                  content: Text(n > 0 ? 'มีแจ้งเตือนใหม่ $n รายการ 🔔' : 'ยังไม่มีอะไรต้องเตือนตอนนี้ 👍'),
+                  content: Text(n > 0
+                      ? 'มีแจ้งเตือนใหม่ $n รายการ 🔔'
+                      : 'ยังไม่มีอะไรต้องเตือนตอนนี้ 👍'),
                 ));
               } catch (_) {
-                messenger.showSnackBar(const SnackBar(content: Text('ตรวจไม่สำเร็จ ลองใหม่อีกครั้ง')));
+                messenger.showSnackBar(const SnackBar(
+                    content: Text('ตรวจไม่สำเร็จ ลองใหม่อีกครั้ง')));
               }
             },
           ),
@@ -53,45 +83,103 @@ class NotificationsScreen extends ConsumerWidget {
                 await ref.read(notificationsRepoProvider).markAllRead();
                 await refresh();
               } catch (_) {
-                messenger.showSnackBar(const SnackBar(content: Text('ทำเครื่องหมายไม่สำเร็จ')));
+                messenger.showSnackBar(
+                    const SnackBar(content: Text('ทำเครื่องหมายไม่สำเร็จ')));
               }
             },
-            child: const Text('อ่านทั้งหมด', style: TextStyle(color: AppColors.primary)),
+            child: const Text('อ่านทั้งหมด',
+                style: TextStyle(color: AppColors.primary)),
           ),
         ],
       ),
-      body: RefreshIndicator(
-        color: AppColors.primary,
-        onRefresh: refresh,
-        child: async.when(
-          loading: () => const Center(child: CircularProgressIndicator(color: AppColors.primary)),
-          error: (e, _) => ListView(children: [
-            const SizedBox(height: 120),
-            Center(child: Text('โหลดไม่ได้: $e', style: const TextStyle(color: Colors.redAccent))),
-          ]),
-          data: (data) {
-            if (data.items.isEmpty) {
-              return ListView(children: const [
-                SizedBox(height: 140),
-                Icon(Icons.notifications_off_outlined, color: Colors.white24, size: 56),
-                SizedBox(height: 12),
-                Center(child: Text('ยังไม่มีการแจ้งเตือน', style: TextStyle(color: Colors.white54))),
-              ]);
-            }
-            return ListView.builder(
-              padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 10),
-              itemCount: data.items.length,
-              itemBuilder: (_, i) => _NotifCard(
-                notif: data.items[i],
-                onTap: () async {
-                  if (!data.items[i].read) {
-                    await ref.read(notificationsRepoProvider).markRead(data.items[i].id);
-                    ref.invalidate(notificationsProvider);
+      body: !settings.notifications
+          ? _NotificationsDisabled(
+              onEnable: () => settingsNotifier.setNotifications(true),
+            )
+          : RefreshIndicator(
+              color: AppColors.primary,
+              onRefresh: refresh,
+              child: async.when(
+                loading: () => const Center(
+                    child: CircularProgressIndicator(color: AppColors.primary)),
+                error: (e, _) => ListView(children: [
+                  const SizedBox(height: 120),
+                  Center(
+                      child: Text('โหลดไม่ได้: $e',
+                          style: const TextStyle(color: Colors.redAccent))),
+                ]),
+                data: (data) {
+                  if (data.items.isEmpty) {
+                    return ListView(children: const [
+                      SizedBox(height: 140),
+                      Icon(Icons.notifications_off_outlined,
+                          color: Colors.white24, size: 56),
+                      SizedBox(height: 12),
+                      Center(
+                          child: Text('ยังไม่มีการแจ้งเตือน',
+                              style: TextStyle(color: Colors.white54))),
+                    ]);
                   }
+                  return ListView.builder(
+                    padding: const EdgeInsets.symmetric(
+                        horizontal: 16, vertical: 10),
+                    itemCount: data.items.length,
+                    itemBuilder: (_, i) => _NotifCard(
+                      notif: data.items[i],
+                      onTap: () async {
+                        if (!data.items[i].read) {
+                          await ref
+                              .read(notificationsRepoProvider)
+                              .markRead(data.items[i].id);
+                          ref.invalidate(notificationsProvider);
+                        }
+                      },
+                    ),
+                  );
                 },
               ),
-            );
-          },
+            ),
+    );
+  }
+}
+
+class _NotificationsDisabled extends StatelessWidget {
+  const _NotificationsDisabled({required this.onEnable});
+  final VoidCallback onEnable;
+
+  @override
+  Widget build(BuildContext context) {
+    return Center(
+      child: Padding(
+        padding: const EdgeInsets.all(28),
+        child: Column(
+          mainAxisSize: MainAxisSize.min,
+          children: [
+            const Icon(Icons.notifications_off_outlined,
+                color: Colors.white30, size: 64),
+            const SizedBox(height: 16),
+            const Text(
+              'ปิดการแจ้งเตือนอยู่',
+              style: TextStyle(
+                  color: Colors.white,
+                  fontSize: 19,
+                  fontWeight: FontWeight.bold),
+            ),
+            const SizedBox(height: 8),
+            const Text(
+              'แอปจะไม่แสดง badge หรือดึงรายการแจ้งเตือนใหม่ จนกว่าจะเปิดใช้งานอีกครั้ง',
+              textAlign: TextAlign.center,
+              style: TextStyle(color: Colors.white54, height: 1.45),
+            ),
+            const SizedBox(height: 22),
+            SizedBox(
+              width: 190,
+              child: ElevatedButton(
+                onPressed: onEnable,
+                child: const Text('เปิดการแจ้งเตือน'),
+              ),
+            ),
+          ],
         ),
       ),
     );
@@ -116,7 +204,9 @@ class _NotifCard extends StatelessWidget {
           color: notif.read ? const Color(0xFF1C1C1C) : const Color(0xFF122017),
           borderRadius: BorderRadius.circular(16),
           border: Border.all(
-            color: notif.read ? Colors.white.withOpacity(0.06) : AppColors.primary.withOpacity(0.35),
+            color: notif.read
+                ? Colors.white.withOpacity(0.06)
+                : AppColors.primary.withOpacity(0.35),
           ),
         ),
         child: Row(
@@ -125,7 +215,8 @@ class _NotifCard extends StatelessWidget {
             Container(
               width: 42,
               height: 42,
-              decoration: BoxDecoration(color: color.withOpacity(0.15), shape: BoxShape.circle),
+              decoration: BoxDecoration(
+                  color: color.withOpacity(0.15), shape: BoxShape.circle),
               child: Icon(icon, color: color, size: 22),
             ),
             const SizedBox(width: 12),
@@ -141,7 +232,8 @@ class _NotifCard extends StatelessWidget {
                           style: TextStyle(
                             color: Colors.white,
                             fontSize: 14.5,
-                            fontWeight: notif.read ? FontWeight.w600 : FontWeight.w800,
+                            fontWeight:
+                                notif.read ? FontWeight.w600 : FontWeight.w800,
                           ),
                         ),
                       ),
@@ -150,14 +242,19 @@ class _NotifCard extends StatelessWidget {
                           width: 9,
                           height: 9,
                           margin: const EdgeInsets.only(left: 6, top: 4),
-                          decoration: const BoxDecoration(color: AppColors.primary, shape: BoxShape.circle),
+                          decoration: const BoxDecoration(
+                              color: AppColors.primary, shape: BoxShape.circle),
                         ),
                     ],
                   ),
                   const SizedBox(height: 3),
-                  Text(notif.body, style: const TextStyle(color: Colors.white70, fontSize: 12.5, height: 1.35)),
+                  Text(notif.body,
+                      style: const TextStyle(
+                          color: Colors.white70, fontSize: 12.5, height: 1.35)),
                   const SizedBox(height: 6),
-                  Text(_timeAgo(notif.createdAt), style: const TextStyle(color: Colors.white38, fontSize: 11)),
+                  Text(_timeAgo(notif.createdAt),
+                      style:
+                          const TextStyle(color: Colors.white38, fontSize: 11)),
                 ],
               ),
             ),

@@ -8,6 +8,8 @@ import '../../app/theme.dart';
 import '../../core/money.dart';
 import '../transactions/transaction.dart';
 import '../transactions/transactions_repository.dart';
+import '../settings/settings_screen.dart';
+import '../../widgets/app_bottom_nav_bar.dart';
 
 enum _DashboardRange { day, week, month, year }
 
@@ -26,6 +28,10 @@ class _FinancialDashboardScreenState
 
   @override
   Widget build(BuildContext context) {
+    final moneySettings = ref.watch(
+      appSettingsProvider.select((s) => (s.currency, s.usdRate)),
+    );
+    Money.configure(moneySettings.$1, thbToUsdRate: moneySettings.$2);
     final dashboard = ref.watch(dashboardProvider);
 
     return Scaffold(
@@ -117,18 +123,9 @@ class _FinancialDashboardScreenState
           },
         ),
       ),
-      floatingActionButton: FloatingActionButton(
-        onPressed: () async {
-          await context.push('/slip');
-          ref.invalidate(dashboardProvider);
-        },
-        backgroundColor: AppColors.primary,
-        foregroundColor: Colors.black,
-        shape: const CircleBorder(),
-        child: const Icon(Icons.add_rounded, size: 30),
-      ),
-      floatingActionButtonLocation: FloatingActionButtonLocation.centerDocked,
-      bottomNavigationBar: const _DashboardBottomNav(),
+      floatingActionButton: const AppFloatingActionButton(),
+      floatingActionButtonLocation: kFixedCenterDockedFabLocation,
+      bottomNavigationBar: const AppBottomNavigationBar(currentTab: AppTab.dashboard),
     );
   }
 }
@@ -303,7 +300,7 @@ class _TrendCard extends StatelessWidget {
                           getTooltipColor: (_) => const Color(0xFF242826),
                           getTooltipItems: (spots) => spots
                               .map((spot) => LineTooltipItem(
-                                    '฿${NumberFormat('#,##0').format(spot.y)}',
+                                    '${Money.symbol}${NumberFormat('#,##0').format(spot.y)}',
                                     TextStyle(
                                       color: spot.barIndex == 0
                                           ? AppColors.income
@@ -394,7 +391,7 @@ class _TrendCard extends StatelessWidget {
       case _DashboardRange.year:
         index = date.month - 1;
     }
-    final amount = item.amount / 100;
+    final amount = Money.displayValue(item.amount);
     if (item.isIncome) {
       income[index] += amount;
     } else {
@@ -936,85 +933,4 @@ class _TransactionList extends StatelessWidget {
   }
 }
 
-class _DashboardBottomNav extends StatelessWidget {
-  const _DashboardBottomNav();
 
-  @override
-  Widget build(BuildContext context) {
-    return BottomAppBar(
-      color: const Color(0xFF1A1A1A),
-      elevation: 8,
-      notchMargin: 8,
-      shape: const CircularNotchedRectangle(),
-      height: 74,
-      padding: EdgeInsets.zero,
-      child: Row(
-        mainAxisAlignment: MainAxisAlignment.spaceAround,
-        children: [
-          _BottomItem(
-            icon: Icons.home_outlined,
-            label: 'หน้าหลัก',
-            onTap: () => context.go('/'),
-          ),
-          const _BottomItem(
-            icon: Icons.dashboard_rounded,
-            label: 'แดชบอร์ด',
-            active: true,
-          ),
-          const SizedBox(width: 48),
-          _BottomItem(
-            icon: Icons.chat_bubble_outline_rounded,
-            label: 'พี่เงิน',
-            onTap: () => context.push('/chat'),
-          ),
-          _BottomItem(
-            icon: Icons.grid_view_rounded,
-            label: 'เมนู',
-            onTap: () => context.push('/menu'),
-          ),
-        ],
-      ),
-    );
-  }
-}
-
-class _BottomItem extends StatelessWidget {
-  const _BottomItem({
-    required this.icon,
-    required this.label,
-    this.active = false,
-    this.onTap,
-  });
-
-  final IconData icon;
-  final String label;
-  final bool active;
-  final VoidCallback? onTap;
-
-  @override
-  Widget build(BuildContext context) {
-    final color = active ? AppColors.primary : Colors.white60;
-    return InkWell(
-      onTap: onTap,
-      borderRadius: BorderRadius.circular(14),
-      child: Padding(
-        padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 8),
-        child: Column(
-          mainAxisSize: MainAxisSize.min,
-          children: [
-            Icon(icon, color: color, size: 26),
-            const SizedBox(height: 3),
-            Text(
-              label,
-              style: TextStyle(
-                color: color,
-                fontSize: 10,
-                fontWeight: active ? FontWeight.w700 : FontWeight.w500,
-              ),
-            ),
-          ],
-        ),
-      ),
-    );
-  }
-}

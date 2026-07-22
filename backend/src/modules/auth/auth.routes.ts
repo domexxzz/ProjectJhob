@@ -1,6 +1,7 @@
 import { Router } from 'express';
 import { z } from 'zod';
 import { asyncHandler } from '../../lib/http';
+import { HttpError } from '../../lib/http';
 import { requireAuth } from '../../lib/auth';
 import { registerSchema, loginSchema } from '../../lib/validate';
 import { registerUser, loginUser } from './auth.service';
@@ -14,6 +15,30 @@ const googleSchema = z
   .object({ idToken: z.string().min(10).optional(), accessToken: z.string().min(10).optional() })
   .refine((d) => d.idToken || d.accessToken, { message: 'ต้องมี idToken หรือ accessToken' });
 const facebookSchema = z.object({ accessToken: z.string().min(10) });
+const updateProfileSchema = z
+  .object({
+    displayName: z.string().trim().min(1).max(60).optional(),
+    email: z.string().trim().email().optional(),
+    phone: z.string().trim().max(30).nullable().optional(),
+    monthlyIncome: z.number().int().nonnegative().optional(),
+    avatarUrl: z.string().max(15_000_000).nullable().optional(),
+  })
+  .refine((data) => Object.keys(data).length > 0, {
+    message: 'ต้องมีข้อมูลที่ต้องการแก้ไขอย่างน้อย 1 รายการ',
+  });
+
+const profileSelect = {
+  id: true,
+  email: true,
+  phone: true,
+  displayName: true,
+  monthlyIncome: true,
+  level: true,
+  streak: true,
+  avatarUrl: true,
+  provider: true,
+  createdAt: true,
+} as const;
 
 authRouter.post(
   '/register',
@@ -57,16 +82,35 @@ authRouter.get(
   asyncHandler(async (req, res) => {
     const user = await prisma.user.findUnique({
       where: { id: req.userId! },
-      select: {
-        id: true,
-        email: true,
-        displayName: true,
-        monthlyIncome: true,
-        level: true,
-        streak: true,
-        avatarUrl: true,
-        provider: true,
+      select: profileSelect,
+    });
+    res.json({ user });
+  }),
+);
+
+authRouter.patch(
+  '/me',
+  requireAuth,
+  asyncHandler(async (req, res) => {
+    const data = updateProfileSchema.parse(req.body);
+
+    if (data.email) {
+      const duplicate = await prisma.user.findFirst({
+        where: { email: data.email, id: { not: req.userId! } },
+        select: { id: true },
+      });
+      if (duplicate) throw new HttpError(409, 'อีเมลนี้ถูกใช้งานแล้ว');
+    }
+
+    const user = await prisma.user.update({
+      where: { id: req.userId! },
+      data: {
+        ...data,
+        ...(data.phone !== undefined
+          ? { phone: data.phone?.trim() || null }
+          : {}),
       },
+      select: profileSelect,
     });
     res.json({ user });
   }),

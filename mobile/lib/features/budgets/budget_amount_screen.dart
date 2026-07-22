@@ -9,6 +9,7 @@ import 'package:intl/intl.dart';
 import '../../app/theme.dart';
 import '../goals/set_deadline_screen.dart';
 import '../transactions/transactions_repository.dart';
+import '../settings/settings_screen.dart';
 
 class BudgetAmountScreen extends ConsumerStatefulWidget {
   const BudgetAmountScreen({super.key});
@@ -40,7 +41,7 @@ class _BudgetAmountScreenState extends ConsumerState<BudgetAmountScreen> {
       return;
     }
     if (amountBaht == null || amountBaht <= 0) {
-      _showMessage('กรุณากรอกวงเงินที่มากกว่า 0 บาท');
+      _showMessage('กรุณากรอกวงเงินที่มากกว่า 0 ${Money.symbol}');
       return;
     }
 

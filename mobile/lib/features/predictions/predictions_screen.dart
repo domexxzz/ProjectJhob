@@ -8,6 +8,7 @@ import '../../app/theme.dart';
 import '../../core/money.dart';
 import '../dashboard/dashboard_screen.dart';
 import '../transactions/transactions_repository.dart';
+import '../settings/settings_screen.dart';
 import 'predictions_model.dart';
 import 'predictions_service.dart';
 
@@ -16,6 +17,10 @@ class PredictionsScreen extends ConsumerWidget {
 
   @override
   Widget build(BuildContext context, WidgetRef ref) {
+    final moneySettings = ref.watch(
+      appSettingsProvider.select((s) => (s.currency, s.usdRate)),
+    );
+    Money.configure(moneySettings.$1, thbToUsdRate: moneySettings.$2);
     final predictionsAsync = ref.watch(predictionsProvider);
     final dashboardAsync = ref.watch(dashboardProvider);
 
@@ -23,8 +28,14 @@ class PredictionsScreen extends ConsumerWidget {
       backgroundColor: const Color(0xFF0D1117),
       appBar: AppBar(
         leading: IconButton(
-          icon: const Icon(Icons.arrow_back_ios_new_rounded, size: 20),
-          onPressed: () => context.pop(),
+          icon: const Icon(Icons.arrow_back, color: Colors.white, size: 24),
+          onPressed: () {
+            if (Navigator.of(context).canPop() || context.canPop()) {
+              context.pop();
+            } else {
+              context.go('/');
+            }
+          },
         ),
         title: const Text(
           'วิเคราะห์ & คาดการณ์ AI',
@@ -115,7 +126,9 @@ class _PredictionsContent extends StatelessWidget {
     int todayIndex = 0;
 
     for (final key in sortedHistoryKeys) {
-      spots.add(FlSpot(index.toDouble(), dailyHistory[key]! / 100.0));
+      spots.add(
+        FlSpot(index.toDouble(), Money.displayValue(dailyHistory[key]!)),
+      );
       dates.add(key);
       if (key == todayStr) {
         todayIndex = index;
@@ -127,7 +140,7 @@ class _PredictionsContent extends StatelessWidget {
     for (final f in predictions.forecast) {
       // Avoid duplicating today's date if it is in history
       if (f.date == todayStr) continue;
-      spots.add(FlSpot(index.toDouble(), f.balance / 100.0));
+      spots.add(FlSpot(index.toDouble(), Money.displayValue(f.balance)));
       dates.add(f.date);
       index++;
     }
@@ -156,7 +169,10 @@ class _PredictionsContent extends StatelessWidget {
           if (predictions.alerts.isNotEmpty) ...[
             const Text(
               'คำเตือนและคำแนะนำจาก "พี่เงิน"',
-              style: TextStyle(fontSize: 15, fontWeight: FontWeight.bold, color: Colors.white70),
+              style: TextStyle(
+                  fontSize: 15,
+                  fontWeight: FontWeight.bold,
+                  color: Colors.white70),
             ),
             const SizedBox(height: 12),
             ...predictions.alerts.map((alert) => _AlertCard(alert: alert)),
@@ -167,7 +183,10 @@ class _PredictionsContent extends StatelessWidget {
           if (predictions.anomalies.isNotEmpty) ...[
             const Text(
               'ตรวจพบความผิดปกติทางการเงิน',
-              style: TextStyle(fontSize: 15, fontWeight: FontWeight.bold, color: Colors.white70),
+              style: TextStyle(
+                  fontSize: 15,
+                  fontWeight: FontWeight.bold,
+                  color: Colors.white70),
             ),
             const SizedBox(height: 12),
             ...predictions.anomalies.map((anom) => _AnomalyCard(anomaly: anom)),
@@ -210,7 +229,10 @@ class _PredictionsContent extends StatelessWidget {
           Expanded(
             child: Text(
               statusText,
-              style: TextStyle(color: statusColor, fontSize: 13, fontWeight: FontWeight.w600),
+              style: TextStyle(
+                  color: statusColor,
+                  fontSize: 13,
+                  fontWeight: FontWeight.w600),
             ),
           ),
         ],
@@ -218,12 +240,13 @@ class _PredictionsContent extends StatelessWidget {
     );
   }
 
-  Widget _buildChartCard(List<FlSpot> spots, List<String> dates, int todayIndex) {
+  Widget _buildChartCard(
+      List<FlSpot> spots, List<String> dates, int todayIndex) {
     if (spots.isEmpty) return const SizedBox();
 
     double minY = spots.map((s) => s.y).reduce((a, b) => a < b ? a : b);
     double maxY = spots.map((s) => s.y).reduce((a, b) => a > b ? a : b);
-    
+
     // Add margins to Y axis scale
     minY = (minY - 500).clamp(0.0, double.infinity);
     maxY = maxY + 1000;
@@ -241,7 +264,8 @@ class _PredictionsContent extends StatelessWidget {
         children: [
           const Text(
             'แนวโน้มยอดคงเหลือล่วงหน้า 30 วัน',
-            style: TextStyle(color: Colors.white, fontSize: 15, fontWeight: FontWeight.bold),
+            style: TextStyle(
+                color: Colors.white, fontSize: 15, fontWeight: FontWeight.bold),
           ),
           const SizedBox(height: 4),
           const Text(
@@ -256,9 +280,12 @@ class _PredictionsContent extends StatelessWidget {
                 gridData: const FlGridData(show: false),
                 titlesData: FlTitlesData(
                   show: true,
-                  rightTitles: const AxisTitles(sideTitles: SideTitles(showTitles: false)),
-                  topTitles: const AxisTitles(sideTitles: SideTitles(showTitles: false)),
-                  leftTitles: const AxisTitles(sideTitles: SideTitles(showTitles: false)),
+                  rightTitles: const AxisTitles(
+                      sideTitles: SideTitles(showTitles: false)),
+                  topTitles: const AxisTitles(
+                      sideTitles: SideTitles(showTitles: false)),
+                  leftTitles: const AxisTitles(
+                      sideTitles: SideTitles(showTitles: false)),
                   bottomTitles: AxisTitles(
                     sideTitles: SideTitles(
                       showTitles: true,
@@ -266,27 +293,33 @@ class _PredictionsContent extends StatelessWidget {
                       interval: 8,
                       getTitlesWidget: (value, meta) {
                         int idx = value.toInt();
-                        if (idx < 0 || idx >= dates.length) return const SizedBox();
-                        
+                        if (idx < 0 || idx >= dates.length)
+                          return const SizedBox();
+
                         // Show formatted date or "Today" indicator
                         if (idx == todayIndex) {
                           return Padding(
                             padding: const EdgeInsets.only(top: 8.0),
                             child: Text(
                               'วันนี้',
-                              style: TextStyle(color: AppColors.primary, fontSize: 10, fontWeight: FontWeight.bold),
+                              style: TextStyle(
+                                  color: AppColors.primary,
+                                  fontSize: 10,
+                                  fontWeight: FontWeight.bold),
                             ),
                           );
                         }
-                        
+
                         try {
                           final parsedDate = DateTime.parse(dates[idx]);
-                          final formattedStr = DateFormat('d MMM').format(parsedDate);
+                          final formattedStr =
+                              DateFormat('d MMM').format(parsedDate);
                           return Padding(
                             padding: const EdgeInsets.only(top: 8.0),
                             child: Text(
                               formattedStr,
-                              style: const TextStyle(color: AppColors.textMuted, fontSize: 9),
+                              style: const TextStyle(
+                                  color: AppColors.textMuted, fontSize: 9),
                             ),
                           );
                         } catch (_) {
@@ -311,16 +344,20 @@ class _PredictionsContent extends StatelessWidget {
                         if (idx < 0 || idx >= dates.length) return null;
                         final dateStr = dates[idx];
                         final amtStr = NumberFormat('#,##0').format(barSpot.y);
-                        
+
                         final parsedDate = DateTime.parse(dateStr);
-                        final displayDate = DateFormat('d MMMM yyyy').format(parsedDate);
-                        
+                        final displayDate =
+                            DateFormat('d MMMM yyyy').format(parsedDate);
+
                         final isFuture = idx > todayIndex;
                         final typeLabel = isFuture ? 'คาดการณ์: ' : 'จริง: ';
 
                         return LineTooltipItem(
-                          '$displayDate\n$typeLabel$amtStr ฿',
-                          const TextStyle(color: Colors.white, fontSize: 11, fontWeight: FontWeight.w500),
+                          '$displayDate\n$typeLabel${Money.symbol}$amtStr',
+                          const TextStyle(
+                              color: Colors.white,
+                              fontSize: 11,
+                              fontWeight: FontWeight.w500),
                         );
                       }).toList();
                     },
@@ -461,12 +498,16 @@ class _MetricCard extends StatelessWidget {
               children: [
                 Text(
                   title,
-                  style: const TextStyle(color: AppColors.textMuted, fontSize: 11),
+                  style:
+                      const TextStyle(color: AppColors.textMuted, fontSize: 11),
                 ),
                 const SizedBox(height: 4),
                 Text(
-                  '${Money.formatBaht(value)} ฿',
-                  style: const TextStyle(color: Colors.white, fontSize: 15, fontWeight: FontWeight.bold),
+                  Money.formatBaht(value),
+                  style: const TextStyle(
+                      color: Colors.white,
+                      fontSize: 15,
+                      fontWeight: FontWeight.bold),
                 ),
               ],
             ),
@@ -513,12 +554,18 @@ class _AlertCard extends StatelessWidget {
               children: [
                 Text(
                   alert.title,
-                  style: TextStyle(color: cardColor, fontSize: 14, fontWeight: FontWeight.bold),
+                  style: TextStyle(
+                      color: cardColor,
+                      fontSize: 14,
+                      fontWeight: FontWeight.bold),
                 ),
                 const SizedBox(height: 6),
                 Text(
                   alert.body,
-                  style: TextStyle(color: Colors.white.withOpacity(0.7), fontSize: 12, height: 1.4),
+                  style: TextStyle(
+                      color: Colors.white.withOpacity(0.7),
+                      fontSize: 12,
+                      height: 1.4),
                 ),
               ],
             ),
@@ -555,11 +602,17 @@ class _AnomalyCard extends StatelessWidget {
             children: [
               Text(
                 anomaly.note,
-                style: const TextStyle(fontSize: 14, fontWeight: FontWeight.bold, color: Colors.white),
+                style: const TextStyle(
+                    fontSize: 14,
+                    fontWeight: FontWeight.bold,
+                    color: Colors.white),
               ),
               Text(
-                '- ${Money.formatBaht(anomaly.amount)} ฿',
-                style: const TextStyle(fontSize: 14, fontWeight: FontWeight.bold, color: AppColors.expense),
+                '- ${Money.formatBaht(anomaly.amount)}',
+                style: const TextStyle(
+                    fontSize: 14,
+                    fontWeight: FontWeight.bold,
+                    color: AppColors.expense),
               ),
             ],
           ),
@@ -571,7 +624,10 @@ class _AnomalyCard extends StatelessWidget {
           const SizedBox(height: 8),
           Text(
             anomaly.description,
-            style: TextStyle(fontSize: 12, color: Colors.white.withOpacity(0.65), height: 1.4),
+            style: TextStyle(
+                fontSize: 12,
+                color: Colors.white.withOpacity(0.65),
+                height: 1.4),
           ),
         ],
       ),
@@ -593,11 +649,15 @@ class _ErrorState extends StatelessWidget {
         child: Column(
           mainAxisAlignment: MainAxisAlignment.center,
           children: [
-            const Icon(Icons.cloud_off_rounded, color: AppColors.textMuted, size: 64),
+            const Icon(Icons.cloud_off_rounded,
+                color: AppColors.textMuted, size: 64),
             const SizedBox(height: 16),
             const Text(
               'ไม่สามารถโหลดข้อมูลคาดการณ์ได้',
-              style: TextStyle(fontSize: 15, fontWeight: FontWeight.bold, color: Colors.white),
+              style: TextStyle(
+                  fontSize: 15,
+                  fontWeight: FontWeight.bold,
+                  color: Colors.white),
             ),
             const SizedBox(height: 8),
             Text(

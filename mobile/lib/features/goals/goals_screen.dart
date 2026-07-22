@@ -8,14 +8,23 @@ import '../../app/theme.dart';
 import '../../core/money.dart';
 import 'goals_provider.dart';
 import '../auth/auth_controller.dart'; // เพิ่มบรรทัดนี้ตามโครงสร้างโปรเจกต์ของคุณ[cite: 20]
+import '../privacy/privacy_screen.dart';
+import '../settings/settings_screen.dart';
+import '../../widgets/app_bottom_nav_bar.dart';
 
 class GoalsScreen extends ConsumerWidget {
   const GoalsScreen({super.key});
 
   @override
   Widget build(BuildContext context, WidgetRef ref) {
+    final moneySettings = ref.watch(
+      appSettingsProvider.select((s) => (s.currency, s.usdRate)),
+    );
+    Money.configure(moneySettings.$1, thbToUsdRate: moneySettings.$2);
     final goals = ref.watch(goalsProvider);
     final user = ref.watch(authControllerProvider).user;
+    final personalized =
+        ref.watch(privacySettingsProvider).personalizedRecommendations;
     return Scaffold(
       backgroundColor:
           const Color(0xFF121212), // คุมโทน Premium Dark UI แบบ Dashboard
@@ -71,35 +80,27 @@ class GoalsScreen extends ConsumerWidget {
                 const SizedBox(height: 28),
 
                 // 6. Recommendation section
-                const Text(
-                  'แนะนำสำหรับคุณ',
-                  style: TextStyle(
-                    fontSize: 18,
-                    fontWeight: FontWeight.bold,
-                    color: Colors.white,
-                    letterSpacing: 0.5,
+                if (personalized) ...[
+                  const Text(
+                    'แนะนำสำหรับคุณ',
+                    style: TextStyle(
+                      fontSize: 18,
+                      fontWeight: FontWeight.bold,
+                      color: Colors.white,
+                      letterSpacing: 0.5,
+                    ),
                   ),
-                ),
-                const SizedBox(height: 12),
-                const _RecommendationCard(),
+                  const SizedBox(height: 12),
+                  const _RecommendationCard(),
+                ],
               ],
             ),
           ),
         ],
       ),
-      floatingActionButton: FloatingActionButton(
-        onPressed: () async {
-          await context.push('/slip');
-          ref.invalidate(goalsProvider);
-        },
-        backgroundColor: AppColors.primary,
-        foregroundColor: Colors.white,
-        shape: const CircleBorder(),
-        elevation: 6,
-        child: const Icon(Icons.add, size: 28),
-      ),
+      floatingActionButton: const AppFloatingActionButton(),
       floatingActionButtonLocation: kFixedCenterDockedFabLocation,
-      bottomNavigationBar: const _GoalsNav(),
+      bottomNavigationBar: const AppBottomNavigationBar(currentTab: AppTab.goals),
     );
   }
 }
@@ -303,7 +304,10 @@ class _GoalItemCard extends StatelessWidget {
                             : null,
                       ),
                       alignment: Alignment.center,
-                      child: hasImage ? null : Text(goal.emoji, style: const TextStyle(fontSize: 24)),
+                      child: hasImage
+                          ? null
+                          : Text(goal.emoji,
+                              style: const TextStyle(fontSize: 24)),
                     );
                   },
                 ),
@@ -322,7 +326,7 @@ class _GoalItemCard extends StatelessWidget {
                       ),
                       const SizedBox(height: 4),
                       Text(
-                        'เป้าหมาย ฿ ${Money.format(goal.target)}',
+                        'เป้าหมาย ${Money.formatBaht(goal.target)}',
                         style: TextStyle(
                             color: Colors.white.withOpacity(0.6), fontSize: 13),
                       ),
@@ -379,7 +383,7 @@ class _GoalItemCard extends StatelessWidget {
               mainAxisAlignment: MainAxisAlignment.spaceBetween,
               children: [
                 Text(
-                  '฿ ${Money.format(goal.current)} / ${Money.format(goal.target)}',
+                  '${Money.formatBaht(goal.current)} / ${Money.formatBaht(goal.target)}',
                   style: const TextStyle(
                       color: Colors.white,
                       fontSize: 13,
@@ -388,7 +392,7 @@ class _GoalItemCard extends StatelessWidget {
                 Text(
                   displayPercentage >= 100
                       ? 'สำเร็จแล้ว 🎉'
-                      : 'เหลืออีก ฿ ${Money.format(remaining)} บาท',
+                      : 'เหลืออีก ${Money.formatBaht(remaining)}',
                   style: TextStyle(
                       color: Colors.white.withOpacity(0.5),
                       fontSize: 11,
@@ -507,97 +511,4 @@ class _RecommendationCard extends StatelessWidget {
   }
 }
 
-// ─────────────────────────────────────────────────────────────────────────────
-// Bottom Navigation Bar (เหมือนหน้า Dashboard)
-// ─────────────────────────────────────────────────────────────────────────────
-class _GoalsNav extends StatelessWidget {
-  const _GoalsNav();
 
-  @override
-  Widget build(BuildContext context) {
-    return Container(
-      decoration: BoxDecoration(
-        color: const Color(0xFF1A1A1A),
-        borderRadius: const BorderRadius.only(
-          topLeft: Radius.circular(30),
-          topRight: Radius.circular(30),
-        ),
-        boxShadow: [
-          BoxShadow(
-              color: Colors.black.withOpacity(0.3),
-              blurRadius: 12,
-              offset: const Offset(0, -2))
-        ],
-      ),
-      child: BottomAppBar(
-        color: Colors.transparent,
-        elevation: 0,
-        notchMargin: 10,
-        height: 74,
-        padding: EdgeInsets.zero,
-        child: Row(
-          mainAxisAlignment: MainAxisAlignment.spaceAround,
-          children: [
-            _NavItem(
-                icon: Icons.home_outlined,
-                label: 'หน้าหลัก',
-                onTap: () => context.go('/')),
-            _NavItem(
-              icon: Icons.dashboard_outlined,
-              label: 'แดชบอร์ด',
-              onTap: () => context.push('/financial-dashboard'),
-            ),
-            const SizedBox(width: 48),
-            _NavItem(
-                icon: Icons.chat_bubble_outline_rounded,
-                label: 'พี่เงิน',
-                onTap: () => context.push('/chat')),
-            _NavItem(
-                icon: Icons.grid_view_rounded,
-                label: 'เมนู',
-                onTap: () => context.push('/menu')),
-          ],
-        ),
-      ),
-    );
-  }
-}
-
-class _NavItem extends StatelessWidget {
-  const _NavItem(
-      {required this.icon,
-      required this.label,
-      this.active = false,
-      this.onTap});
-  final IconData icon;
-  final String label;
-  final bool active;
-  final VoidCallback? onTap;
-
-  @override
-  Widget build(BuildContext context) {
-    final color = active ? const Color(0xFF4CD97B) : Colors.white60;
-    return InkWell(
-      onTap: onTap,
-      borderRadius: BorderRadius.circular(16),
-      child: Padding(
-        padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 8),
-        child: Column(
-          mainAxisSize: MainAxisSize.min,
-          children: [
-            Icon(icon, color: color, size: 28),
-            const SizedBox(height: 4),
-            Text(
-              label,
-              style: TextStyle(
-                color: color,
-                fontSize: 11,
-                fontWeight: active ? FontWeight.bold : FontWeight.w500,
-              ),
-            ),
-          ],
-        ),
-      ),
-    );
-  }
-}

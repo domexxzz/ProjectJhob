@@ -9,6 +9,8 @@ import '../transactions/transaction.dart';
 import '../transactions/transactions_repository.dart';
 import '../notifications/notif_bell.dart';
 import '../goals/goals_provider.dart';
+import '../settings/settings_screen.dart';
+import '../../widgets/app_bottom_nav_bar.dart';
 
 // ─────────────────────────────────────────────────────────────────────────────
 // Dashboard Screen (Main) - Premium Dark UI Redesign
@@ -18,6 +20,10 @@ class DashboardScreen extends ConsumerWidget {
 
   @override
   Widget build(BuildContext context, WidgetRef ref) {
+    final moneySettings = ref.watch(
+      appSettingsProvider.select((s) => (s.currency, s.usdRate)),
+    );
+    Money.configure(moneySettings.$1, thbToUsdRate: moneySettings.$2);
     final user = ref.watch(authControllerProvider).user;
     final dashboard = ref.watch(dashboardProvider);
 
@@ -91,26 +97,9 @@ class DashboardScreen extends ConsumerWidget {
           ),
         ],
       ),
-      floatingActionButton: Container(
-        height: 64,
-        width: 64,
-        margin: const EdgeInsets.only(top: 10),
-        child: FloatingActionButton(
-          onPressed: () async {
-            await context.push('/slip'); // ปุ่ม + → หน้าเลือกสลิป
-            ref.invalidate(dashboardProvider);
-            await ref.read(
-                dashboardProvider.future); // รอโหลดเสร็จให้ balance อัปเดตทันที
-          },
-          backgroundColor: const Color(0xFF3CAE63),
-          foregroundColor: Colors.black,
-          shape: const CircleBorder(),
-          elevation: 4,
-          child: const Icon(Icons.add, size: 32),
-        ),
-      ),
+      floatingActionButton: const AppFloatingActionButton(),
       floatingActionButtonLocation: kFixedCenterDockedFabLocation,
-      bottomNavigationBar: const _DashboardNav(),
+      bottomNavigationBar: const AppBottomNavigationBar(currentTab: AppTab.home),
     );
   }
 }
@@ -398,7 +387,7 @@ class _GoalsCardState extends ConsumerState<_GoalsCard> {
     return Column(
       children: [
         SizedBox(
-          height: 164, 
+          height: 164,
           child: PageView.builder(
             controller: _pageController,
             onPageChanged: (index) => setState(() => _currentPage = index),
@@ -435,7 +424,7 @@ class _GoalsCardState extends ConsumerState<_GoalsCard> {
 
               final remaining = g.target - g.current;
               final isSuccess = remaining <= 0;
-              final badge = _getTypeBadgeDetails(g.type); 
+              final badge = _getTypeBadgeDetails(g.type);
 
               return Container(
                 margin: const EdgeInsets.symmetric(horizontal: 2),
@@ -475,7 +464,8 @@ class _GoalsCardState extends ConsumerState<_GoalsCard> {
                             const SizedBox(width: 8),
                             // Badge แสดงประเภทระยะเวลาเป้าหมาย (แก้ไขเรียกผ่านตัวระบุตำแหน่งดัชนี ดึงค่าถูกต้องแน่นอน)
                             Container(
-                              padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 3),
+                              padding: const EdgeInsets.symmetric(
+                                  horizontal: 8, vertical: 3),
                               decoration: BoxDecoration(
                                 color: badge.$3, // badgeBg
                                 borderRadius: BorderRadius.circular(20),
@@ -483,7 +473,9 @@ class _GoalsCardState extends ConsumerState<_GoalsCard> {
                               child: Row(
                                 mainAxisSize: MainAxisSize.min,
                                 children: [
-                                  Icon(badge.$2, size: 11, color: badge.$4), // icon, badgeText
+                                  Icon(badge.$2,
+                                      size: 11,
+                                      color: badge.$4), // icon, badgeText
                                   const SizedBox(width: 3),
                                   Text(
                                     badge.$1, // label
@@ -544,7 +536,7 @@ class _GoalsCardState extends ConsumerState<_GoalsCard> {
                       child: Text(
                         isSuccess
                             ? 'สำเร็จเป้าหมายแล้ว! 🎉'
-                            : 'เหลืออีก ${Money.formatBaht(remaining)} บาท',
+                            : 'เหลืออีก ${Money.formatBaht(remaining)}',
                         style: TextStyle(
                             color: accentColor,
                             fontSize: 11,
@@ -936,95 +928,4 @@ class _ErrorBox extends StatelessWidget {
   }
 }
 
-// ─────────────────────────────────────────────────────────────────────────────
-// Bottom Navigation Bar
-// ─────────────────────────────────────────────────────────────────────────────
-class _DashboardNav extends StatelessWidget {
-  const _DashboardNav();
 
-  @override
-  Widget build(BuildContext context) {
-    return Container(
-      decoration: BoxDecoration(
-        color: const Color(0xFF1A1A1A),
-        borderRadius: const BorderRadius.only(
-          topLeft: Radius.circular(30),
-          topRight: Radius.circular(30),
-        ),
-        boxShadow: [
-          BoxShadow(
-              color: Colors.black.withOpacity(0.3),
-              blurRadius: 12,
-              offset: const Offset(0, -2))
-        ],
-      ),
-      child: BottomAppBar(
-        color: Colors.transparent,
-        elevation: 0,
-        notchMargin: 10,
-        height: 74,
-        padding: EdgeInsets.zero,
-        child: Row(
-          mainAxisAlignment: MainAxisAlignment.spaceAround,
-          children: [
-            const _NavItem(
-                icon: Icons.home_outlined, label: 'หน้าหลัก', active: true),
-            _NavItem(
-              icon: Icons.dashboard_outlined,
-              label: 'แดชบอร์ด',
-              onTap: () => context.push('/financial-dashboard'),
-            ),
-            const SizedBox(width: 48),
-            _NavItem(
-                icon: Icons.chat_bubble_outline_rounded,
-                label: 'พี่เงิน',
-                onTap: () => context.push('/chat')),
-            _NavItem(
-                icon: Icons.grid_view_rounded,
-                label: 'เมนู',
-                onTap: () => context.push('/menu')),
-          ],
-        ),
-      ),
-    );
-  }
-}
-
-class _NavItem extends StatelessWidget {
-  const _NavItem(
-      {required this.icon,
-      required this.label,
-      this.active = false,
-      this.onTap});
-  final IconData icon;
-  final String label;
-  final bool active;
-  final VoidCallback? onTap;
-
-  @override
-  Widget build(BuildContext context) {
-    final color = active ? const Color(0xFF4CD97B) : Colors.white60;
-    return InkWell(
-      onTap: onTap,
-      borderRadius: BorderRadius.circular(16),
-      child: Padding(
-        padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 8),
-        child: Column(
-          mainAxisSize: MainAxisSize.min,
-          children: [
-            Icon(icon, color: color, size: 28),
-            const SizedBox(height: 4),
-            Text(
-              label,
-              style: TextStyle(
-                color: color,
-                fontSize: 11,
-                fontWeight: active ? FontWeight.bold : FontWeight.w500,
-              ),
-            ),
-          ],
-        ),
-      ),
-    );
-  }
-}

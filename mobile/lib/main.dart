@@ -5,50 +5,46 @@ import 'package:intl/date_symbol_data_local.dart';
 
 import 'app/router.dart';
 import 'app/theme.dart';
+import 'features/privacy/app_security_gate.dart';
+import 'features/settings/settings_screen.dart';
+import 'core/money.dart';
 
 Future<void> main() async {
   WidgetsFlutterBinding.ensureInitialized();
-  
+
   // Capture all Flutter framework errors
   FlutterError.onError = (FlutterErrorDetails details) {
     FlutterError.presentError(details);
-    debugPrint('FLUTTER FRAMEWORK ERROR: ${details.exception}\n${details.stack}');
+    debugPrint(
+        'FLUTTER FRAMEWORK ERROR: ${details.exception}\n${details.stack}');
   };
 
   // Capture all asynchronous errors outside of Flutter framework
-  WidgetsBinding.instance.platformDispatcher.onError = (Object error, StackTrace stack) {
+  WidgetsBinding.instance.platformDispatcher.onError =
+      (Object error, StackTrace stack) {
     debugPrint('UNCAUGHT ASYNC ERROR: $error\n$stack');
     return true;
   };
 
+  // ระบบแคชเป็นความสามารถเสริม โดยเฉพาะบน Web ที่ IndexedDB อาจถูกบล็อก
+  // แอปต้องยังเปิดและเรียก API ได้ แม้ Hive เริ่มต้นไม่สำเร็จ
   try {
     debugPrint('Initializing Hive...');
     await Hive.initFlutter();
-    debugPrint('Opening Hive box...');
-    await Hive.openBox('cache');
-    // เริ่มต้นข้อมูล locale สำหรับ DateFormat ภาษาไทย
-    await initializeDateFormatting('th');
-    debugPrint('Running app...');
-    runApp(const ProviderScope(child: FinanceCoachApp()));
-  } catch (e, stack) {
-    debugPrint('INITIALIZATION ERROR: $e');
+  } catch (error, stack) {
+    debugPrint('HIVE INITIALIZATION SKIPPED: $error');
     debugPrint(stack.toString());
-    runApp(
-      MaterialApp(
-        home: Scaffold(
-          body: Center(
-            child: Padding(
-              padding: const EdgeInsets.all(16.0),
-              child: SelectableText(
-                'Initialization Error:\n$e\n\nStacktrace:\n$stack',
-                style: const TextStyle(color: Colors.red, fontSize: 14),
-              ),
-            ),
-          ),
-        ),
-      ),
-    );
   }
+
+  try {
+    await initializeDateFormatting('th');
+  } catch (error, stack) {
+    debugPrint('THAI DATE LOCALE INITIALIZATION SKIPPED: $error');
+    debugPrint(stack.toString());
+  }
+
+  debugPrint('Running app...');
+  runApp(const ProviderScope(child: FinanceCoachApp()));
 }
 
 class FinanceCoachApp extends ConsumerWidget {
@@ -57,11 +53,15 @@ class FinanceCoachApp extends ConsumerWidget {
   @override
   Widget build(BuildContext context, WidgetRef ref) {
     final router = ref.watch(routerProvider);
+    final settings = ref.watch(appSettingsProvider);
+    Money.configure(settings.currency, thbToUsdRate: settings.usdRate);
     return MaterialApp.router(
       title: 'พี่เงิน',
       debugShowCheckedModeBanner: false,
       theme: buildTheme(),
       routerConfig: router,
+      builder: (context, child) =>
+          AppSecurityGate(child: child ?? const SizedBox.shrink()),
     );
   }
 }

@@ -11,9 +11,25 @@ import '../../core/money.dart';
 import 'transaction.dart';
 import 'transactions_repository.dart';
 import '../notifications/notifications_repository.dart';
+import '../settings/settings_screen.dart';
 
-const _thMonths = ['', 'ม.ค.', 'ก.พ.', 'มี.ค.', 'เม.ย.', 'พ.ค.', 'มิ.ย.', 'ก.ค.', 'ส.ค.', 'ก.ย.', 'ต.ค.', 'พ.ย.', 'ธ.ค.'];
-String _fmtThaiDate(DateTime d) => '${d.day} ${_thMonths[d.month]} ${d.year + 543}';
+const _thMonths = [
+  '',
+  'ม.ค.',
+  'ก.พ.',
+  'มี.ค.',
+  'เม.ย.',
+  'พ.ค.',
+  'มิ.ย.',
+  'ก.ค.',
+  'ส.ค.',
+  'ก.ย.',
+  'ต.ค.',
+  'พ.ย.',
+  'ธ.ค.'
+];
+String _fmtThaiDate(DateTime d) =>
+    '${d.day} ${_thMonths[d.month]} ${d.year + 543}';
 
 // เส้นขอบการ์ดเข้มอมเขียวตามดีไซน์
 const _boxBorder = Color(0xFF2C4636);
@@ -63,7 +79,8 @@ class _SlipScreenState extends ConsumerState<SlipScreen> {
 
   Future<void> _pickSlip() async {
     try {
-      final file = await _picker.pickImage(source: ImageSource.gallery, imageQuality: 70, maxWidth: 1600);
+      final file = await _picker.pickImage(
+          source: ImageSource.gallery, imageQuality: 70, maxWidth: 1600);
       if (file == null) return;
       setState(() {
         _analyzing = true;
@@ -77,20 +94,24 @@ class _SlipScreenState extends ConsumerState<SlipScreen> {
         _type = 'expense';
         // a.amount เป็น satang → แปลงเป็นบาทก่อน set ลง field
         // เพราะ _confirm() จะ toSatang() อีกครั้ง
-        if ((a.amount ?? 0) > 0) _amount.text = (a.amount! / 100).toStringAsFixed(2);
+        if ((a.amount ?? 0) > 0) _amount.text = Money.format(a.amount!);
         if (a.date != null) _date = DateTime.tryParse(a.date!);
         _categoryId = a.categoryId;
-        if ((a.merchant?.trim().isNotEmpty ?? false)) _desc.text = a.merchant!.trim();
+        if ((a.merchant?.trim().isNotEmpty ?? false))
+          _desc.text = a.merchant!.trim();
         _analyzing = false;
       });
       final ok = (a.amount ?? 0) > 0;
       ScaffoldMessenger.of(context).showSnackBar(SnackBar(
-        content: Text(ok ? 'อ่านสลิปสำเร็จ! ตรวจสอบแล้วกดยืนยัน ✅' : 'อ่านยอดไม่เจอ กรอกเองได้เลย'),
+        content: Text(ok
+            ? 'อ่านสลิปสำเร็จ! ตรวจสอบแล้วกดยืนยัน ✅'
+            : 'อ่านยอดไม่เจอ กรอกเองได้เลย'),
       ));
     } catch (e) {
       if (!mounted) return;
       setState(() => _analyzing = false);
-      ScaffoldMessenger.of(context).showSnackBar(SnackBar(content: Text('อ่านสลิปไม่สำเร็จ: $e')));
+      ScaffoldMessenger.of(context)
+          .showSnackBar(SnackBar(content: Text('อ่านสลิปไม่สำเร็จ: $e')));
     }
   }
 
@@ -109,14 +130,19 @@ class _SlipScreenState extends ConsumerState<SlipScreen> {
       context: context,
       isScrollControlled: true,
       backgroundColor: AppColors.surface,
-      shape: const RoundedRectangleBorder(borderRadius: BorderRadius.vertical(top: Radius.circular(20))),
+      shape: const RoundedRectangleBorder(
+          borderRadius: BorderRadius.vertical(top: Radius.circular(20))),
       builder: (_) => SafeArea(
         child: ConstrainedBox(
           constraints: BoxConstraints(maxHeight: MediaQuery.of(context).size.height * 0.7),
           child: Consumer(builder: (ctx, ref2, __) {
             final async = ref2.watch(budgetsListProvider);
             return async.when(
-              loading: () => const SizedBox(height: 160, child: Center(child: CircularProgressIndicator(color: AppColors.primary))),
+              loading: () => const SizedBox(
+                  height: 160,
+                  child: Center(
+                      child:
+                          CircularProgressIndicator(color: AppColors.primary))),
               error: (e, _) => Padding(
                 padding: const EdgeInsets.all(20),
                 child: Text('โหลดงบไม่ได้: $e', style: const TextStyle(color: Colors.redAccent)),
@@ -222,7 +248,8 @@ class _SlipScreenState extends ConsumerState<SlipScreen> {
   Future<void> _confirm() async {
     final baht = double.tryParse(_amount.text.replaceAll(',', '').trim());
     if (baht == null || baht <= 0) {
-      ScaffoldMessenger.of(context).showSnackBar(const SnackBar(content: Text('กรอกจำนวนเงินให้ถูกต้อง')));
+      ScaffoldMessenger.of(context).showSnackBar(
+          const SnackBar(content: Text('กรอกจำนวนเงินให้ถูกต้อง')));
       return;
     }
     setState(() => _saving = true);
@@ -237,16 +264,26 @@ class _SlipScreenState extends ConsumerState<SlipScreen> {
             occurredAt: _date,
           );
       ref.invalidate(dashboardProvider);
-      ref.invalidate(notificationsProvider); // รีเฟรชการแจ้งเตือนการทำนาย/งบประมาณล่วงหน้า
-      await ref.read(dashboardProvider.future); // รอให้ดึงข้อมูลเสร็จก่อนเด้งกลับ
+      ref.invalidate(
+          notificationsProvider); // รีเฟรชการแจ้งเตือนการทำนาย/งบประมาณล่วงหน้า
+      await ref
+          .read(dashboardProvider.future); // รอให้ดึงข้อมูลเสร็จก่อนเด้งกลับ
       if (!mounted) return;
       if (alert != null) {
         await showDialog(
           context: context,
           builder: (_) => AlertDialog(
-            title: const Row(children: [Icon(Icons.warning, color: Colors.orange), SizedBox(width: 8), Text('แจ้งเตือน')]),
+            title: const Row(children: [
+              Icon(Icons.warning, color: Colors.orange),
+              SizedBox(width: 8),
+              Text('แจ้งเตือน')
+            ]),
             content: Text(alert),
-            actions: [TextButton(onPressed: () => Navigator.pop(context), child: const Text('ตกลง'))],
+            actions: [
+              TextButton(
+                  onPressed: () => Navigator.pop(context),
+                  child: const Text('ตกลง'))
+            ],
           ),
         );
       }
@@ -254,7 +291,8 @@ class _SlipScreenState extends ConsumerState<SlipScreen> {
     } catch (e) {
       if (mounted) {
         setState(() => _saving = false);
-        ScaffoldMessenger.of(context).showSnackBar(SnackBar(content: Text('บันทึกไม่สำเร็จ: $e')));
+        ScaffoldMessenger.of(context)
+            .showSnackBar(SnackBar(content: Text('บันทึกไม่สำเร็จ: $e')));
       }
     }
   }
@@ -274,20 +312,26 @@ class _SlipScreenState extends ConsumerState<SlipScreen> {
           child: GestureDetector(
             onTap: () => context.pop(),
             child: Container(
-              decoration: const BoxDecoration(color: AppColors.primary, shape: BoxShape.circle),
-              child: const Icon(Icons.arrow_back, color: Colors.white, size: 20),
+              decoration: const BoxDecoration(
+                  color: AppColors.primary, shape: BoxShape.circle),
+              child:
+                  const Icon(Icons.arrow_back, color: Colors.white, size: 20),
             ),
           ),
         ),
-        title: const Text('เลือกสลิป', style: TextStyle(fontWeight: FontWeight.bold, fontSize: 20)),
+        title: const Text('เลือกสลิป',
+            style: TextStyle(fontWeight: FontWeight.bold, fontSize: 20)),
       ),
       body: _analyzing
           ? const Center(
-              child: Column(mainAxisAlignment: MainAxisAlignment.center, children: [
-                CircularProgressIndicator(color: AppColors.primary),
-                SizedBox(height: 12),
-                Text('กำลังอ่านสลิป...', style: TextStyle(color: AppColors.textMuted)),
-              ]),
+              child: Column(
+                  mainAxisAlignment: MainAxisAlignment.center,
+                  children: [
+                    CircularProgressIndicator(color: AppColors.primary),
+                    SizedBox(height: 12),
+                    Text('กำลังอ่านสลิป...',
+                        style: TextStyle(color: AppColors.textMuted)),
+                  ]),
             )
           : SafeArea(
               child: ListView(
@@ -305,16 +349,23 @@ class _SlipScreenState extends ConsumerState<SlipScreen> {
                     GestureDetector(
                       onTap: _pickSlip,
                       child: Container(
-                        padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 18),
+                        padding: const EdgeInsets.symmetric(
+                            horizontal: 16, vertical: 18),
                         decoration: _boxDeco(),
                         child: Row(children: [
-                          const Icon(Icons.cloud_upload_outlined, color: AppColors.primary, size: 26),
+                          const Icon(Icons.cloud_upload_outlined,
+                              color: AppColors.primary, size: 26),
                           const SizedBox(width: 14),
                           Expanded(
                             child: Text(
                               _fileName ?? 'แตะเพื่อเลือกรูปสลิป',
-                              style: TextStyle(color: _fileName != null ? Colors.white : AppColors.textMuted, fontSize: 14),
-                              maxLines: 1, overflow: TextOverflow.ellipsis,
+                              style: TextStyle(
+                                  color: _fileName != null
+                                      ? Colors.white
+                                      : AppColors.textMuted,
+                                  fontSize: 14),
+                              maxLines: 1,
+                              overflow: TextOverflow.ellipsis,
                             ),
                           ),
                         ]),
@@ -324,26 +375,43 @@ class _SlipScreenState extends ConsumerState<SlipScreen> {
                   ],
 
                   Text(_imageMode ? 'ข้อมูลที่ได้จากสลิป' : 'กรอกข้อมูลรายการ',
-                      style: const TextStyle(color: Colors.white, fontSize: 15, fontWeight: FontWeight.w600)),
+                      style: const TextStyle(
+                          color: Colors.white,
+                          fontSize: 15,
+                          fontWeight: FontWeight.w600)),
                   const SizedBox(height: 12),
 
                   // ── จำนวนเงิน ──
                   Container(
                     padding: const EdgeInsets.fromLTRB(16, 10, 16, 12),
                     decoration: _boxDeco(),
-                    child: Column(crossAxisAlignment: CrossAxisAlignment.start, children: [
-                      const Text('จำนวนเงิน', style: TextStyle(color: AppColors.textMuted, fontSize: 12)),
-                      TextField(
-                        controller: _amount,
-                        keyboardType: const TextInputType.numberWithOptions(decimal: true),
-                        inputFormatters: [FilteringTextInputFormatter.allow(RegExp(r'[0-9.,]'))],
-                        style: const TextStyle(color: AppColors.primary, fontSize: 26, fontWeight: FontWeight.bold),
-                        decoration: const InputDecoration(
-                          isDense: true, contentPadding: EdgeInsets.symmetric(vertical: 4),
-                          border: InputBorder.none, hintText: '0', hintStyle: TextStyle(color: Color(0xFF3A5546)),
-                        ),
-                      ),
-                    ]),
+                    child: Column(
+                        crossAxisAlignment: CrossAxisAlignment.start,
+                        children: [
+                          const Text('จำนวนเงิน',
+                              style: TextStyle(
+                                  color: AppColors.textMuted, fontSize: 12)),
+                          TextField(
+                            controller: _amount,
+                            keyboardType: const TextInputType.numberWithOptions(
+                                decimal: true),
+                            inputFormatters: [
+                              FilteringTextInputFormatter.allow(
+                                  RegExp(r'[0-9.,]'))
+                            ],
+                            style: const TextStyle(
+                                color: AppColors.primary,
+                                fontSize: 26,
+                                fontWeight: FontWeight.bold),
+                            decoration: const InputDecoration(
+                              isDense: true,
+                              contentPadding: EdgeInsets.symmetric(vertical: 4),
+                              border: InputBorder.none,
+                              hintText: '0',
+                              hintStyle: TextStyle(color: Color(0xFF3A5546)),
+                            ),
+                          ),
+                        ]),
                   ),
                   const SizedBox(height: 12),
 
@@ -353,18 +421,29 @@ class _SlipScreenState extends ConsumerState<SlipScreen> {
                     child: Container(
                       padding: const EdgeInsets.fromLTRB(16, 10, 16, 14),
                       decoration: _boxDeco(),
-                      child: Column(crossAxisAlignment: CrossAxisAlignment.start, children: [
-                        const Text('วันที่', style: TextStyle(color: AppColors.textMuted, fontSize: 12)),
-                        const SizedBox(height: 4),
-                        Row(children: [
-                          Text(_date != null ? _fmtThaiDate(_date!) : 'แตะเพื่อเลือกวันที่',
-                              style: TextStyle(
-                                  color: _date != null ? AppColors.primary : AppColors.textMuted,
-                                  fontSize: 20, fontWeight: FontWeight.bold)),
-                          const Spacer(),
-                          const Icon(Icons.calendar_today, color: AppColors.textMuted, size: 18),
-                        ]),
-                      ]),
+                      child: Column(
+                          crossAxisAlignment: CrossAxisAlignment.start,
+                          children: [
+                            const Text('วันที่',
+                                style: TextStyle(
+                                    color: AppColors.textMuted, fontSize: 12)),
+                            const SizedBox(height: 4),
+                            Row(children: [
+                              Text(
+                                  _date != null
+                                      ? _fmtThaiDate(_date!)
+                                      : 'แตะเพื่อเลือกวันที่',
+                                  style: TextStyle(
+                                      color: _date != null
+                                          ? AppColors.primary
+                                          : AppColors.textMuted,
+                                      fontSize: 20,
+                                      fontWeight: FontWeight.bold)),
+                              const Spacer(),
+                              const Icon(Icons.calendar_today,
+                                  color: AppColors.textMuted, size: 18),
+                            ]),
+                          ]),
                     ),
                   ),
                   const SizedBox(height: 18),
@@ -385,7 +464,8 @@ class _SlipScreenState extends ConsumerState<SlipScreen> {
                   GestureDetector(
                     onTap: _pickBudget,
                     child: Container(
-                      padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 18),
+                      padding: const EdgeInsets.symmetric(
+                          horizontal: 16, vertical: 18),
                       decoration: _boxDeco(),
                       child: Row(children: [
                         Expanded(
@@ -395,7 +475,8 @@ class _SlipScreenState extends ConsumerState<SlipScreen> {
                                   fontSize: 16, fontWeight: FontWeight.bold),
                               maxLines: 1, overflow: TextOverflow.ellipsis),
                         ),
-                        const Icon(Icons.keyboard_arrow_down, color: AppColors.textMuted),
+                        const Icon(Icons.keyboard_arrow_down,
+                            color: AppColors.textMuted),
                       ]),
                     ),
                   ),
@@ -408,7 +489,11 @@ class _SlipScreenState extends ConsumerState<SlipScreen> {
                   ],
 
                   // ── คำอธิบาย ──
-                  const Text('คำอธิบาย (ไม่บังคับ)', style: TextStyle(color: Colors.white, fontSize: 14, fontWeight: FontWeight.w600)),
+                  const Text('คำอธิบาย (ไม่บังคับ)',
+                      style: TextStyle(
+                          color: Colors.white,
+                          fontSize: 14,
+                          fontWeight: FontWeight.w600)),
                   const SizedBox(height: 8),
                   Container(
                     decoration: _boxDeco(),
@@ -417,8 +502,12 @@ class _SlipScreenState extends ConsumerState<SlipScreen> {
                       style: const TextStyle(color: Colors.white, fontSize: 15),
                       decoration: const InputDecoration(
                         border: InputBorder.none,
-                        contentPadding: EdgeInsets.symmetric(horizontal: 16, vertical: 18),
-                        hintText: 'เขียนคำอธิบาย', hintStyle: TextStyle(color: AppColors.primary, fontWeight: FontWeight.bold),
+                        contentPadding:
+                            EdgeInsets.symmetric(horizontal: 16, vertical: 18),
+                        hintText: 'เขียนคำอธิบาย',
+                        hintStyle: TextStyle(
+                            color: AppColors.primary,
+                            fontWeight: FontWeight.bold),
                       ),
                     ),
                   ),
@@ -430,10 +519,15 @@ class _SlipScreenState extends ConsumerState<SlipScreen> {
                     child: ElevatedButton(
                       onPressed: _saving ? null : _confirm,
                       child: _saving
-                          ? const SizedBox(height: 22, width: 22, child: CircularProgressIndicator(strokeWidth: 2, color: Colors.white))
+                          ? const SizedBox(
+                              height: 22,
+                              width: 22,
+                              child: CircularProgressIndicator(
+                                  strokeWidth: 2, color: Colors.white))
                           : Text(
                               _imageMode ? 'ยืนยันบันทึกสลิป' : 'บันทึกสลิป',
-                              style: const TextStyle(fontSize: 16, fontWeight: FontWeight.bold),
+                              style: const TextStyle(
+                                  fontSize: 16, fontWeight: FontWeight.bold),
                             ),
                     ),
                   ),
@@ -443,7 +537,8 @@ class _SlipScreenState extends ConsumerState<SlipScreen> {
     );
   }
 
-  Widget _buildBudgetInfoCard(BuildContext context, WidgetRef ref, String categoryId) {
+  Widget _buildBudgetInfoCard(
+      BuildContext context, WidgetRef ref, String categoryId) {
     final statuses = ref.watch(budgetStatusProvider);
     BudgetStatus? targetStatus;
     for (final s in statuses) {
@@ -453,7 +548,8 @@ class _SlipScreenState extends ConsumerState<SlipScreen> {
       }
     }
 
-    final double enteredAmount = double.tryParse(_amount.text.replaceAll(',', '').trim()) ?? 0;
+    final double enteredAmount =
+        double.tryParse(_amount.text.replaceAll(',', '').trim()) ?? 0;
     final int enteredSatang = Money.toSatang(enteredAmount);
 
     if (targetStatus == null) {
@@ -471,16 +567,23 @@ class _SlipScreenState extends ConsumerState<SlipScreen> {
               child: Column(
                 crossAxisAlignment: CrossAxisAlignment.start,
                 children: [
-                  Text('ยังไม่ได้ตั้งงบประมาณสำหรับหมวดนี้', style: TextStyle(color: Colors.white60, fontSize: 13)),
+                  Text('ยังไม่ได้ตั้งงบประมาณสำหรับหมวดนี้',
+                      style: TextStyle(color: Colors.white60, fontSize: 13)),
                   SizedBox(height: 2),
-                  Text('ตั้งค่าไว้เพื่อช่วยควบคุมค่าใช้จ่ายได้ดีขึ้น', style: TextStyle(color: Colors.white38, fontSize: 11)),
+                  Text('ตั้งค่าไว้เพื่อช่วยควบคุมค่าใช้จ่ายได้ดีขึ้น',
+                      style: TextStyle(color: Colors.white38, fontSize: 11)),
                 ],
               ),
             ),
             TextButton.icon(
               onPressed: () => context.push('/budgets'),
-              icon: const Icon(Icons.add_chart_rounded, size: 16, color: AppColors.primary),
-              label: const Text('ตั้งงบ', style: TextStyle(color: AppColors.primary, fontSize: 13, fontWeight: FontWeight.bold)),
+              icon: const Icon(Icons.add_chart_rounded,
+                  size: 16, color: AppColors.primary),
+              label: const Text('ตั้งงบ',
+                  style: TextStyle(
+                      color: AppColors.primary,
+                      fontSize: 13,
+                      fontWeight: FontWeight.bold)),
             ),
           ],
         ),
@@ -490,16 +593,23 @@ class _SlipScreenState extends ConsumerState<SlipScreen> {
     final newSpent = targetStatus.spent + enteredSatang;
     final isExceededNow = targetStatus.spent > targetStatus.amount;
     final willExceed = newSpent > targetStatus.amount;
-    
-    final currentPercent = targetStatus.amount > 0 ? (targetStatus.spent / targetStatus.amount).clamp(0.0, 1.0) : 0.0;
-    final newPercent = targetStatus.amount > 0 ? (newSpent / targetStatus.amount).clamp(0.0, 1.0) : 0.0;
+
+    final currentPercent = targetStatus.amount > 0
+        ? (targetStatus.spent / targetStatus.amount).clamp(0.0, 1.0)
+        : 0.0;
+    final newPercent = targetStatus.amount > 0
+        ? (newSpent / targetStatus.amount).clamp(0.0, 1.0)
+        : 0.0;
 
     return Container(
       padding: const EdgeInsets.all(16),
       decoration: BoxDecoration(
         color: const Color(0xFF13241A),
         borderRadius: BorderRadius.circular(14),
-        border: Border.all(color: willExceed ? Colors.redAccent.withOpacity(0.3) : AppColors.primary.withOpacity(0.2)),
+        border: Border.all(
+            color: willExceed
+                ? Colors.redAccent.withOpacity(0.3)
+                : AppColors.primary.withOpacity(0.2)),
       ),
       child: Column(
         crossAxisAlignment: CrossAxisAlignment.start,
@@ -509,11 +619,15 @@ class _SlipScreenState extends ConsumerState<SlipScreen> {
             children: [
               Row(
                 children: [
-                  const Icon(Icons.pie_chart_outline_rounded, color: AppColors.primary, size: 18),
+                  const Icon(Icons.pie_chart_outline_rounded,
+                      color: AppColors.primary, size: 18),
                   const SizedBox(width: 6),
                   Text(
                     'งบประมาณ: ${targetStatus.category?.nameTh ?? ""}',
-                    style: const TextStyle(color: Colors.white, fontSize: 13, fontWeight: FontWeight.bold),
+                    style: const TextStyle(
+                        color: Colors.white,
+                        fontSize: 13,
+                        fontWeight: FontWeight.bold),
                   ),
                 ],
               ),
@@ -521,8 +635,13 @@ class _SlipScreenState extends ConsumerState<SlipScreen> {
                 onTap: () => context.push('/budgets'),
                 child: const Row(
                   children: [
-                    Text('ดูงบทั้งหมด', style: TextStyle(color: AppColors.primary, fontSize: 12, fontWeight: FontWeight.bold)),
-                    Icon(Icons.chevron_right_rounded, color: AppColors.primary, size: 16),
+                    Text('ดูงบทั้งหมด',
+                        style: TextStyle(
+                            color: AppColors.primary,
+                            fontSize: 12,
+                            fontWeight: FontWeight.bold)),
+                    Icon(Icons.chevron_right_rounded,
+                        color: AppColors.primary, size: 16),
                   ],
                 ),
               ),
@@ -533,12 +652,12 @@ class _SlipScreenState extends ConsumerState<SlipScreen> {
             mainAxisAlignment: MainAxisAlignment.spaceBetween,
             children: [
               Text(
-                'ใช้ไป ฿${Money.format(targetStatus.spent)} / ฿${Money.format(targetStatus.amount)}',
+                'ใช้ไป ${Money.formatBaht(targetStatus.spent)} / ${Money.formatBaht(targetStatus.amount)}',
                 style: const TextStyle(color: Colors.white70, fontSize: 13),
               ),
               if (enteredSatang > 0)
                 Text(
-                  'ใหม่: ฿${Money.format(newSpent)}',
+                  'ใหม่: ${Money.formatBaht(newSpent)}',
                   style: TextStyle(
                     color: willExceed ? Colors.redAccent : AppColors.primary,
                     fontSize: 13,
@@ -548,7 +667,7 @@ class _SlipScreenState extends ConsumerState<SlipScreen> {
             ],
           ),
           const SizedBox(height: 8),
-          
+
           // Progress Bar showing spent vs new spent vs limit
           Stack(
             children: [
@@ -566,7 +685,9 @@ class _SlipScreenState extends ConsumerState<SlipScreen> {
                   child: Container(
                     height: 8,
                     decoration: BoxDecoration(
-                      color: willExceed ? Colors.redAccent.withOpacity(0.5) : AppColors.primary.withOpacity(0.5),
+                      color: willExceed
+                          ? Colors.redAccent.withOpacity(0.5)
+                          : AppColors.primary.withOpacity(0.5),
                       borderRadius: BorderRadius.circular(4),
                     ),
                   ),
@@ -589,14 +710,17 @@ class _SlipScreenState extends ConsumerState<SlipScreen> {
             children: [
               if (willExceed)
                 Text(
-                  isExceededNow 
-                      ? 'เกินงบประมาณอยู่ ฿${Money.format(targetStatus.spent - targetStatus.amount)}'
-                      : 'รายการนี้จะทำให้เกินงบไป ฿${Money.format(newSpent - targetStatus.amount)}',
-                  style: const TextStyle(color: Colors.redAccent, fontSize: 11, fontWeight: FontWeight.w500),
+                  isExceededNow
+                      ? 'เกินงบประมาณอยู่ ${Money.formatBaht(targetStatus.spent - targetStatus.amount)}'
+                      : 'รายการนี้จะทำให้เกินงบไป ${Money.formatBaht(newSpent - targetStatus.amount)}',
+                  style: const TextStyle(
+                      color: Colors.redAccent,
+                      fontSize: 11,
+                      fontWeight: FontWeight.w500),
                 )
               else
                 Text(
-                  'เหลือใช้อีก ฿${Money.format(targetStatus.amount - newSpent)}',
+                  'เหลือใช้อีก ${Money.formatBaht(targetStatus.amount - newSpent)}',
                   style: const TextStyle(color: Colors.white38, fontSize: 11),
                 ),
               Text(
@@ -617,7 +741,8 @@ class _SlipScreenState extends ConsumerState<SlipScreen> {
   BoxDecoration _boxDeco() => BoxDecoration(
         gradient: const LinearGradient(
           colors: [Color(0xFF16281D), Color(0xFF0F1712)],
-          begin: Alignment.topLeft, end: Alignment.bottomRight,
+          begin: Alignment.topLeft,
+          end: Alignment.bottomRight,
         ),
         borderRadius: BorderRadius.circular(14),
         border: Border.all(color: _boxBorder),
@@ -634,15 +759,21 @@ class _ModeTabs extends StatelessWidget {
   Widget build(BuildContext context) {
     return Container(
       padding: const EdgeInsets.all(4),
-      decoration: BoxDecoration(color: const Color(0xFF0F1712), borderRadius: BorderRadius.circular(30), border: Border.all(color: _boxBorder)),
+      decoration: BoxDecoration(
+          color: const Color(0xFF0F1712),
+          borderRadius: BorderRadius.circular(30),
+          border: Border.all(color: _boxBorder)),
       child: Row(children: [
-        _tab('เลือกไฟล์รูป', imageMode, AppColors.primary, () => onChanged(true)),
+        _tab('เลือกไฟล์รูป', imageMode, AppColors.primary,
+            () => onChanged(true)),
         _tab('เขียนเอง', !imageMode, AppColors.expense, () => onChanged(false)),
       ]),
     );
   }
 
-  Widget _tab(String label, bool active, Color activeColor, VoidCallback onTap) => Expanded(
+  Widget _tab(
+          String label, bool active, Color activeColor, VoidCallback onTap) =>
+      Expanded(
         child: GestureDetector(
           onTap: onTap,
           child: AnimatedContainer(
@@ -656,7 +787,8 @@ class _ModeTabs extends StatelessWidget {
             child: Text(label,
                 style: TextStyle(
                     color: active ? Colors.white : AppColors.textMuted,
-                    fontWeight: FontWeight.bold, fontSize: 14)),
+                    fontWeight: FontWeight.bold,
+                    fontSize: 14)),
           ),
         ),
       );
@@ -664,7 +796,11 @@ class _ModeTabs extends StatelessWidget {
 
 /// ปิ่นรายรับ/รายจ่าย
 class _TypePill extends StatelessWidget {
-  const _TypePill({required this.label, required this.selected, required this.color, required this.onTap});
+  const _TypePill(
+      {required this.label,
+      required this.selected,
+      required this.color,
+      required this.onTap});
   final String label;
   final bool selected;
   final Color color;
@@ -684,7 +820,8 @@ class _TypePill extends StatelessWidget {
         child: Text(label,
             style: TextStyle(
                 color: selected ? Colors.white : AppColors.textMuted,
-                fontWeight: FontWeight.bold, fontSize: 13)),
+                fontWeight: FontWeight.bold,
+                fontSize: 13)),
       ),
     );
   }

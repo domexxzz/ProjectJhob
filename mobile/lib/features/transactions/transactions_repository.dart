@@ -30,13 +30,21 @@ class TransactionsRepository {
   TransactionsRepository(this._dio);
   final Dio _dio;
 
-  Future<Box> _getCacheBox() => Hive.openBox('cache');
-  Future<Box> _getPendingBox() => Hive.openBox('pending_sync');
+  Future<Box?> _openBoxSafely(String name) async {
+    try {
+      return await Hive.openBox(name);
+    } catch (_) {
+      return null;
+    }
+  }
+
+  Future<Box?> _getCacheBox() => _openBoxSafely('cache');
+  Future<Box?> _getPendingBox() => _openBoxSafely('pending_sync');
 
   /// ล้าง Hive cache ทั้งหมดเมื่อข้อมูลเปลี่ยนแปลง (หลัง create/update/delete สำเร็จ)
   Future<void> _clearCache() async {
     final box = await _getCacheBox();
-    await box.clear();
+    await box?.clear();
   }
 
   Future<DashboardData> list({String? month, String? type}) async {
@@ -51,12 +59,12 @@ class TransactionsRepository {
       final data = res.data as Map<String, dynamic>;
 
       // Save raw JSON to cache for offline-first read
-      await cacheBox.put(cacheKey, jsonEncode(data));
+      await cacheBox?.put(cacheKey, jsonEncode(data));
 
       return _parseDashboardData(data);
     } catch (e) {
       // Offline fallback: read from Hive cache
-      final cachedJson = cacheBox.get(cacheKey) as String?;
+      final cachedJson = cacheBox?.get(cacheKey) as String?;
       if (cachedJson != null) {
         final decoded = jsonDecode(cachedJson) as Map<String, dynamic>;
         return _parseDashboardData(decoded);
@@ -103,6 +111,7 @@ class TransactionsRepository {
     } catch (e) {
       // Offline fallback: Queue write operation
       final pendingBox = await _getPendingBox();
+      if (pendingBox == null) rethrow;
       final pendingActions =
           pendingBox.get('actions', defaultValue: []) as List;
       pendingActions.add({
@@ -138,6 +147,7 @@ class TransactionsRepository {
       return data['anomalyAlert'] as String?;
     } catch (e) {
       final pendingBox = await _getPendingBox();
+      if (pendingBox == null) rethrow;
       final pendingActions =
           pendingBox.get('actions', defaultValue: []) as List;
       pendingActions.add({
@@ -157,6 +167,7 @@ class TransactionsRepository {
       await _clearCache(); // ล้าง cache หลัง delete สำเร็จ
     } catch (e) {
       final pendingBox = await _getPendingBox();
+      if (pendingBox == null) rethrow;
       final pendingActions =
           pendingBox.get('actions', defaultValue: []) as List;
       pendingActions.add({
@@ -171,6 +182,7 @@ class TransactionsRepository {
   /// Sync pending offline actions with server
   Future<void> syncPending() async {
     final pendingBox = await _getPendingBox();
+    if (pendingBox == null) return;
     final pendingActions = pendingBox.get('actions', defaultValue: []) as List;
     if (pendingActions.isEmpty) return;
 

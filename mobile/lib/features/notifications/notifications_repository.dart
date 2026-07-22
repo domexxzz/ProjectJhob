@@ -2,6 +2,7 @@ import 'package:dio/dio.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 
 import '../../core/api/api_client.dart';
+import '../settings/settings_screen.dart';
 
 /// การแจ้งเตือน — ตรงกับ Notification model ฝั่ง backend
 class AppNotification {
@@ -15,7 +16,8 @@ class AppNotification {
   });
 
   final String id;
-  final String type; // budget_near | budget_over | daily_summary | goal | subscription
+  final String
+      type; // budget_near | budget_over | daily_summary | goal | subscription
   final String title;
   final String body;
   final bool read;
@@ -51,8 +53,10 @@ class NotificationsRepository {
   Future<void> markAllRead() => _dio.post('/notifications/read-all');
 
   /// ตรวจงบเดี๋ยวนี้ → สร้างแจ้งเตือน (ใช้เดโม/ทดสอบ เพราะ cron ปิดอยู่)
-  Future<int> runTriggers() async {
-    final res = await _dio.post('/notifications/run-triggers');
+  Future<int> runTriggers({bool includeBudgetAlerts = true}) async {
+    final res = await _dio.post('/notifications/run-triggers', data: {
+      'includeBudgetAlerts': includeBudgetAlerts,
+    });
     return ((res.data as Map<String, dynamic>)['created'] as int?) ?? 0;
   }
 }
@@ -63,5 +67,21 @@ final notificationsRepoProvider = Provider<NotificationsRepository>(
 
 /// รายการ + จำนวนยังไม่อ่าน (ใช้ทั้งจอ Notification และ badge ในเมนู)
 final notificationsProvider = FutureProvider.autoDispose<NotificationList>(
-  (ref) => ref.watch(notificationsRepoProvider).list(),
+  (ref) async {
+    final settings = ref.watch(appSettingsProvider);
+    if (!settings.notifications) {
+      return (items: <AppNotification>[], unreadCount: 0);
+    }
+    final data = await ref.watch(notificationsRepoProvider).list();
+    final items = settings.budgetAlerts
+        ? data.items
+        : data.items
+            .where((item) =>
+                item.type != 'budget_near' && item.type != 'budget_over')
+            .toList();
+    return (
+      items: items,
+      unreadCount: items.where((item) => !item.read).length,
+    );
+  },
 );
