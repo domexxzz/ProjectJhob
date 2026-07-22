@@ -10,6 +10,7 @@ import '../../app/theme.dart';
 import '../goals/set_deadline_screen.dart';
 import '../transactions/transactions_repository.dart';
 import '../settings/settings_screen.dart';
+import '../../core/money.dart';
 
 class BudgetAmountScreen extends ConsumerStatefulWidget {
   const BudgetAmountScreen({super.key});

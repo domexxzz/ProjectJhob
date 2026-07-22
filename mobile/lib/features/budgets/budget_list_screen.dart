@@ -7,6 +7,8 @@ import '../../core/money.dart';
 import '../transactions/transaction.dart';
 import '../transactions/transactions_repository.dart';
 import '../auth/auth_controller.dart'; 
+import '../settings/settings_screen.dart';
+import '../../widgets/app_bottom_nav_bar.dart';
 import 'package:intl/intl.dart';
 
 class BudgetListScreen extends ConsumerWidget {
@@ -303,9 +305,9 @@ class BudgetListScreen extends ConsumerWidget {
           ),
         ],
       ),
-      floatingActionButton: const AppFloatingActionButton(),
+      floatingActionButton: AppFloatingActionButton(),
       floatingActionButtonLocation: kFixedCenterDockedFabLocation,
-      bottomNavigationBar: const AppBottomNavigationBar(currentTab: AppTab.budgets),
+      bottomNavigationBar: AppBottomNavigationBar(currentTab: AppTab.budgets),
     );
   }
 

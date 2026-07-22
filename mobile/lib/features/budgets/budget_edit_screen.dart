@@ -26,6 +26,8 @@ class _BudgetEditScreenState extends ConsumerState<BudgetEditScreen> {
   late TextEditingController _amountController;
   late bool _showOnDashboard;
 
+  bool _didApplyDisplayCurrency = false;
+
   @override
   void initState() {
     super.initState();
@@ -460,8 +462,7 @@ class _BudgetEditScreenState extends ConsumerState<BudgetEditScreen> {
                               child: const Icon(Icons.smart_toy_rounded,
                                   color: Color(0xFF4CD97B), size: 28),
                             ),
-                            child: const Icon(Icons.smart_toy_rounded, color: Color(0xFF4CD97B), size: 28),
-                          ),
+
                           const SizedBox(width: 14),
                           Expanded(
                             child: Column(
@@ -478,8 +479,9 @@ class _BudgetEditScreenState extends ConsumerState<BudgetEditScreen> {
                                 )
                               ],
                             ),
-                            const Icon(Icons.arrow_forward_ios_rounded,
-                                color: Colors.white30, size: 14),
+                          ),
+                          const Icon(Icons.arrow_forward_ios_rounded,
+                              color: Colors.white30, size: 14),
                           ],
                         ),
                       ),
