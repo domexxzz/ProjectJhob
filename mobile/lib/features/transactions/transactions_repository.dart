@@ -87,6 +87,7 @@ class TransactionsRepository {
     required String type,
     required int amount,
     String? categoryId,
+    String? budgetId,
     String? note,
     String source = 'manual',
     DateTime? occurredAt,
@@ -95,6 +96,7 @@ class TransactionsRepository {
       'type': type,
       'amount': amount,
       if (categoryId != null) 'categoryId': categoryId,
+      if (budgetId != null) 'budgetId': budgetId,
       if (note != null && note.isNotEmpty) 'note': note,
       'source': source,
       if (occurredAt != null)
@@ -127,12 +129,14 @@ class TransactionsRepository {
     required String type,
     required int amount,
     String? categoryId,
+    String? budgetId,
     String? note,
   }) async {
     final payload = {
       'type': type,
       'amount': amount,
       'categoryId': categoryId,
+      'budgetId': budgetId,
       'note': note ?? '',
     };
 
@@ -243,14 +247,16 @@ class TransactionsRepository {
   }
 
   Future<Budget> createBudget({
-    required String categoryId,
+    required String name,
+    String? categoryId,
     required int amount,
-    required String period,
+    bool showOnDashboard = true,
   }) async {
     final res = await _dio.post('/budgets', data: {
-      'categoryId': categoryId,
+      'name': name,
+      if (categoryId != null) 'categoryId': categoryId,
       'amount': amount,
-      'period': period,
+      'showOnDashboard': showOnDashboard,
     });
     await _clearCache();
     final data = res.data as Map<String, dynamic>;
@@ -259,14 +265,16 @@ class TransactionsRepository {
 
   Future<Budget> updateBudget(
     String id, {
+    String? name,
     int? amount,
-    String? period,
     String? categoryId,
+    bool? showOnDashboard,
   }) async {
     final res = await _dio.patch('/budgets/$id', data: {
+      if (name != null) 'name': name,
       if (amount != null) 'amount': amount,
-      if (period != null) 'period': period,
       if (categoryId != null) 'categoryId': categoryId,
+      if (showOnDashboard != null) 'showOnDashboard': showOnDashboard,
     });
     await _clearCache();
     final data = res.data as Map<String, dynamic>;
@@ -329,49 +337,33 @@ final budgetStatusProvider = Provider.autoDispose<List<BudgetStatus>>((ref) {
   final budgets = budgetsAsync.value ?? [];
   final transactions = dashboardAsync.value?.items ?? [];
 
-  final now = DateTime.now();
-
-  final startOfMonth = DateTime(now.year, now.month, 1);
-  final endOfMonth = DateTime(now.year, now.month + 1, 1);
-
-  final day = now.weekday; // 1 is Monday, 7 is Sunday
-  final startOfWeek = DateTime(now.year, now.month, now.day - (day - 1));
-  final endOfWeek = startOfWeek.add(const Duration(days: 7));
-
   return budgets.map((b) {
-    final isWeekly = b.period == 'weekly';
-    final start = isWeekly ? startOfWeek : startOfMonth;
-    final end = isWeekly ? endOfWeek : endOfMonth;
-
     final filtered = transactions.where((t) {
       if (t.type != 'expense') return false;
-      if (t.occurredAt.isBefore(start) || t.occurredAt.isAfter(end)) {
-        return false;
+      
+      // If transaction is explicitly linked to THIS budget
+      if (t.budgetId != null) {
+        return t.budgetId == b.id;
       }
-      if (b.categoryId != null && t.category?.id != b.categoryId) {
-        return false;
+
+      // Legacy fallback: match by category if budget has a category
+      if (b.categoryId != null) {
+        return t.category?.id == b.categoryId;
       }
-      return true;
+
+      // It's a custom budget but transaction doesn't have a matching budgetId
+      return false;
     });
 
     final spent = filtered.fold<int>(0, (sum, t) => sum + t.amount);
-    final totalDays = end.difference(start).inDays;
-    final elapsedDays = now.difference(start).inHours / 24;
-    final periodProgress = totalDays > 0
-        ? (elapsedDays / totalDays).clamp(1 / totalDays, 1.0)
-        : 1.0;
-    final projectedCandidate =
-        spent == 0 ? 0 : (spent / periodProgress).round();
-    final projectedSpend =
-        projectedCandidate < spent ? spent : projectedCandidate;
     final actualRatio = b.amount > 0 ? spent / b.amount : 0.0;
-    final projectedRatio = b.amount > 0 ? projectedSpend / b.amount : 0.0;
-    final riskLevel = actualRatio >= 1 || projectedRatio >= 1.1
+    final riskLevel = actualRatio >= 0.8
         ? 'danger'
-        : (actualRatio >= 0.8 || projectedRatio >= 0.9 ? 'warning' : 'safe');
+        : (actualRatio >= 0.5 ? 'warning' : 'safe');
 
     return BudgetStatus(
       id: b.id,
+      name: b.name,
       categoryId: b.categoryId,
       category: b.category,
       amount: b.amount,
@@ -379,10 +371,7 @@ final budgetStatusProvider = Provider.autoDispose<List<BudgetStatus>>((ref) {
       remaining: b.amount - spent,
       percentage: b.amount > 0 ? spent / b.amount : 0.0,
       isExceeded: spent > b.amount,
-      period: b.period,
-      projectedSpend: projectedSpend,
-      periodProgress: periodProgress,
-      daysRemaining: (totalDays - elapsedDays.ceil()).clamp(0, totalDays),
+      showOnDashboard: b.showOnDashboard,
       riskLevel: riskLevel,
     );
   }).toList();

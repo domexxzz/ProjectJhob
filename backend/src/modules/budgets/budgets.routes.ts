@@ -9,9 +9,10 @@ export const budgetsRouter = Router();
 budgetsRouter.use(requireAuth);
 
 const createBudgetSchema = z.object({
+  name: z.string().min(1, 'กรุณาใส่ชื่อหัวข้องบประมาณ').optional(),
   categoryId: z.string().nullable().optional(),
   amount: z.number().int().positive('amount ต้องมากกว่า 0'),
-  period: z.enum(['monthly', 'weekly']).default('monthly'),
+  showOnDashboard: z.boolean().default(true).optional(),
 });
 
 const updateBudgetSchema = createBudgetSchema.partial();
@@ -40,79 +41,45 @@ budgetsRouter.get(
   '/status',
   asyncHandler(async (req, res) => {
     const userId = req.userId!;
-    const { period } = req.query as { period?: string };
 
-    const cacheKey = `user:${userId}:budgets_status:${period || 'all'}`;
+    const cacheKey = `user:${userId}:budgets_status`;
     const cached = await cache.get<{ budgetsStatus: any[] }>(cacheKey);
     if (cached) return res.json(cached);
 
     const budgets = await prisma.budget.findMany({
       where: {
         userId,
-        ...(period ? { period } : {}),
       },
       include: { category: true },
     });
 
-    const now = new Date();
     const budgetsStatus = [];
 
     for (const b of budgets) {
-      let startDate: Date;
-      let endDate: Date;
-
-      if (b.period === 'weekly') {
-        const startOfWeek = new Date(now);
-        const day = startOfWeek.getDay();
-        const diff = startOfWeek.getDate() - day + (day === 0 ? -6 : 1);
-        startOfWeek.setDate(diff);
-        startOfWeek.setHours(0, 0, 0, 0);
-
-        const endOfWeek = new Date(startOfWeek);
-        endOfWeek.setDate(startOfWeek.getDate() + 7);
-
-        startDate = startOfWeek;
-        endDate = endOfWeek;
-      } else {
-        // default to monthly
-        const startOfMonth = new Date(now.getFullYear(), now.getMonth(), 1);
-        const endOfMonth = new Date(now.getFullYear(), now.getMonth() + 1, 1);
-
-        startDate = startOfMonth;
-        endDate = endOfMonth;
-      }
-
-      // Calculate total expense spent in this budget's range
+      // Calculate total expense spent for this budget's category
       const agg = await prisma.transaction.aggregate({
         _sum: { amount: true },
         where: {
           userId,
           type: 'expense',
-          categoryId: b.categoryId || null,
-          occurredAt: {
-            gte: startDate,
-            lt: endDate,
-          },
+          OR: [
+            { budgetId: b.id },
+            ...(b.categoryId ? [{ categoryId: b.categoryId }] : []),
+          ],
         },
       });
 
       const spent = agg._sum.amount || 0;
-      const totalMs = endDate.getTime() - startDate.getTime();
-      const elapsedMs = Math.max(0, Math.min(now.getTime() - startDate.getTime(), totalMs));
-      const minimumProgress = 1 / Math.max(1, Math.ceil(totalMs / 86_400_000));
-      const periodProgress = Math.max(minimumProgress, totalMs > 0 ? elapsedMs / totalMs : 1);
-      const projectedSpend = spent > 0 ? Math.max(spent, Math.round(spent / periodProgress)) : 0;
       const actualRatio = b.amount > 0 ? spent / b.amount : 0;
-      const projectedRatio = b.amount > 0 ? projectedSpend / b.amount : 0;
-      const riskLevel = actualRatio >= 1 || projectedRatio >= 1.1
+      const riskLevel = actualRatio >= 0.8
         ? 'danger'
-        : actualRatio >= 0.8 || projectedRatio >= 0.9
+        : actualRatio >= 0.5
           ? 'warning'
           : 'safe';
-      const daysRemaining = Math.max(0, Math.ceil((endDate.getTime() - now.getTime()) / 86_400_000));
 
       budgetsStatus.push({
         id: b.id,
+        name: (b as any).name ?? null,
         categoryId: b.categoryId,
         category: b.category ? {
           id: b.category.id,
@@ -127,10 +94,7 @@ budgetsRouter.get(
         remaining: b.amount - spent,
         percentage: b.amount > 0 ? parseFloat((spent / b.amount).toFixed(2)) : 0,
         isExceeded: spent > b.amount,
-        period: b.period,
-        projectedSpend,
-        periodProgress: parseFloat(periodProgress.toFixed(3)),
-        daysRemaining,
+        showOnDashboard: (b as any).showOnDashboard ?? true,
         riskLevel,
       });
     }
@@ -147,24 +111,39 @@ budgetsRouter.post(
   asyncHandler(async (req, res) => {
     const data = createBudgetSchema.parse(req.body);
     
-    // Check if budget for this category and period already exists
-    const existing = await prisma.budget.findFirst({
-      where: {
-        userId: req.userId!,
-        categoryId: data.categoryId || null,
-        period: data.period,
-      },
-    });
-    if (existing) {
-      throw new HttpError(400, 'งบสำหรับหมวดหมู่นี้ถูกตั้งไว้แล้ว');
+    // Check duplicates:
+    // - ถ้ามี categoryId → ห้ามซ้ำ category+period
+    // - ถ้าไม่มี categoryId (custom name) → ห้ามซ้ำ name+period
+    let existing = null;
+    if (data.categoryId) {
+      existing = await prisma.budget.findFirst({
+        where: {
+          userId: req.userId!,
+          categoryId: data.categoryId,
+          period: data.period,
+        },
+      });
+      if (existing) throw new HttpError(400, 'งบสำหรับหมวดหมู่นี้ถูกตั้งไว้แล้ว');
+    } else if (data.name) {
+      existing = await prisma.budget.findFirst({
+        where: {
+          userId: req.userId!,
+          name: data.name,
+          period: data.period,
+        },
+      });
+      if (existing) throw new HttpError(400, `งบ "${data.name}" สำหรับช่วงเวลานี้ถูกตั้งไว้แล้ว`);
     }
 
     const budget = await prisma.budget.create({
       data: {
         userId: req.userId!,
+        name: data.name ?? null,
         categoryId: data.categoryId,
         amount: data.amount,
         period: data.period,
+        startDate: data.startDate ? new Date(data.startDate) : undefined,
+        endDate: data.endDate ? new Date(data.endDate) : undefined,
       },
       include: { category: true },
     });
@@ -187,9 +166,12 @@ budgetsRouter.patch(
     const budget = await prisma.budget.update({
       where: { id: req.params.id },
       data: {
+        ...(data.name !== undefined ? { name: data.name } : {}),
         categoryId: data.categoryId,
         amount: data.amount,
         period: data.period,
+        startDate: data.startDate !== undefined ? (data.startDate ? new Date(data.startDate) : null) : undefined,
+        endDate: data.endDate !== undefined ? (data.endDate ? new Date(data.endDate) : null) : undefined,
       },
       include: { category: true },
     });

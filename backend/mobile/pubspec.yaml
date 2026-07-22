@@ -1,0 +1,41 @@
+name: ai_finance_coach
+description: AI Personal Finance Coach (พี่เงิน)
+publish_to: "none"
+version: 0.1.0+1
+
+environment:
+  sdk: ">=3.3.0 <4.0.0"
+  flutter: ">=3.19.0"
+
+dependencies:
+  flutter:
+    sdk: flutter
+  table_calendar: ^3.1.2
+  cupertino_icons: ^1.0.6
+  flutter_riverpod: ^2.5.1
+  go_router: ^14.2.0
+  dio: ^5.5.0
+  flutter_secure_storage: ^9.2.2
+  shared_preferences: ^2.3.2
+  hive: ^2.2.3
+  hive_flutter: ^1.1.0
+  intl: ^0.19.0
+  fl_chart: ^0.68.0
+  speech_to_text: ^7.0.0
+  image_picker: ^1.1.2
+  flutter_markdown_plus: ^1.0.7
+  google_sign_in: ^6.2.2
+  flutter_facebook_auth: ^6.2.0
+  url_launcher: ^6.3.0
+
+dev_dependencies:
+  flutter_lints: ^4.0.0
+  flutter_test:
+    sdk: flutter
+
+flutter:
+  uses-material-design: true
+  assets:
+    - assets/images/
+    - assets/images/goal_banner.png
+

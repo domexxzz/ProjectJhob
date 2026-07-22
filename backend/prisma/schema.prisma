@@ -62,12 +62,15 @@ model Transaction {
   note       String?
   source     String   @default("manual") // manual | ocr | sms
   categoryId String?
+  budgetId   String?
   occurredAt DateTime @default(now())
   createdAt  DateTime @default(now())
   updatedAt  DateTime @updatedAt
 
   user     User      @relation(fields: [userId], references: [id], onDelete: Cascade)
   category Category? @relation(fields: [categoryId], references: [id])
+  budget   Budget?   @relation(fields: [budgetId], references: [id])
+
 
   @@index([userId, occurredAt])
 }
@@ -75,13 +78,15 @@ model Transaction {
 model Budget {
   id         String   @id @default(cuid())
   userId     String
+  name       String?  // ชื่อหัวข้องบประมาณที่ผู้ใช้ตั้งเอง
   categoryId String?
-  amount     Int // satang ต่อ period
-  period     String   @default("monthly") // monthly | weekly
+  amount     Int // satang
+  showOnDashboard Boolean @default(true)
   createdAt  DateTime @default(now())
 
-  user     User      @relation(fields: [userId], references: [id], onDelete: Cascade)
-  category Category? @relation(fields: [categoryId], references: [id])
+  user         User          @relation(fields: [userId], references: [id], onDelete: Cascade)
+  category     Category?     @relation(fields: [categoryId], references: [id])
+  transactions Transaction[]
 }
 
 model Goal {

@@ -1,0 +1,12 @@
+{
+  "monthly_income": 2500000,
+  "this_month_spent": 1850000,
+  "budget_remaining": { "อาหาร": -150000, "ช้อปปิ้ง": -120000, "เดินทาง": 50000 },
+  "top_expenses": [
+    { "category": "อาหาร", "amount": 650000 },
+    { "category": "ช้อปปิ้ง", "amount": 420000 },
+    { "category": "เดินทาง", "amount": 350000 }
+  ],
+  "goals": [{ "name": "เที่ยวญี่ปุ่น", "progress_pct": 45 }],
+  "streak_days": 12
+}

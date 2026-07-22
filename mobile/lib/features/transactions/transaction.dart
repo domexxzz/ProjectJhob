@@ -30,6 +30,7 @@ class Txn {
     this.note,
     required this.source,
     this.category,
+    this.budgetId,
     required this.occurredAt,
   });
 
@@ -39,6 +40,7 @@ class Txn {
   final String? note;
   final String source;
   final Category? category;
+  final String? budgetId;
   final DateTime occurredAt;
 
   bool get isIncome => type == 'income';
@@ -52,6 +54,7 @@ class Txn {
         category: j['category'] != null
             ? Category.fromJson(j['category'] as Map<String, dynamic>)
             : null,
+        budgetId: j['budgetId'] as String?,
         occurredAt: DateTime.parse(j['occurredAt'] as String),
       );
 }
@@ -74,25 +77,37 @@ class Budget {
   Budget({
     required this.id,
     required this.userId,
+    this.name,
     this.categoryId,
     required this.amount,
-    required this.period,
+    this.showOnDashboard = true,
+    required this.createdAt,
     this.category,
   });
 
   final String id;
   final String userId;
+  final String? name;
   final String? categoryId;
   final int amount;
-  final String period;
+  final bool showOnDashboard;
+  final DateTime createdAt;
   final Category? category;
+
+  /// ชื่อที่แสดงในหน้า UI: ใช้ชื่อที่ตั้งเอง >> nameTh จาก category >> 'งบประมาณทั่วไป'
+  String get displayName =>
+      (name?.isNotEmpty == true)
+          ? name!
+          : (category?.nameTh.isNotEmpty == true ? category!.nameTh : 'งบประมาณทั่วไป');
 
   factory Budget.fromJson(Map<String, dynamic> j) => Budget(
         id: j['id'] as String,
         userId: j['userId'] as String,
+        name: j['name'] as String?,
         categoryId: j['categoryId'] as String?,
         amount: (j['amount'] as num).toInt(),
-        period: (j['period'] ?? 'monthly') as String,
+        showOnDashboard: j['showOnDashboard'] as bool? ?? true,
+        createdAt: j['createdAt'] != null ? DateTime.parse(j['createdAt'] as String) : DateTime.now(),
         category: j['category'] != null
             ? Category.fromJson(j['category'] as Map<String, dynamic>)
             : null,
@@ -102,6 +117,7 @@ class Budget {
 class BudgetStatus {
   BudgetStatus({
     required this.id,
+    this.name,
     this.categoryId,
     this.category,
     required this.amount,
@@ -109,14 +125,12 @@ class BudgetStatus {
     required this.remaining,
     required this.percentage,
     required this.isExceeded,
-    required this.period,
-    this.projectedSpend = 0,
-    this.periodProgress = 0,
-    this.daysRemaining = 0,
+    this.showOnDashboard = true,
     this.riskLevel = 'safe',
   });
 
   final String id;
+  final String? name;
   final String? categoryId;
   final Category? category;
   final int amount;
@@ -124,14 +138,17 @@ class BudgetStatus {
   final int remaining;
   final double percentage;
   final bool isExceeded;
-  final String period;
-  final int projectedSpend;
-  final double periodProgress;
-  final int daysRemaining;
+  final bool showOnDashboard;
   final String riskLevel; // safe | warning | danger
+
+  String get displayName =>
+      (name?.isNotEmpty == true)
+          ? name!
+          : (category?.nameTh.isNotEmpty == true ? category!.nameTh : 'งบประมาณทั่วไป');
 
   factory BudgetStatus.fromJson(Map<String, dynamic> j) => BudgetStatus(
         id: j['id'] as String,
+        name: j['name'] as String?,
         categoryId: j['categoryId'] as String?,
         category: j['category'] != null
             ? Category.fromJson(j['category'] as Map<String, dynamic>)
@@ -141,10 +158,7 @@ class BudgetStatus {
         remaining: (j['remaining'] as num).toInt(),
         percentage: (j['percentage'] as num).toDouble(),
         isExceeded: j['isExceeded'] as bool,
-        period: j['period'] as String,
-        projectedSpend: (j['projectedSpend'] as num?)?.toInt() ?? 0,
-        periodProgress: (j['periodProgress'] as num?)?.toDouble() ?? 0,
-        daysRemaining: (j['daysRemaining'] as num?)?.toInt() ?? 0,
+        showOnDashboard: j['showOnDashboard'] as bool? ?? true,
         riskLevel: (j['riskLevel'] ?? 'safe') as String,
       );
 }

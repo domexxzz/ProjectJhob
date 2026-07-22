@@ -1,0 +1,105 @@
+import { Router } from 'express';
+import { z } from 'zod';
+import { asyncHandler, HttpError } from '../../lib/http';
+import { requireAuth } from '../../lib/auth';
+import { prisma } from '../../lib/prisma';
+import { cache } from '../../lib/cache';
+import { buildContext } from './context_builder';
+import { generateReply, ChatTurn, ocrImage } from './coach';
+import { detectExportRequest, buildExportReply, buildDynamicExportReply, ChatAttachment } from './export_intent';
+
+export const chatRouter = Router();
+chatRouter.use(requireAuth);
+
+// เผื่อข้อความยาวจาก OCR (สลิป/ตาราง) — ปกติผู้ใช้พิมพ์สั้น แต่แนบรูปแล้ววิเคราะห์อาจยาว
+const sendSchema = z.object({ message: z.string().min(1).max(8000) });
+
+// GET /api/v1/chat -> ประวัติแชท
+chatRouter.get(
+  '/',
+  asyncHandler(async (req, res) => {
+    const messages = await prisma.chatMessage.findMany({
+      where: { userId: req.userId! },
+      orderBy: { createdAt: 'asc' },
+      take: 100,
+    });
+    res.json({ messages });
+  }),
+);
+
+// POST /api/v1/chat -> ส่งข้อความ + รับคำตอบจากพี่เงิน
+chatRouter.post(
+  '/',
+  asyncHandler(async (req, res) => {
+    const { message } = sendSchema.parse(req.body);
+    const userId = req.userId!;
+
+    // rate limit ง่ายๆ: 20 ข้อความ/นาที/คน
+    const rlKey = `chat_rl:${userId}`;
+    const count = (await cache.get<number>(rlKey)) ?? 0;
+    if (count >= 20) throw new HttpError(429, 'ส่งข้อความถี่เกินไป ลองใหม่อีกครั้งใน 1 นาที');
+    await cache.set(rlKey, count + 1, 60);
+
+    // เก็บข้อความผู้ใช้
+    await prisma.chatMessage.create({ data: { userId, role: 'user', content: message } });
+
+    // ── ถ้าเป็นคำขอ "ไฟล์การเงิน" → พี่เงินสร้างไฟล์ + แนบปุ่มดาวน์โหลด ──
+    const exp = detectExportRequest(message);
+    if (exp) {
+      let reply: string;
+      let attachment: ChatAttachment | null;
+      if (exp.kind === 'custom') {
+        // ข้อมูลจากบทสนทนา → ให้ LLM จัดเป็นตาราง
+        const ctx = await buildContext(userId);
+        const recent = await prisma.chatMessage.findMany({ where: { userId }, orderBy: { createdAt: 'desc' }, take: 8 });
+        const history: ChatTurn[] = recent
+          .reverse()
+          .map((mm) => ({ role: mm.role === 'assistant' ? 'assistant' : 'user', content: mm.content }));
+        ({ reply, attachment } = await buildDynamicExportReply(userId, exp.format, ctx, message, history));
+      } else {
+        ({ reply, attachment } = buildExportReply(userId, exp.kind, exp.format));
+      }
+      const saved = await prisma.chatMessage.create({
+        data: { userId, role: 'assistant', content: reply, context: JSON.stringify({ source: 'export', attachment }) },
+      });
+      res.status(201).json({ message: saved, source: 'export', attachment });
+      return;
+    }
+
+    // ประกอบ context จริง + ดึง history ล่าสุด
+    const context = await buildContext(userId);
+    const recent = await prisma.chatMessage.findMany({
+      where: { userId },
+      orderBy: { createdAt: 'desc' },
+      take: 8,
+    });
+    const history: ChatTurn[] = recent
+      .reverse()
+      .map((m) => ({ role: m.role === 'assistant' ? 'assistant' : 'user', content: m.content }));
+
+    const { reply, source } = await generateReply(context, message, history);
+
+    // เก็บคำตอบ (แนบ snapshot ว่า source อะไร)
+    const saved = await prisma.chatMessage.create({
+      data: { userId, role: 'assistant', content: reply, context: JSON.stringify({ source }) },
+    });
+
+    res.status(201).json({ message: saved, source });
+  }),
+);
+
+// POST /api/v1/chat/ocr -> อ่านข้อความจากรูป (สลิป/เอกสาร) ด้วย Typhoon OCR
+chatRouter.post(
+  '/ocr',
+  asyncHandler(async (req, res) => {
+    const { imageBase64 } = req.body as { imageBase64?: string };
+    if (!imageBase64) throw new HttpError(400, 'ต้องแนบรูป (imageBase64 เป็น data URL)');
+    try {
+      const text = await ocrImage(imageBase64);
+      res.json({ text });
+    } catch (e) {
+      console.error('[chat/ocr] failed:', (e as Error).message);
+      throw new HttpError(503, 'อ่านรูปไม่สำเร็จ — ตรวจว่าตั้ง TYPHOON_API_KEY และรุ่น OCR ถูกต้อง');
+    }
+  }),
+);

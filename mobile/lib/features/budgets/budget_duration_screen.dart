@@ -71,13 +71,7 @@ class _BudgetDurationScreenState extends State<BudgetDurationScreen> {
                         ),
                       ),
                       const SizedBox(height: 16),
-                      const Text(
-                        'เที่ยวต่างประเทศ',
-                        style: TextStyle(
-                            color: AppColors.primary,
-                            fontSize: 18,
-                            fontWeight: FontWeight.bold),
-                      ),
+                      
                     ],
                   ),
                 ),
