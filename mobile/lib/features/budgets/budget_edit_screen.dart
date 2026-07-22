@@ -2,10 +2,13 @@ import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:go_router/go_router.dart';
 
+import 'package:intl/intl.dart';
+
 import '../../app/theme.dart';
 import '../../core/money.dart';
 import '../transactions/transaction.dart';
 import '../transactions/transactions_repository.dart'; // ตรวจสอบตำแหน่งอ้างอิงของ Provider งบประมาณตามโปรเจกต์ของคุณ
+import '../goals/set_deadline_screen.dart';
 
 class BudgetEditScreen extends ConsumerStatefulWidget {
   const BudgetEditScreen({super.key, required this.status});
@@ -19,13 +22,19 @@ class _BudgetEditScreenState extends ConsumerState<BudgetEditScreen> {
   final _formKey = GlobalKey<FormState>();
   late TextEditingController _nameController;
   late TextEditingController _amountController;
+  late bool _showOnDashboard;
 
   @override
   void initState() {
     super.initState();
-    // ดึงค่าเริ่มต้นจาก status ที่ส่งเข้ามาแสดงผลใน Input Field
-    _nameController = TextEditingController(text: widget.status.category?.nameTh ?? '');
-    
+    _showOnDashboard = widget.status.showOnDashboard;
+    // ใช้ชื่อที่ผู้ใช้ตั้งเอง (name) ก่อน ถ้าไม่มีค่อย fallback ไป nameTh ของ category
+    _nameController = TextEditingController(
+      text: widget.status.name?.isNotEmpty == true
+          ? widget.status.name!
+          : (widget.status.category?.nameTh ?? ''),
+    );
+
     // แปลงจำนวนเงินสตางค์กลับเป็นหน่วยบาทเพื่อแสดงผลในช่องกรอกเงินแบบเข้าใจง่าย
     final double bahtAmount = widget.status.amount / 100;
     _amountController = TextEditingController(
@@ -320,14 +329,21 @@ class _BudgetEditScreenState extends ConsumerState<BudgetEditScreen> {
                     ),
                     const SizedBox(height: 14),
 
-                    // Duration Menu Card (แบบเดียวกับหน้า Edit Goal)[cite: 29]
-                    _buildMenuRowCard(
-                      icon: Icons.calendar_month_rounded,
-                      title: 'กำหนดระยะเวลา',
-                      subtitle: '31 ธ.ค. 2569',
-                      onTap: () {
-                        context.push('/budgets/duration');
-                      },
+                    // ── ตัวเลือกแสดงผลบน Dashboard ──
+                    const SizedBox(height: 28),
+                    Container(
+                      decoration: BoxDecoration(
+                        color: const Color(0xFF1C2224),
+                        borderRadius: BorderRadius.circular(16),
+                      ),
+                      child: SwitchListTile(
+                        title: const Text('แสดงบน Dashboard', style: TextStyle(color: Colors.white, fontSize: 15)),
+                        subtitle: const Text('จำกัดการแสดงผลบนหน้าแรกสูงสุด 6 รายการ', style: TextStyle(color: Colors.white54, fontSize: 13)),
+                        value: _showOnDashboard,
+                        onChanged: (val) => setState(() => _showOnDashboard = val),
+                        activeColor: AppColors.primary,
+                        inactiveTrackColor: Colors.white12,
+                      ),
                     ),
                     const SizedBox(height: 24),
 
@@ -370,7 +386,7 @@ class _BudgetEditScreenState extends ConsumerState<BudgetEditScreen> {
                                 ),
                                 const SizedBox(height: 4),
                                 Text(
-                                  'เหลือเวลาอีก 10 วัน เรามาวางแผนกันใหม่',
+                                  remaining > 0 ? 'ยังเหลือให้ใช้ได้อีก ${Money.formatBaht(remaining * 100)} บาท' : 'คุณใช้เงินเกินงบไปแล้ว',
                                   style: TextStyle(color: Colors.white.withOpacity(0.5), fontSize: 13),
                                 )
                               ],
@@ -439,17 +455,20 @@ class _BudgetEditScreenState extends ConsumerState<BudgetEditScreen> {
     if (_formKey.currentState!.validate()) {
       final double bahtAmount = double.tryParse(_amountController.text) ?? 0;
       final int targetSubunits = (bahtAmount * 100).toInt();
+      final String budgetName = _nameController.text.trim();
 
-      // บันทึกและอัปเดตข้อมูลผ่าน Repository 
+      // บันทึกและอัปเดตข้อมูลผ่าน Repository
       await ref.read(transactionsRepoProvider).updateBudget(
-        widget.status.id, 
+        widget.status.id,
+        name: budgetName.isNotEmpty ? budgetName : null,
         amount: targetSubunits,
+        showOnDashboard: _showOnDashboard,
       );
-      
+
       // สั่งให้รีเฟรชค่าในแอปพลิเคชัน
       ref.invalidate(budgetsListProvider);
       ref.invalidate(dashboardProvider);
-      
+
       // ปิดหน้าจอแก้ไข
       if (mounted) context.pop();
     }
@@ -503,6 +522,45 @@ class _BudgetEditScreenState extends ConsumerState<BudgetEditScreen> {
             ),
             const Icon(Icons.arrow_forward_ios_rounded, color: Colors.white30, size: 14),
           ],
+        ),
+      ),
+    );
+  }
+}
+
+class _PeriodButton extends StatelessWidget {
+  const _PeriodButton({
+    required this.title,
+    required this.active,
+    required this.onTap,
+  });
+
+  final String title;
+  final bool active;
+  final VoidCallback onTap;
+
+  @override
+  Widget build(BuildContext context) {
+    return InkWell(
+      onTap: onTap,
+      borderRadius: BorderRadius.circular(12),
+      child: Container(
+        padding: const EdgeInsets.symmetric(vertical: 14),
+        decoration: BoxDecoration(
+          color: active ? const Color(0xFF0C2E1B) : AppColors.surface,
+          borderRadius: BorderRadius.circular(12),
+          border: Border.all(
+            color: active ? AppColors.primary : const Color(0xFF1E293B),
+          ),
+        ),
+        child: Text(
+          title,
+          textAlign: TextAlign.center,
+          style: TextStyle(
+            color: active ? AppColors.primary : Colors.white38,
+            fontWeight: active ? FontWeight.bold : FontWeight.normal,
+            fontSize: 14,
+          ),
         ),
       ),
     );

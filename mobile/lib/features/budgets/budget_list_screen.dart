@@ -7,6 +7,7 @@ import '../../core/money.dart';
 import '../transactions/transaction.dart';
 import '../transactions/transactions_repository.dart';
 import '../auth/auth_controller.dart'; 
+import 'package:intl/intl.dart';
 
 class BudgetListScreen extends ConsumerWidget {
   const BudgetListScreen({super.key});
@@ -48,7 +49,7 @@ class BudgetListScreen extends ConsumerWidget {
                     mainAxisAlignment: MainAxisAlignment.spaceBetween,
                     children: [
                       const Text(
-                        'งบประมาณรายเดือน 📊',
+                        'งบประมาณของคุณ 📊',
                         style: TextStyle(
                           color: Colors.white,
                           fontSize: 18,
@@ -75,17 +76,14 @@ class BudgetListScreen extends ConsumerWidget {
                       onRetry: () => _refresh(ref),
                     ),
                     data: (list) {
-                      if (list.isEmpty) {
+                      final activeStatuses = statuses;
+                      if (activeStatuses.isEmpty) {
                         return Container(
                           width: double.infinity,
                           padding: const EdgeInsets.all(24),
                           decoration: BoxDecoration(
-                            borderRadius: BorderRadius.circular(20),
-                            gradient: const LinearGradient(
-                              colors: [Color(0xFF041E14), Color(0xFF0A2B1D)],
-                              begin: Alignment.topLeft,
-                              end: Alignment.bottomRight,
-                            ),
+                            color: const Color(0xFF1E1E1E),
+                            borderRadius: BorderRadius.circular(24),
                             border: Border.all(color: const Color(0xFF3CAE63).withOpacity(0.2)),
                           ),
                           child: const Column(
@@ -107,7 +105,7 @@ class BudgetListScreen extends ConsumerWidget {
                       }
 
                       // เรียงลำดับจากระดับความเสี่ยงการใช้เงินเกินงบมากที่สุดไปน้อย
-                      final sorted = List<BudgetStatus>.from(statuses);
+                      final sorted = List<BudgetStatus>.from(activeStatuses);
                       sorted.sort((a, b) => _riskScore(b).compareTo(_riskScore(a)));
 
                       return ListView.builder(
@@ -153,40 +151,57 @@ class BudgetListScreen extends ConsumerWidget {
                                 Row(
                                   mainAxisAlignment: MainAxisAlignment.spaceBetween,
                                   children: [
-                                    Row(
-                                      children: [
-                                        Text(status.category?.icon ?? '📊', style: const TextStyle(fontSize: 18)),
-                                        const SizedBox(width: 10),
-                                        Text(
-                                          status.category?.nameTh ?? 'ไม่ระบุหมวดหมู่',
-                                          style: const TextStyle(color: Colors.white, fontSize: 16, fontWeight: FontWeight.bold),
-                                        ),
-                                        const SizedBox(width: 10),
-                                        // Badge บอกระดับความปลอดภัย
-                                        Container(
-                                          padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 4),
-                                          decoration: BoxDecoration(
-                                            color: badge.$3,
-                                            borderRadius: BorderRadius.circular(12),
-                                          ),
-                                          child: Row(
-                                            mainAxisSize: MainAxisSize.min,
-                                            children: [
-                                              Icon(badge.$2, size: 12, color: badge.$4),
-                                              const SizedBox(width: 4),
-                                              Text(
-                                                badge.$1,
-                                                style: TextStyle(
-                                                  color: badge.$4,
-                                                  fontSize: 11,
-                                                  fontWeight: FontWeight.bold,
+                                    Expanded(
+                                      child: Row(
+                                        children: [
+                                          Text(status.category?.icon ?? '📊', style: const TextStyle(fontSize: 24)),
+                                          const SizedBox(width: 14),
+                                          Expanded(
+                                            child: Column(
+                                              crossAxisAlignment: CrossAxisAlignment.start,
+                                              children: [
+                                                Row(
+                                                  children: [
+                                                    Flexible(
+                                                      child: Text(
+                                                        status.displayName,
+                                                        style: const TextStyle(color: Colors.white, fontSize: 16, fontWeight: FontWeight.bold),
+                                                        overflow: TextOverflow.ellipsis,
+                                                      ),
+                                                    ),
+                                                    const SizedBox(width: 10),
+                                                    // Badge บอกระดับความปลอดภัย
+                                                    Container(
+                                                      padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 3),
+                                                      decoration: BoxDecoration(
+                                                        color: badge.$3,
+                                                        borderRadius: BorderRadius.circular(8),
+                                                      ),
+                                                      child: Row(
+                                                        mainAxisSize: MainAxisSize.min,
+                                                        children: [
+                                                          Icon(badge.$2, size: 10, color: badge.$4),
+                                                          const SizedBox(width: 4),
+                                                          Text(
+                                                            badge.$1,
+                                                            style: TextStyle(
+                                                              color: badge.$4,
+                                                              fontSize: 10,
+                                                              fontWeight: FontWeight.bold,
+                                                            ),
+                                                          ),
+                                                        ],
+                                                      ),
+                                                    ),
+                                                  ],
                                                 ),
-                                              ),
-                                            ],
+                                              ],
+                                            ),
                                           ),
-                                        ),
-                                      ],
+                                        ],
+                                      ),
                                     ),
+                                    const SizedBox(width: 10),
                                     GestureDetector(
                                       onTap: () => context.push('/budgets/edit', extra: status),
                                       child: Icon(Icons.edit_note_rounded, size: 24, color: Colors.white.withOpacity(0.6)),
@@ -264,20 +279,21 @@ class BudgetListScreen extends ConsumerWidget {
     );
   }
 
+
   (String, IconData, Color, Color) _getBudgetStatusDetails(double pct) {
-    if (pct >= 1.0) {
+    if (pct >= 0.8) {
       return (
         'อันตราย',
         Icons.error_outline_rounded,
         const Color(0xFFFF4D4F).withOpacity(0.15),
         const Color(0xFFFF4D4F), // สีแดงเดียวกับเป้าหมายที่สำเร็จแล้วหรือใช้เกิน
       );
-    } else if (pct >= 0.8) {
+    } else if (pct >= 0.5) {
       return (
         'เสี่ยง',
         Icons.warning_amber_rounded,
-        const Color(0xFFFFD54F).withOpacity(0.15),
-        const Color(0xFFFFD54F), // สีเหลือง
+        const Color(0xFFFFC067).withOpacity(0.15),
+        const Color(0xFFFFC067), // สีทอง/เหลือง
       );
     } else {
       return (

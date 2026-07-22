@@ -19,6 +19,7 @@ export const createTransactionSchema = z.object({
   note: z.string().max(280).optional(),
   source: z.enum(['manual', 'ocr', 'sms']).default('manual'),
   categoryId: z.string().nullable().optional(),
+  budgetId: z.string().nullable().optional(),
   occurredAt: z.string().datetime().optional(),
 });
 

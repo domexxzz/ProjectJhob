@@ -644,40 +644,44 @@ class _BudgetsCard extends ConsumerWidget {
                 error: (e, _) => Text('โหลดงบไม่ได้: $e',
                     style: const TextStyle(color: Colors.red)),
                 data: (budgets) {
-                  if (budgets.isEmpty) {
+                  final activeStatuses = budgetStatuses
+                      .where((s) => s.showOnDashboard)
+                      .take(6)
+                      .toList();
+                  
+                  if (activeStatuses.isEmpty) {
                     return const Padding(
                       padding: EdgeInsets.symmetric(vertical: 12),
                       child: Center(
                         child: Text(
-                          'ยังไม่ได้ตั้งงบประมาณ — เริ่มใช้งานได้เลย',
+                          'ไม่มีงบประมาณที่กำลังเปิดใช้งาน',
                           style: TextStyle(
                               color: AppColors.textMuted, fontSize: 13),
                         ),
                       ),
                     );
                   }
+                  
                   return Column(
-                    children: budgetStatuses.map((status) {
+                    children: activeStatuses.map((status) {
                       final pct = status.percentage;
                       String statusLabel;
                       Color statusColor;
 
-                      if (status.riskLevel == 'danger') {
+                      if (pct >= 0.8) {
                         statusLabel = 'อันตราย';
-                        statusColor = const Color(0xFFFF4B4B);
-                      } else if (status.riskLevel == 'warning') {
+                        statusColor = const Color(0xFFFF4D4F);
+                      } else if (pct >= 0.5) {
                         statusLabel = 'เสี่ยง';
-                        statusColor = const Color(0xFFFFE568);
+                        statusColor = const Color(0xFFFFC067);
                       } else {
                         statusLabel = 'ปลอดภัย';
-                        statusColor = const Color(0xFF3CAE63);
+                        statusColor = const Color(0xFF37C871);
                       }
 
                       final cat = status.category;
-                      final remaining = status.amount - status.spent;
+                      final remaining = status.remaining;
                       final overBy = status.spent - status.amount;
-                      final projectedOver =
-                          status.projectedSpend - status.amount;
 
                       return Padding(
                         padding: const EdgeInsets.only(bottom: 16),
@@ -687,7 +691,9 @@ class _BudgetsCard extends ConsumerWidget {
                               children: [
                                 Expanded(
                                   child: Text(
-                                    cat?.nameTh ?? 'งบรวม',
+                                    status.name?.isNotEmpty == true
+                                        ? status.name!
+                                        : (cat?.nameTh ?? 'งบรวม'),
                                     style: const TextStyle(
                                       color: Colors.white,
                                       fontWeight: FontWeight.w500,
@@ -729,9 +735,7 @@ class _BudgetsCard extends ConsumerWidget {
                               child: Text(
                                 overBy > 0
                                     ? 'ใช้เกินไป ${Money.formatBaht(overBy)} บาท'
-                                    : projectedOver > 0
-                                        ? 'คาดว่าจะเกิน ${Money.formatBaht(projectedOver)} เมื่อสิ้นรอบ'
-                                        : 'ใช้ได้อีก ${Money.formatBaht(remaining)} บาท',
+                                    : 'เหลืออีก ${Money.formatBaht(remaining)} บาท',
                                 style: TextStyle(
                                     color: Colors.white.withOpacity(0.5),
                                     fontSize: 11),

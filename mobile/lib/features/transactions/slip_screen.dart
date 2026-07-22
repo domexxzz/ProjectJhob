@@ -36,6 +36,7 @@ class _SlipScreenState extends ConsumerState<SlipScreen> {
   late bool _imageMode; // true = เลือกไฟล์รูป, false = เขียนเอง
   String _type = 'expense';
   String? _categoryId;
+  Budget? _selectedBudget; // งบประมาณที่ผู้ใช้เลือกจาก slip screen
   DateTime? _date;
   String? _fileName;
   bool _analyzing = false;
@@ -103,7 +104,7 @@ class _SlipScreenState extends ConsumerState<SlipScreen> {
     if (picked != null) setState(() => _date = picked);
   }
 
-  void _pickCategory() {
+  void _pickBudget() {
     showModalBottomSheet(
       context: context,
       isScrollControlled: true,
@@ -112,59 +113,102 @@ class _SlipScreenState extends ConsumerState<SlipScreen> {
       builder: (_) => SafeArea(
         child: ConstrainedBox(
           constraints: BoxConstraints(maxHeight: MediaQuery.of(context).size.height * 0.7),
-          // watch แบบ reactive → โหลดเสร็จเมื่อไหร่ลิสต์ขึ้นเอง (แก้ปัญหา read ตอนยังโหลดไม่เสร็จ)
           child: Consumer(builder: (ctx, ref2, __) {
-            final async = ref2.watch(categoriesProvider);
+            final async = ref2.watch(budgetsListProvider);
             return async.when(
               loading: () => const SizedBox(height: 160, child: Center(child: CircularProgressIndicator(color: AppColors.primary))),
               error: (e, _) => Padding(
                 padding: const EdgeInsets.all(20),
-                child: Text('โหลดหมวดไม่ได้: $e', style: const TextStyle(color: Colors.redAccent)),
+                child: Text('โหลดงบไม่ได้: $e', style: const TextStyle(color: Colors.redAccent)),
               ),
-              data: (cats) {
-                final filtered = cats.where((c) => c.type == _type).toList();
+              data: (budgets) {
+                
+                if (budgets.isEmpty) {
+                  return const Padding(
+                    padding: EdgeInsets.all(32),
+                    child: Column(
+                      mainAxisSize: MainAxisSize.min,
+                      children: [
+                        Icon(Icons.account_balance_wallet_outlined, color: Colors.white38, size: 48),
+                        SizedBox(height: 12),
+                        Text('ไม่มีงบประมาณในระบบ', style: TextStyle(color: Colors.white54, fontSize: 15)),
+                        SizedBox(height: 6),
+                        Text('คุณยังไม่ได้สร้างงบประมาณใดๆ', style: TextStyle(color: Colors.white38, fontSize: 13)),
+                      ],
+                    ),
+                  );
+                }
                 return Column(
                   mainAxisSize: MainAxisSize.min,
                   crossAxisAlignment: CrossAxisAlignment.start,
                   children: [
                     Padding(
                       padding: const EdgeInsets.fromLTRB(18, 16, 18, 8),
-                      child: Text(_type == 'income' ? 'เลือกหมวดรายรับ' : 'เลือกหมวดรายจ่าย',
-                          style: const TextStyle(color: Colors.white, fontSize: 16, fontWeight: FontWeight.bold)),
-                    ),
-                    if (filtered.isEmpty)
-                      const Padding(padding: EdgeInsets.all(20), child: Text('ยังไม่มีหมวดหมู่', style: TextStyle(color: Colors.white54)))
-                    else
-                      Flexible(
-                        child: GridView.count(
-                          padding: const EdgeInsets.fromLTRB(16, 0, 16, 16),
-                          crossAxisCount: 4,
-                          shrinkWrap: true,
-                          mainAxisSpacing: 14,
-                          crossAxisSpacing: 12,
-                          childAspectRatio: 0.78,
-                          children: filtered.map((c) {
-                            final sel = c.id == _categoryId;
-                            return GestureDetector(
-                              onTap: () {
-                                setState(() => _categoryId = c.id);
-                                Navigator.pop(ctx);
-                              },
-                              child: Column(children: [
-                                CircleAvatar(
-                                  radius: 26,
-                                  backgroundColor: sel ? AppColors.primary : hexColor(c.color).withOpacity(0.15),
-                                  child: Text(c.icon, style: const TextStyle(fontSize: 24)),
-                                ),
-                                const SizedBox(height: 4),
-                                Text(c.nameTh,
-                                    style: TextStyle(fontSize: 11, color: sel ? AppColors.primary : Colors.white70),
-                                    textAlign: TextAlign.center, maxLines: 2, overflow: TextOverflow.ellipsis),
-                              ]),
-                            );
-                          }).toList(),
-                        ),
+                      child: Row(
+                        children: [
+                          const Icon(Icons.account_balance_wallet_rounded, color: AppColors.primary, size: 20),
+                          const SizedBox(width: 8),
+                          Text('เลือกงบประมาณ',
+                              style: const TextStyle(color: Colors.white, fontSize: 16, fontWeight: FontWeight.bold)),
+                        ],
                       ),
+                    ),
+                    Flexible(
+                      child: ListView.separated(
+                        padding: const EdgeInsets.fromLTRB(16, 0, 16, 16),
+                        shrinkWrap: true,
+                        itemCount: budgets.length,
+                        separatorBuilder: (_, __) => const SizedBox(height: 8),
+                        itemBuilder: (ctx2, i) {
+                          final b = budgets[i];
+                          final sel = b.id == _selectedBudget?.id;
+                          return GestureDetector(
+                            onTap: () {
+                              setState(() {
+                                _selectedBudget = b;
+                                _categoryId = b.categoryId;
+                              });
+                              Navigator.pop(ctx);
+                            },
+                            child: Container(
+                              padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 14),
+                              decoration: BoxDecoration(
+                                color: sel ? const Color(0xFF0C2E1B) : AppColors.bg,
+                                borderRadius: BorderRadius.circular(14),
+                                border: Border.all(
+                                  color: sel ? AppColors.primary : const Color(0xFF1E293B),
+                                  width: sel ? 2 : 1,
+                                ),
+                              ),
+                              child: Row(
+                                children: [
+                                  Text(b.category?.icon ?? '📊', style: const TextStyle(fontSize: 22)),
+                                  const SizedBox(width: 12),
+                                  Expanded(
+                                    child: Column(
+                                      crossAxisAlignment: CrossAxisAlignment.start,
+                                      children: [
+                                        Text(
+                                          b.displayName,
+                                          style: TextStyle(
+                                            color: sel ? Colors.white : Colors.white70,
+                                            fontSize: 15,
+                                            fontWeight: sel ? FontWeight.bold : FontWeight.normal,
+                                          ),
+                                        ),
+                                      ],
+                                    ),
+                                  ),
+                                  if (sel)
+                                    const Icon(Icons.check_circle_rounded,
+                                        color: AppColors.primary, size: 20),
+                                ],
+                              ),
+                            ),
+                          );
+                        },
+                      ),
+                    ),
                   ],
                 );
               },
@@ -186,7 +230,8 @@ class _SlipScreenState extends ConsumerState<SlipScreen> {
       final alert = await ref.read(transactionsRepoProvider).create(
             type: _type,
             amount: Money.toSatang(baht),
-            categoryId: _categoryId,
+            categoryId: _selectedBudget?.categoryId ?? _categoryId,
+            budgetId: _selectedBudget?.id,
             note: _desc.text.trim(),
             source: _imageMode ? 'ocr' : 'manual',
             occurredAt: _date,
@@ -216,14 +261,9 @@ class _SlipScreenState extends ConsumerState<SlipScreen> {
 
   @override
   Widget build(BuildContext context) {
-    // watch เพื่อ "อุ่นเครื่อง" ให้เริ่มโหลดหมวดหมู่ตั้งแต่เปิดหน้า (จะได้พร้อมตอนกดเลือก)
-    final cats = ref.watch(categoriesProvider).value ?? const <Category>[];
-    String? catName;
-    if (_categoryId != null) {
-      for (final c in cats) {
-        if (c.id == _categoryId) { catName = '${c.icon} ${c.nameTh}'; break; }
-      }
-    }
+    // watch budgets เพื่อ "อุ่นเครื่อง" ให้โหลดล่วงหน้า
+    ref.watch(budgetsListProvider);
+    final budgetDisplayName = _selectedBudget?.displayName;
 
     return Scaffold(
       backgroundColor: AppColors.bg,
@@ -332,26 +372,26 @@ class _SlipScreenState extends ConsumerState<SlipScreen> {
                   // ── รายรับ / รายจ่าย ──
                   Row(children: [
                     _TypePill(label: 'รายรับ', selected: _type == 'income', color: AppColors.primary,
-                        onTap: () => setState(() { _type = 'income'; _categoryId = null; })),
+                        onTap: () => setState(() { _type = 'income'; _selectedBudget = null; _categoryId = null; })),
                     const SizedBox(width: 8),
                     _TypePill(label: 'รายจ่าย', selected: _type == 'expense', color: AppColors.expense,
-                        onTap: () => setState(() { _type = 'expense'; _categoryId = null; })),
+                        onTap: () => setState(() { _type = 'expense'; _selectedBudget = null; _categoryId = null; })),
                   ]),
                   const SizedBox(height: 16),
 
-                  // ── หมวดหมู่ ──
-                  const Text('จัดไปที่หมวดหมู่', style: TextStyle(color: Colors.white, fontSize: 14, fontWeight: FontWeight.w600)),
+                  // ── งบประมาณ ──
+                  const Text('จัดไปที่งบประมาณ', style: TextStyle(color: Colors.white, fontSize: 14, fontWeight: FontWeight.w600)),
                   const SizedBox(height: 8),
                   GestureDetector(
-                    onTap: _pickCategory,
+                    onTap: _pickBudget,
                     child: Container(
                       padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 18),
                       decoration: _boxDeco(),
                       child: Row(children: [
                         Expanded(
-                          child: Text(catName ?? 'เลือกหมวดหมู่',
+                          child: Text(budgetDisplayName ?? 'เลือกงบประมาณ',
                               style: TextStyle(
-                                  color: catName != null ? Colors.white : AppColors.primary,
+                                  color: budgetDisplayName != null ? Colors.white : AppColors.primary,
                                   fontSize: 16, fontWeight: FontWeight.bold),
                               maxLines: 1, overflow: TextOverflow.ellipsis),
                         ),
@@ -362,8 +402,8 @@ class _SlipScreenState extends ConsumerState<SlipScreen> {
                   const SizedBox(height: 16),
 
                   // ── ข้อมูลการเชื่อมโยงงบประมาณ (Proactive Budget Status Display) ──
-                  if (_categoryId != null && _type == 'expense') ...[
-                    _buildBudgetInfoCard(context, ref, _categoryId!),
+                  if (_selectedBudget != null && _selectedBudget!.categoryId != null && _type == 'expense') ...[
+                    _buildBudgetInfoCard(context, ref, _selectedBudget!.categoryId!),
                     const SizedBox(height: 16),
                   ],
 
