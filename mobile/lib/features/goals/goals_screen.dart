@@ -8,8 +8,6 @@ import '../../app/theme.dart';
 import '../../core/money.dart';
 import 'goals_provider.dart';
 import '../auth/auth_controller.dart'; // เพิ่มบรรทัดนี้ตามโครงสร้างโปรเจกต์ของคุณ[cite: 20]
-import '../privacy/privacy_screen.dart';
-import '../settings/settings_screen.dart';
 import '../../widgets/app_bottom_nav_bar.dart';
 
 class GoalsScreen extends ConsumerWidget {
@@ -17,14 +15,8 @@ class GoalsScreen extends ConsumerWidget {
 
   @override
   Widget build(BuildContext context, WidgetRef ref) {
-    final moneySettings = ref.watch(
-      appSettingsProvider.select((s) => (s.currency, s.usdRate)),
-    );
-    Money.configure(moneySettings.$1, thbToUsdRate: moneySettings.$2);
     final goals = ref.watch(goalsProvider);
     final user = ref.watch(authControllerProvider).user;
-    final personalized =
-        ref.watch(privacySettingsProvider).personalizedRecommendations;
     return Scaffold(
       backgroundColor:
           const Color(0xFF121212), // คุมโทน Premium Dark UI แบบ Dashboard
@@ -80,19 +72,17 @@ class GoalsScreen extends ConsumerWidget {
                 const SizedBox(height: 28),
 
                 // 6. Recommendation section
-                if (personalized) ...[
-                  const Text(
-                    'แนะนำสำหรับคุณ',
-                    style: TextStyle(
-                      fontSize: 18,
-                      fontWeight: FontWeight.bold,
-                      color: Colors.white,
-                      letterSpacing: 0.5,
-                    ),
+                const Text(
+                  'แนะนำสำหรับคุณ',
+                  style: TextStyle(
+                    fontSize: 18,
+                    fontWeight: FontWeight.bold,
+                    color: Colors.white,
+                    letterSpacing: 0.5,
                   ),
-                  const SizedBox(height: 12),
-                  const _RecommendationCard(),
-                ],
+                ),
+                const SizedBox(height: 12),
+                const _RecommendationCard(),
               ],
             ),
           ),
@@ -240,14 +230,7 @@ class _GoalItemCard extends StatelessWidget {
     final remaining = (goal.target - goal.current).clamp(0, goal.target);
     final int displayPercentage = (goal.progressPercentage * 100).toInt();
 
-    Color progressColor;
-    if (displayPercentage <= 50) {
-      progressColor = const Color(0xFF37C871); // 0-60% สีเขียว
-    } else if (displayPercentage <= 70) {
-      progressColor = const Color(0xFFFFD54F); // 71-99% สีเหลือง
-    } else {
-      progressColor = const Color(0xFFFF4D4F); // 100% ขึ้นไป สีแดง
-    }
+    const Color progressColor = Color(0xFF37C871); // สี #37C871 ทั้งหมดตามคำขอ
 
     return GestureDetector(
       onTap: () => context.push('/goals/edit?id=${goal.id}'),
@@ -304,10 +287,7 @@ class _GoalItemCard extends StatelessWidget {
                             : null,
                       ),
                       alignment: Alignment.center,
-                      child: hasImage
-                          ? null
-                          : Text(goal.emoji,
-                              style: const TextStyle(fontSize: 24)),
+                      child: hasImage ? null : Text(goal.emoji, style: const TextStyle(fontSize: 24)),
                     );
                   },
                 ),
@@ -323,12 +303,35 @@ class _GoalItemCard extends StatelessWidget {
                           fontWeight: FontWeight.bold,
                           color: Colors.white,
                         ),
+                        overflow: TextOverflow.ellipsis,
                       ),
                       const SizedBox(height: 4),
-                      Text(
-                        'เป้าหมาย ${Money.formatBaht(goal.target)}',
-                        style: TextStyle(
-                            color: Colors.white.withOpacity(0.6), fontSize: 13),
+                      Wrap(
+                        crossAxisAlignment: WrapCrossAlignment.center,
+                        spacing: 6,
+                        runSpacing: 4,
+                        children: [
+                          Text(
+                            'เป้าหมาย ฿ ${Money.format(goal.target)}',
+                            style: TextStyle(
+                                color: Colors.white.withOpacity(0.6), fontSize: 12),
+                          ),
+                          Container(
+                            padding: const EdgeInsets.symmetric(horizontal: 6, vertical: 2),
+                            decoration: BoxDecoration(
+                              color: const Color(0xFF37C871).withOpacity(0.15),
+                              borderRadius: BorderRadius.circular(10),
+                            ),
+                            child: Text(
+                              goal.typeLabel,
+                              style: const TextStyle(
+                                color: Color(0xFF37C871),
+                                fontSize: 10,
+                                fontWeight: FontWeight.w600,
+                              ),
+                            ),
+                          ),
+                        ],
                       ),
                     ],
                   ),
@@ -383,7 +386,7 @@ class _GoalItemCard extends StatelessWidget {
               mainAxisAlignment: MainAxisAlignment.spaceBetween,
               children: [
                 Text(
-                  '${Money.formatBaht(goal.current)} / ${Money.formatBaht(goal.target)}',
+                  '฿ ${Money.format(goal.current)} / ${Money.format(goal.target)}',
                   style: const TextStyle(
                       color: Colors.white,
                       fontSize: 13,
@@ -392,7 +395,7 @@ class _GoalItemCard extends StatelessWidget {
                 Text(
                   displayPercentage >= 100
                       ? 'สำเร็จแล้ว 🎉'
-                      : 'เหลืออีก ${Money.formatBaht(remaining)}',
+                      : 'เหลืออีก ฿ ${Money.format(remaining)} บาท',
                   style: TextStyle(
                       color: Colors.white.withOpacity(0.5),
                       fontSize: 11,
