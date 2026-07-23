@@ -4,8 +4,7 @@ import 'package:intl/intl.dart';
 import 'package:table_calendar/table_calendar.dart';
 
 class SetDeadlineScreen extends StatefulWidget {
-  const SetDeadlineScreen(
-      {super.key, this.initialStartDate, this.initialEndDate});
+  const SetDeadlineScreen({super.key, this.initialStartDate, this.initialEndDate});
 
   final DateTime? initialStartDate;
   final DateTime? initialEndDate;
@@ -17,32 +16,21 @@ class SetDeadlineScreen extends StatefulWidget {
 class _SetDeadlineScreenState extends State<SetDeadlineScreen> {
   CalendarFormat _calendarFormat = CalendarFormat.month;
   DateTime _focusedDay = DateTime.now();
-
+  
   DateTime? _rangeStart;
   DateTime? _rangeEnd;
 
   // รายชื่อเดือนภาษาไทยสำหรับ Dropdown
   final List<String> _monthsTh = [
-    'มกราคม',
-    'กุมภาพันธ์',
-    'มีนาคม',
-    'เมษายน',
-    'พฤษภาคม',
-    'มิถุนายน',
-    'กรกฎาคม',
-    'สิงหาคม',
-    'กันยายน',
-    'ตุลาคม',
-    'พฤศจิกายน',
-    'ธันวาคม'
+    'มกราคม', 'กุมภาพันธ์', 'มีนาคม', 'เมษายน', 'พฤษภาคม', 'มิถุนายน',
+    'กรกฎาคม', 'สิงหาคม', 'กันยายน', 'ตุลาคม', 'พฤศจิกายน', 'ธันวาคม'
   ];
 
   @override
   void initState() {
     super.initState();
     _rangeStart = widget.initialStartDate ?? DateTime.now();
-    _rangeEnd =
-        widget.initialEndDate ?? DateTime.now().add(const Duration(days: 90));
+    _rangeEnd = widget.initialEndDate ?? DateTime.now().add(const Duration(days: 90));
     _focusedDay = _rangeStart ?? DateTime.now();
   }
 
@@ -58,8 +46,7 @@ class _SetDeadlineScreenState extends State<SetDeadlineScreen> {
     final kLastDay = DateTime(kToday.year + 10, kToday.month, kToday.day);
 
     // สร้างลิสต์ปี ค.ศ. สำหรับ Dropdown (ย้อนหลัง 5 ปี - ล่วงหน้า 10 ปี)
-    final List<int> _yearsList =
-        List.generate(16, (index) => kToday.year - 5 + index);
+    final List<int> _yearsList = List.generate(16, (index) => kToday.year - 5 + index);
 
     return Scaffold(
       backgroundColor: const Color(0xFF121212),
@@ -78,8 +65,7 @@ class _SetDeadlineScreenState extends State<SetDeadlineScreen> {
         ),
         title: const Text(
           'กำหนดระยะเวลา',
-          style: TextStyle(
-              fontWeight: FontWeight.bold, fontSize: 20, color: Colors.white),
+          style: TextStyle(fontWeight: FontWeight.bold, fontSize: 20, color: Colors.white),
         ),
         centerTitle: true,
       ),
@@ -105,12 +91,8 @@ class _SetDeadlineScreenState extends State<SetDeadlineScreen> {
                       child: DropdownButton<int>(
                         value: _focusedDay.month,
                         dropdownColor: const Color(0xFF1A1A1A),
-                        style: const TextStyle(
-                            color: Colors.white,
-                            fontSize: 15,
-                            fontWeight: FontWeight.bold),
-                        icon: const Icon(Icons.keyboard_arrow_down_rounded,
-                            color: Colors.white60),
+                        style: const TextStyle(color: Colors.white, fontSize: 15, fontWeight: FontWeight.bold),
+                        icon: const Icon(Icons.keyboard_arrow_down_rounded, color: Colors.white60),
                         items: List.generate(12, (index) {
                           return DropdownMenuItem(
                             value: index + 1,
@@ -120,8 +102,7 @@ class _SetDeadlineScreenState extends State<SetDeadlineScreen> {
                         onChanged: (month) {
                           if (month != null) {
                             setState(() {
-                              _focusedDay =
-                                  DateTime(_focusedDay.year, month, 1);
+                              _focusedDay = DateTime(_focusedDay.year, month, 1);
                             });
                           }
                         },
@@ -143,24 +124,18 @@ class _SetDeadlineScreenState extends State<SetDeadlineScreen> {
                       child: DropdownButton<int>(
                         value: _focusedDay.year,
                         dropdownColor: const Color(0xFF1A1A1A),
-                        style: const TextStyle(
-                            color: Colors.white,
-                            fontSize: 15,
-                            fontWeight: FontWeight.bold),
-                        icon: const Icon(Icons.keyboard_arrow_down_rounded,
-                            color: Colors.white60),
+                        style: const TextStyle(color: Colors.white, fontSize: 15, fontWeight: FontWeight.bold),
+                        icon: const Icon(Icons.keyboard_arrow_down_rounded, color: Colors.white60),
                         items: _yearsList.map((year) {
                           return DropdownMenuItem(
                             value: year,
-                            child: Text(
-                                'พ.ศ. ${year + 543}'), // แสดงผลเป็นปี พ.ศ. ให้สวยงามตามรูปแบบไทย
+                            child: Text('พ.ศ. ${year + 543}'), // แสดงผลเป็นปี พ.ศ. ให้สวยงามตามรูปแบบไทย
                           );
                         }).toList(),
                         onChanged: (year) {
                           if (year != null) {
                             setState(() {
-                              _focusedDay =
-                                  DateTime(year, _focusedDay.month, 1);
+                              _focusedDay = DateTime(year, _focusedDay.month, 1);
                             });
                           }
                         },
@@ -190,8 +165,7 @@ class _SetDeadlineScreenState extends State<SetDeadlineScreen> {
               rangeStartDay: _rangeStart,
               rangeEndDay: _rangeEnd,
               rangeSelectionMode: RangeSelectionMode.enforced,
-              headerVisible:
-                  false, // ปิด Header เดิมเพื่อใช้ Dropdown ด้านบนแทน
+              headerVisible: false, // ปิด Header เดิมเพื่อใช้ Dropdown ด้านบนแทน
               daysOfWeekStyle: const DaysOfWeekStyle(
                 weekdayStyle: TextStyle(color: Colors.white38, fontSize: 13),
                 weekendStyle: TextStyle(color: Colors.white38, fontSize: 13),
@@ -199,10 +173,8 @@ class _SetDeadlineScreenState extends State<SetDeadlineScreen> {
               calendarStyle: CalendarStyle(
                 isTodayHighlighted: true,
                 outsideDaysVisible: false,
-                defaultTextStyle: TextStyle(
-                    color: Colors.white.withOpacity(0.8), fontSize: 14),
-                weekendTextStyle: TextStyle(
-                    color: Colors.white.withOpacity(0.8), fontSize: 14),
+                defaultTextStyle: TextStyle(color: Colors.white.withOpacity(0.8), fontSize: 14),
+                weekendTextStyle: TextStyle(color: Colors.white.withOpacity(0.8), fontSize: 14),
                 todayDecoration: BoxDecoration(
                   color: Colors.white.withOpacity(0.1),
                   shape: BoxShape.circle,
@@ -211,14 +183,12 @@ class _SetDeadlineScreenState extends State<SetDeadlineScreen> {
                   color: Color(0xFF3CAE63),
                   shape: BoxShape.circle,
                 ),
-                rangeStartTextStyle: const TextStyle(
-                    color: Colors.black, fontWeight: FontWeight.bold),
+                rangeStartTextStyle: const TextStyle(color: Colors.black, fontWeight: FontWeight.bold),
                 rangeEndDecoration: const BoxDecoration(
                   color: Color(0xFF3CAE63),
                   shape: BoxShape.circle,
                 ),
-                rangeEndTextStyle: const TextStyle(
-                    color: Colors.black, fontWeight: FontWeight.bold),
+                rangeEndTextStyle: const TextStyle(color: Colors.black, fontWeight: FontWeight.bold),
                 rangeHighlightColor: const Color(0xFF3CAE63).withOpacity(0.15),
                 withinRangeTextStyle: const TextStyle(color: Color(0xFF4CD97B)),
               ),
@@ -241,21 +211,16 @@ class _SetDeadlineScreenState extends State<SetDeadlineScreen> {
                 children: [
                   const Text(
                     'ไทม์ไลน์เป้าหมายของคุณ',
-                    style: TextStyle(
-                        color: Colors.white70,
-                        fontSize: 14,
-                        fontWeight: FontWeight.w500),
+                    style: TextStyle(color: Colors.white70, fontSize: 14, fontWeight: FontWeight.w500),
                   ),
                   const SizedBox(height: 16),
-
+                  
                   // บล็อก Timeline ขั้นตอนที่ 1 (วันเริ่ม)
                   _buildTimelineStep(
                     isFirst: true,
                     isLast: false,
                     title: 'เริ่มต้นการออมเป้าหมาย',
-                    dateText: _rangeStart != null
-                        ? DateFormat('d MMMM yyyy', 'th').format(_rangeStart!)
-                        : '-',
+                    dateText: _rangeStart != null ? DateFormat('d MMMM yyyy', 'th').format(_rangeStart!) : '-',
                     iconColor: const Color(0xFF3CAE63),
                   ),
 
@@ -265,8 +230,7 @@ class _SetDeadlineScreenState extends State<SetDeadlineScreen> {
                       isFirst: false,
                       isLast: false,
                       title: 'ระยะเวลาเก็บออมทั้งหมด',
-                      dateText:
-                          '${_calculateMonthsDifference(_rangeStart!, _rangeEnd!)} เดือน',
+                      dateText: '${_calculateMonthsDifference(_rangeStart!, _rangeEnd!)} เดือน',
                       iconColor: Colors.white30,
                       customIcon: Icons.timelapse_rounded,
                     ),
@@ -276,9 +240,7 @@ class _SetDeadlineScreenState extends State<SetDeadlineScreen> {
                     isFirst: false,
                     isLast: true,
                     title: 'เป้าหมายสำเร็จสมบูรณ์ 🎉',
-                    dateText: _rangeEnd != null
-                        ? DateFormat('d MMMM yyyy', 'th').format(_rangeEnd!)
-                        : 'กำลังเลือกวันสิ้นสุด...',
+                    dateText: _rangeEnd != null ? DateFormat('d MMMM yyyy', 'th').format(_rangeEnd!) : 'กำลังเลือกวันสิ้นสุด...',
                     iconColor: const Color(0xFF4CD97B),
                   ),
                 ],
@@ -299,16 +261,12 @@ class _SetDeadlineScreenState extends State<SetDeadlineScreen> {
               style: ElevatedButton.styleFrom(
                 backgroundColor: const Color(0xFF3CAE63),
                 minimumSize: const Size(double.infinity, 54),
-                shape: RoundedRectangleBorder(
-                    borderRadius: BorderRadius.circular(16)),
+                shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(16)),
                 elevation: 0,
               ),
               child: const Text(
                 'บันทึกระยะเวลานี้',
-                style: TextStyle(
-                    color: Colors.black,
-                    fontWeight: FontWeight.bold,
-                    fontSize: 16),
+                style: TextStyle(color: Colors.black, fontWeight: FontWeight.bold, fontSize: 16),
               ),
             ),
           ),
@@ -339,8 +297,8 @@ class _SetDeadlineScreenState extends State<SetDeadlineScreen> {
                 shape: BoxShape.circle,
                 border: Border.all(color: Colors.white12, width: 2),
               ),
-              child: customIcon != null
-                  ? Icon(customIcon, size: 10, color: Colors.black)
+              child: customIcon != null 
+                  ? Icon(customIcon, size: 10, color: Colors.black) 
                   : null,
             ),
             if (!isLast)
@@ -358,18 +316,12 @@ class _SetDeadlineScreenState extends State<SetDeadlineScreen> {
             children: [
               Text(
                 title,
-                style: const TextStyle(
-                    color: Colors.white,
-                    fontSize: 14,
-                    fontWeight: FontWeight.w600),
+                style: const TextStyle(color: Colors.white, fontSize: 14, fontWeight: FontWeight.w600),
               ),
               const SizedBox(height: 2),
               Text(
                 dateText,
-                style: const TextStyle(
-                    color: Color(0xFF4CD97B),
-                    fontSize: 13,
-                    fontWeight: FontWeight.w500),
+                style: const TextStyle(color: Color(0xFF4CD97B), fontSize: 13, fontWeight: FontWeight.w500),
               ),
               const SizedBox(height: 16),
             ],

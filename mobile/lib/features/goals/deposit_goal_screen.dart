@@ -5,7 +5,6 @@ import 'package:intl/intl.dart';
 
 import '../../app/theme.dart';
 import '../../core/money.dart';
-import '../settings/settings_screen.dart';
 import 'goals_provider.dart';
 
 class DepositGoalScreen extends ConsumerStatefulWidget {
@@ -20,17 +19,7 @@ class DepositGoalScreen extends ConsumerStatefulWidget {
 class _DepositGoalScreenState extends ConsumerState<DepositGoalScreen> {
   final TextEditingController _amountController = TextEditingController();
 
-  final List<int> _presetAmounts = [
-    500,
-    1000,
-    1500,
-    2000,
-    2500,
-    3000,
-    4000,
-    5000,
-    6000
-  ];
+  final List<int> _presetAmounts = [500, 1000, 1500, 2000, 2500, 3000, 4000, 5000, 6000];
 
   @override
   void dispose() {
@@ -40,20 +29,20 @@ class _DepositGoalScreenState extends ConsumerState<DepositGoalScreen> {
 
   @override
   Widget build(BuildContext context) {
-    final moneySettings = ref.watch(
-      appSettingsProvider.select((s) => (s.currency, s.usdRate)),
-    );
-    Money.configure(moneySettings.$1, thbToUsdRate: moneySettings.$2);
-    final goal =
-        ref.watch(goalsProvider).firstWhere((g) => g.id == widget.goalId);
+    final goal = ref.watch(goalsProvider).firstWhere((g) => g.id == widget.goalId);
 
     return Scaffold(
       backgroundColor: AppColors.bg,
       appBar: AppBar(
         leading: IconButton(
-          icon: const Icon(Icons.arrow_back_ios_new_rounded,
-              color: AppColors.primary),
-          onPressed: () => context.pop(),
+          icon: const Icon(Icons.arrow_back, color: Colors.white, size: 24),
+          onPressed: () {
+            if (Navigator.of(context).canPop() || context.canPop()) {
+              context.pop();
+            } else {
+              context.go('/');
+            }
+          },
         ),
         title: const Text(
           'กำหนดเงินเข้าเป้าหมาย',
@@ -89,12 +78,10 @@ class _DepositGoalScreenState extends ConsumerState<DepositGoalScreen> {
             const SizedBox(height: 12),
             Text(
               goal.name,
-              style: const TextStyle(
-                  fontSize: 18,
-                  fontWeight: FontWeight.bold,
-                  color: AppColors.primary),
+              style: const TextStyle(fontSize: 18, fontWeight: FontWeight.bold, color: AppColors.primary),
             ),
             const SizedBox(height: 32),
+
             Container(
               padding: const EdgeInsets.symmetric(horizontal: 20, vertical: 16),
               decoration: BoxDecoration(
@@ -104,12 +91,9 @@ class _DepositGoalScreenState extends ConsumerState<DepositGoalScreen> {
               ),
               child: Row(
                 children: [
-                  Text(
-                    Money.symbol,
-                    style: const TextStyle(
-                        fontSize: 32,
-                        fontWeight: FontWeight.bold,
-                        color: AppColors.primary),
+                  const Text(
+                    '฿',
+                    style: TextStyle(fontSize: 32, fontWeight: FontWeight.bold, color: AppColors.primary),
                   ),
                   const SizedBox(width: 16),
                   Expanded(
@@ -117,10 +101,7 @@ class _DepositGoalScreenState extends ConsumerState<DepositGoalScreen> {
                       controller: _amountController,
                       keyboardType: TextInputType.number,
                       autofocus: true,
-                      style: const TextStyle(
-                          fontSize: 32,
-                          fontWeight: FontWeight.bold,
-                          color: Colors.white),
+                      style: const TextStyle(fontSize: 32, fontWeight: FontWeight.bold, color: Colors.white),
                       decoration: const InputDecoration(
                         border: InputBorder.none,
                         enabledBorder: InputBorder.none,
@@ -135,6 +116,7 @@ class _DepositGoalScreenState extends ConsumerState<DepositGoalScreen> {
               ),
             ),
             const SizedBox(height: 24),
+
             GridView.builder(
               shrinkWrap: true,
               physics: const NeverScrollableScrollPhysics(),
@@ -157,13 +139,11 @@ class _DepositGoalScreenState extends ConsumerState<DepositGoalScreen> {
                     backgroundColor: AppColors.surface,
                     foregroundColor: Colors.white,
                     side: const BorderSide(color: Color(0xFF1E293B)),
-                    shape: RoundedRectangleBorder(
-                        borderRadius: BorderRadius.circular(16)),
+                    shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(16)),
                   ),
                   child: Text(
                     NumberFormat('#,###').format(amt),
-                    style: const TextStyle(
-                        fontSize: 18, fontWeight: FontWeight.bold),
+                    style: const TextStyle(fontSize: 18, fontWeight: FontWeight.bold),
                   ),
                 );
               },
@@ -174,9 +154,7 @@ class _DepositGoalScreenState extends ConsumerState<DepositGoalScreen> {
       bottomNavigationBar: Container(
         padding: const EdgeInsets.fromLTRB(24, 8, 24, 24),
         child: ElevatedButton(
-          onPressed: _amountController.text.trim().isEmpty
-              ? null
-              : () => _confirmDeposit(goal.name),
+          onPressed: _amountController.text.trim().isEmpty ? null : () => _confirmDeposit(goal.name),
           child: const Text('ต่อไป'),
         ),
       ),
@@ -187,13 +165,12 @@ class _DepositGoalScreenState extends ConsumerState<DepositGoalScreen> {
     final text = _amountController.text.trim();
     final baht = double.tryParse(text) ?? 0;
     if (baht > 0) {
-      final satang = Money.toSatang(baht);
+      final satang = (baht * 100).toInt(); // หรือเรียกใช้ Money.toSatang(baht) ตามโครงสร้างเดิม
       ref.read(goalsProvider.notifier).addSavings(widget.goalId, satang);
       context.pop();
       ScaffoldMessenger.of(context).showSnackBar(
         SnackBar(
-          content: Text(
-              'ฝากเงินสำเร็จ! +${Money.formatBaht(satang)} เข้า $goalName'),
+          content: Text('ฝากเงินสำเร็จ! +${Money.formatBaht(satang)} เข้า $goalName'),
           behavior: SnackBarBehavior.floating,
           backgroundColor: AppColors.income,
         ),
