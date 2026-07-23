@@ -9,6 +9,8 @@ import '../../core/money.dart';
 import '../transactions/transaction.dart';
 import '../transactions/transactions_repository.dart';
 import '../settings/settings_screen.dart';
+import '../auth/auth_controller.dart';
+import '../notifications/notif_bell.dart';
 import '../../widgets/app_bottom_nav_bar.dart';
 
 enum _DashboardRange { day, week, month, year }
@@ -32,24 +34,19 @@ class _FinancialDashboardScreenState
       appSettingsProvider.select((s) => (s.currency, s.usdRate)),
     );
     Money.configure(moneySettings.$1, thbToUsdRate: moneySettings.$2);
+    final user = ref.watch(authControllerProvider).user;
     final dashboard = ref.watch(dashboardProvider);
 
     return Scaffold(
       backgroundColor: const Color(0xFF0D0F0E),
-      appBar: AppBar(
-        backgroundColor: const Color(0xFF0D0F0E),
-        surfaceTintColor: Colors.transparent,
-        centerTitle: true,
-        title: const Text(
-          'แดชบอร์ด',
-          style: TextStyle(fontSize: 18, fontWeight: FontWeight.w700),
-        ),
-        leading: IconButton(
-          onPressed: () => context.pop(),
-          icon: const Icon(Icons.arrow_back_rounded),
-        ),
-      ),
-      body: RefreshIndicator(
+      body: Column(
+        children: [
+          _GreenHeader(
+            name: user?.displayName ?? 'Fanta Inazuma',
+            streak: user?.streak ?? 20,
+          ),
+          Expanded(
+            child: RefreshIndicator(
         color: AppColors.primary,
         onRefresh: () async {
           ref.invalidate(dashboardProvider);
@@ -121,6 +118,9 @@ class _FinancialDashboardScreenState
               ],
             );
           },
+        ),
+            ),
+          ],
         ),
       ),
       floatingActionButton: const AppFloatingActionButton(),
@@ -929,6 +929,89 @@ class _TransactionList extends StatelessWidget {
           ),
         );
       }).toList(),
+    );
+  }
+}
+
+// ─────────────────────────────────────────────────────────────────────────────
+// Green Header (แถบโปรไฟล์ผู้ใช้ด้านบน)
+// ─────────────────────────────────────────────────────────────────────────────
+class _GreenHeader extends StatelessWidget {
+  const _GreenHeader({required this.name, required this.streak});
+  final String name;
+  final int streak;
+
+  @override
+  Widget build(BuildContext context) {
+    final topPad = MediaQuery.of(context).padding.top;
+    final canPop = Navigator.canPop(context);
+    return Container(
+      width: double.infinity,
+      padding: EdgeInsets.fromLTRB(canPop ? 8 : 20, topPad + 16, 20, 24),
+      decoration: const BoxDecoration(
+        gradient: LinearGradient(
+          colors: [Color(0xFF06120A), Color(0xFF334E3D), Color(0xFF3CAE63)],
+          begin: Alignment.topCenter,
+          end: Alignment.bottomCenter,
+        ),
+        borderRadius: BorderRadius.only(
+          bottomLeft: Radius.circular(32),
+          bottomRight: Radius.circular(32),
+        ),
+      ),
+      child: Row(
+        children: [
+          if (canPop) ...[
+            IconButton(
+              icon: const Icon(Icons.arrow_back_rounded, color: Colors.white),
+              onPressed: () => context.pop(),
+            ),
+            const SizedBox(width: 4),
+          ],
+          Container(
+            width: 48,
+            height: 48,
+            decoration: const BoxDecoration(
+              shape: BoxShape.circle,
+              color: Color(0xFF5E6E85),
+            ),
+            child: const Icon(Icons.person, color: Colors.white, size: 30),
+          ),
+          const SizedBox(width: 14),
+          Expanded(
+            child: Column(
+              crossAxisAlignment: CrossAxisAlignment.start,
+              children: [
+                Text(
+                  name,
+                  style: const TextStyle(
+                    color: Colors.white,
+                    fontSize: 18,
+                    fontWeight: FontWeight.w600,
+                  ),
+                ),
+                const SizedBox(height: 6),
+                Container(
+                  padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 4),
+                  decoration: BoxDecoration(
+                    color: Colors.white.withOpacity(0.2),
+                    borderRadius: BorderRadius.circular(12),
+                  ),
+                  child: Text(
+                    'ใช้งานต่อเนื่อง $streak วัน',
+                    style: const TextStyle(
+                      color: Colors.white,
+                      fontSize: 12,
+                      fontWeight: FontWeight.bold,
+                    ),
+                  ),
+                ),
+              ],
+            ),
+          ),
+          const NotifBell(),
+        ],
+      ),
     );
   }
 }
