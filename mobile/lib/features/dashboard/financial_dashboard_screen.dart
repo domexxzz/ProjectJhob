@@ -119,10 +119,10 @@ class _FinancialDashboardScreenState
             );
           },
         ),
-            ),
-          ],
-        ),
       ),
+    ),
+  ],
+),
       floatingActionButton: const AppFloatingActionButton(),
       floatingActionButtonLocation: kFixedCenterDockedFabLocation,
       bottomNavigationBar: const AppBottomNavigationBar(currentTab: AppTab.dashboard),
