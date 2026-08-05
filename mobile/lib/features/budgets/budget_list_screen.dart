@@ -44,6 +44,7 @@ class BudgetListScreen extends ConsumerWidget {
             name: user?.displayName ?? 'Fanta Inazuma',
             streak: user?.streak ?? 20,
             avatarUrl: user?.avatarUrl,
+            level: user?.level ?? 1,
           ),
 
           // 2. ส่วนแสดงเนื้อหารายการงบประมาณ
@@ -178,16 +179,15 @@ class BudgetListScreen extends ConsumerWidget {
                                             child: Column(
                                               crossAxisAlignment: CrossAxisAlignment.start,
                                               children: [
-                                                Row(
+                                                Wrap(
+                                                  spacing: 8,
+                                                  runSpacing: 4,
+                                                  crossAxisAlignment: WrapCrossAlignment.center,
                                                   children: [
-                                                    Flexible(
-                                                      child: Text(
-                                                        status.displayName,
-                                                        style: const TextStyle(color: Colors.white, fontSize: 16, fontWeight: FontWeight.bold),
-                                                        overflow: TextOverflow.ellipsis,
-                                                      ),
+                                                    Text(
+                                                      status.displayName,
+                                                      style: const TextStyle(color: Colors.white, fontSize: 16, fontWeight: FontWeight.bold),
                                                     ),
-                                                    const SizedBox(width: 10),
                                                     // Badge บอกระดับความปลอดภัย
                                                     Container(
                                                       padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 3),
@@ -204,6 +204,47 @@ class BudgetListScreen extends ConsumerWidget {
                                                             badge.$1,
                                                             style: TextStyle(
                                                               color: badge.$4,
+                                                              fontSize: 10,
+                                                              fontWeight: FontWeight.bold,
+                                                            ),
+                                                          ),
+                                                        ],
+                                                      ),
+                                                    ),
+                                                    // Badge บอกสถานะแสดงบนแดชบอร์ด
+                                                    Container(
+                                                      padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 3),
+                                                      decoration: BoxDecoration(
+                                                        color: status.showOnDashboard
+                                                            ? const Color(0xFF3CAE63).withOpacity(0.12)
+                                                            : Colors.white.withOpacity(0.05),
+                                                        borderRadius: BorderRadius.circular(8),
+                                                        border: Border.all(
+                                                          color: status.showOnDashboard
+                                                              ? const Color(0xFF3CAE63).withOpacity(0.3)
+                                                              : Colors.white.withOpacity(0.1),
+                                                          width: 1,
+                                                        ),
+                                                      ),
+                                                      child: Row(
+                                                        mainAxisSize: MainAxisSize.min,
+                                                        children: [
+                                                          Icon(
+                                                            status.showOnDashboard
+                                                                ? Icons.visibility_rounded
+                                                                : Icons.visibility_off_rounded,
+                                                            size: 10,
+                                                            color: status.showOnDashboard
+                                                                ? const Color(0xFF4CD97B)
+                                                                : Colors.white38,
+                                                          ),
+                                                          const SizedBox(width: 4),
+                                                          Text(
+                                                            status.showOnDashboard ? 'โชว์หน้าแรก' : 'ไม่โชว์หน้าแรก',
+                                                            style: TextStyle(
+                                                              color: status.showOnDashboard
+                                                                  ? const Color(0xFF4CD97B)
+                                                                  : Colors.white38,
                                                               fontSize: 10,
                                                               fontWeight: FontWeight.bold,
                                                             ),
@@ -352,16 +393,29 @@ class _GreenHeader extends StatelessWidget {
   const _GreenHeader({
     required this.name,
     required this.streak,
+    required this.level,
     this.avatarUrl,
   });
 
   final String name;
   final int streak;
+  final int level;
   final String? avatarUrl;
 
   @override
   Widget build(BuildContext context) {
     final topPad = MediaQuery.of(context).padding.top;
+
+    String rankName = 'Bronze';
+    Color rankColor = const Color(0xFFCD7F32); // Bronze
+    if (level == 3) {
+      rankName = 'Gold';
+      rankColor = const Color(0xFFFFD700); // Gold
+    } else if (level == 2) {
+      rankName = 'Silver';
+      rankColor = const Color(0xFFC0C0C0); // Silver
+    }
+
     return Container(
       width: double.infinity,
       padding: EdgeInsets.fromLTRB(20, topPad + 16, 20, 24),
@@ -393,21 +447,33 @@ class _GreenHeader extends StatelessWidget {
                   ),
                 ),
                 const SizedBox(height: 6),
-                Container(
-                  padding:
-                      const EdgeInsets.symmetric(horizontal: 12, vertical: 4),
-                  decoration: BoxDecoration(
-                    color: Colors.white.withOpacity(0.2),
-                    borderRadius: BorderRadius.circular(12),
-                  ),
-                  child: Text(
-                    'ใช้งานต่อเนื่อง $streak วัน',
-                    style: const TextStyle(
-                      color: Colors.white,
-                      fontSize: 12,
-                      fontWeight: FontWeight.bold,
+                Row(
+                  children: [
+                    Container(
+                      padding:
+                          const EdgeInsets.symmetric(horizontal: 10, vertical: 4),
+                      decoration: BoxDecoration(
+                        color: rankColor.withOpacity(0.2),
+                        borderRadius: BorderRadius.circular(12),
+                        border: Border.all(color: rankColor.withOpacity(0.4)),
+                      ),
+                      child: Row(
+                        mainAxisSize: MainAxisSize.min,
+                        children: [
+                          Icon(Icons.emoji_events_rounded, color: rankColor, size: 12),
+                          const SizedBox(width: 4),
+                          Text(
+                            rankName,
+                            style: TextStyle(
+                              color: rankColor,
+                              fontSize: 11,
+                              fontWeight: FontWeight.bold,
+                            ),
+                          ),
+                        ],
+                      ),
                     ),
-                  ),
+                  ],
                 ),
               ],
             ),

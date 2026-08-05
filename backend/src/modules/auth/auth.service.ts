@@ -10,6 +10,7 @@ type UserRow = {
   monthlyIncome: number;
   level: number;
   streak: number;
+  points: number;
   avatarUrl?: string | null;
   createdAt?: Date;
 };
@@ -23,6 +24,7 @@ export function publicUser(u: UserRow) {
     monthlyIncome: u.monthlyIncome,
     level: u.level,
     streak: u.streak,
+    points: u.points,
     avatarUrl: u.avatarUrl ?? null,
     createdAt: u.createdAt?.toISOString() ?? null,
   };
@@ -55,4 +57,28 @@ export async function loginUser(input: { email: string; password: string }) {
     throw new HttpError(401, 'อีเมลหรือรหัสผ่านไม่ถูกต้อง');
   }
   return { user: publicUser(user), token: signToken(user.id) };
+}
+
+export async function awardPoints(userId: string, pointsToAward: number) {
+  const user = await prisma.user.findUnique({
+    where: { id: userId },
+    select: { points: true },
+  });
+  if (!user) return;
+
+  const newPoints = user.points + pointsToAward;
+  let newLevel = 1;
+  if (newPoints >= 500) {
+    newLevel = 3;
+  } else if (newPoints >= 100) {
+    newLevel = 2;
+  }
+
+  await prisma.user.update({
+    where: { id: userId },
+    data: {
+      points: newPoints,
+      level: newLevel,
+    },
+  });
 }

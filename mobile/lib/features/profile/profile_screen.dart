@@ -65,15 +65,10 @@ class ProfileScreen extends ConsumerWidget {
                             ? '-'
                             : Money.formatBaht(user.monthlyIncome),
                       ),
-                      _StatRow(
-                        icon: Icons.local_fire_department_outlined,
-                        label: 'การใช้งานต่อเนื่อง',
-                        value: '${user?.streak ?? 0} วัน',
-                      ),
-                      _StatRow(
-                        icon: Icons.star_border_rounded,
-                        label: 'ลำดับ',
-                        value: '${user?.level ?? 1}',
+
+                      _RankProgressCard(
+                        points: user?.points ?? 0,
+                        level: user?.level ?? 1,
                       ),
                       const SizedBox(height: 32),
                       Center(
@@ -507,6 +502,173 @@ class _ProfileField extends StatelessWidget {
               enabledBorder: OutlineInputBorder(
                   borderRadius: BorderRadius.circular(5),
                   borderSide: const BorderSide(color: _fieldBorder)),
+            ),
+          ),
+        ],
+      ),
+    );
+  }
+}
+
+class _RankProgressCard extends StatelessWidget {
+  const _RankProgressCard({required this.points, required this.level});
+  final int points;
+  final int level;
+
+  @override
+  Widget build(BuildContext context) {
+    String rankName = 'Bronze';
+    Color rankColor = const Color(0xFFCD7F32); // Bronze
+    int nextPoints = 100;
+    int prevPoints = 0;
+    String nextRankName = 'Silver';
+
+    if (level >= 3 || points >= 500) {
+      rankName = 'Gold';
+      rankColor = const Color(0xFFFFD700); // Gold
+      nextPoints = 500;
+      prevPoints = 100;
+      nextRankName = '';
+    } else if (level == 2 || (points >= 100 && points < 500)) {
+      rankName = 'Silver';
+      rankColor = const Color(0xFFC0C0C0); // Silver
+      nextPoints = 500;
+      prevPoints = 100;
+      nextRankName = 'Gold';
+    }
+
+    final double progress = nextRankName.isEmpty
+        ? 1.0
+        : ((points - prevPoints) / (nextPoints - prevPoints)).clamp(0.0, 1.0);
+
+    return Container(
+      margin: const EdgeInsets.symmetric(vertical: 12),
+      padding: const EdgeInsets.all(18),
+      decoration: BoxDecoration(
+        gradient: LinearGradient(
+          begin: Alignment.topLeft,
+          end: Alignment.bottomRight,
+          colors: [
+            rankColor.withOpacity(0.15),
+            const Color(0xFF1D222B),
+          ],
+        ),
+        borderRadius: BorderRadius.circular(20),
+        border: Border.all(
+          color: rankColor.withOpacity(0.3),
+          width: 1.5,
+        ),
+        boxShadow: [
+          BoxShadow(
+            color: rankColor.withOpacity(0.05),
+            blurRadius: 15,
+            spreadRadius: 2,
+          ),
+        ],
+      ),
+      child: Column(
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: [
+          Row(
+            mainAxisAlignment: MainAxisAlignment.spaceBetween,
+            children: [
+              Row(
+                children: [
+                  Icon(
+                    Icons.emoji_events_rounded,
+                    color: rankColor,
+                    size: 28,
+                  ),
+                  const SizedBox(width: 10),
+                  Column(
+                    crossAxisAlignment: CrossAxisAlignment.start,
+                    children: [
+                      const Text(
+                        'ระดับสมาชิกของคุณ',
+                        style: TextStyle(color: Colors.white60, fontSize: 12),
+                      ),
+                      const SizedBox(height: 2),
+                      Text(
+                        rankName,
+                        style: TextStyle(
+                          color: rankColor,
+                          fontSize: 20,
+                          fontWeight: FontWeight.bold,
+                          letterSpacing: 0.5,
+                          shadows: [
+                            Shadow(
+                              color: rankColor.withOpacity(0.5),
+                              blurRadius: 10,
+                            ),
+                          ],
+                        ),
+                      ),
+                    ],
+                  ),
+                ],
+              ),
+              Container(
+                padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 6),
+                decoration: BoxDecoration(
+                  color: Colors.white.withOpacity(0.05),
+                  borderRadius: BorderRadius.circular(10),
+                ),
+                child: Text(
+                  '$points แต้ม',
+                  style: const TextStyle(
+                    color: Colors.white,
+                    fontWeight: FontWeight.bold,
+                    fontSize: 14,
+                  ),
+                ),
+              ),
+            ],
+          ),
+          const SizedBox(height: 18),
+          // Progress bar
+          Stack(
+            children: [
+              Container(
+                height: 8,
+                width: double.infinity,
+                decoration: BoxDecoration(
+                  color: Colors.white12,
+                  borderRadius: BorderRadius.circular(4),
+                ),
+              ),
+              FractionallySizedBox(
+                widthFactor: progress,
+                child: Container(
+                  height: 8,
+                  decoration: BoxDecoration(
+                    gradient: LinearGradient(
+                      colors: [rankColor.withOpacity(0.7), rankColor],
+                    ),
+                    borderRadius: BorderRadius.circular(4),
+                    boxShadow: [
+                      BoxShadow(
+                        color: rankColor.withOpacity(0.3),
+                        blurRadius: 6,
+                        spreadRadius: 1,
+                      ),
+                    ],
+                  ),
+                ),
+              ),
+            ],
+          ),
+          const SizedBox(height: 10),
+          Align(
+            alignment: Alignment.centerRight,
+            child: Text(
+              nextRankName.isEmpty
+                  ? 'คุณอยู่ในระดับสูงสุดแล้ว ✨'
+                  : 'สะสมอีก ${nextPoints - points} แต้มเพื่อเลื่อนขั้นเป็น $nextRankName',
+              style: TextStyle(
+                color: nextRankName.isEmpty ? const Color(0xFFFFD700) : Colors.white38,
+                fontSize: 11,
+                fontWeight: FontWeight.w500,
+              ),
             ),
           ),
         ],

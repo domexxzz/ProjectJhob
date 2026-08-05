@@ -4,6 +4,7 @@ import { asyncHandler, HttpError } from '../../lib/http';
 import { requireAuth } from '../../lib/auth';
 import { z } from 'zod';
 import { cache } from '../../lib/cache';
+import { awardPoints } from '../auth/auth.service';
 import type { Goal } from '@prisma/client';
 import { buildContext } from '../chat/context_builder';
 import { generateSavingsPlan } from './plan';
@@ -13,6 +14,7 @@ goalsRouter.use(requireAuth);
 
 // 💡 จำนวนเงิน (target/current) เป็น "สตางค์" (Int) เหมือนทั้งระบบ
 const createGoalSchema = z.object({
+  id: z.string().optional(),
   name: z.string().trim().min(1, 'ชื่อเป้าหมายห้ามว่าง').max(100),
   target: z.number().int().positive('target ต้องมากกว่า 0'),
   current: z.number().int().min(0).optional(),
@@ -61,6 +63,7 @@ goalsRouter.post(
 
     const goal = await prisma.goal.create({
       data: {
+        id: data.id,
         userId: req.userId!,
         name: data.name,
         target: data.target,
@@ -70,6 +73,7 @@ goalsRouter.post(
     });
 
     await cache.delPattern(`user:${req.userId!}:*`);
+    await awardPoints(req.userId!, 10);
     res.status(201).json({ goal: withProgress(goal) });
   }),
 );
@@ -106,10 +110,20 @@ goalsRouter.post(
   asyncHandler(async (req, res) => {
     const { amount } = depositSchema.parse(req.body);
 
-    const existing = await prisma.goal.findFirst({
+    let existing = await prisma.goal.findFirst({
       where: { id: req.params.id, userId: req.userId! },
     });
-    if (!existing) throw new HttpError(404, 'ไม่พบเป้าหมาย');
+    if (!existing) {
+      existing = await prisma.goal.create({
+        data: {
+          id: req.params.id,
+          userId: req.userId!,
+          name: 'เป้าหมายระบบสะสมแต้ม',
+          target: amount * 2,
+          current: 0,
+        },
+      });
+    }
 
     const goal = await prisma.goal.update({
       where: { id: req.params.id },
@@ -117,6 +131,7 @@ goalsRouter.post(
     });
 
     await cache.delPattern(`user:${req.userId!}:*`);
+    await awardPoints(req.userId!, 15);
     res.json({ goal: withProgress(goal) });
   }),
 );

@@ -273,7 +273,11 @@ class _EditGoalScreenState extends ConsumerState<EditGoalScreen> {
                   ),
                   Text(
                     widget.goalId != null ? 'แก้ไขเป้าหมาย' : 'เพิ่มเป้าหมาย',
-                    style: const TextStyle(fontWeight: FontWeight.bold, fontSize: 24, color: Colors.white, letterSpacing: 0.5),
+                    style: const TextStyle(
+                        fontWeight: FontWeight.bold,
+                        fontSize: 24,
+                        color: Colors.white,
+                        letterSpacing: 0.5),
                   ),
                 ],
               ),
@@ -673,31 +677,57 @@ class _EditGoalScreenState extends ConsumerState<EditGoalScreen> {
                         const Icon(Icons.arrow_forward_ios_rounded, color: Colors.white30, size: 14),
                       ],
                     ),
-                  ),
-                  const SizedBox(height: 48),
-                  
-                  // ปุ่มลบ และ ยืนยันการบันทึก/แก้ไข
-                  Row(
-                    children: [
-                      if (widget.goalId != null) ...[
-                        Expanded(
-                          child: SizedBox(
-                            height: 56,
-                            child: ElevatedButton(
-                              onPressed: () => _deleteGoal(),
-                              style: ElevatedButton.styleFrom(
-                                backgroundColor: const Color(0xFFFF5959), 
-                                elevation: 0,
-                                shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(16)),
+                  SizedBox(height: personalized ? 48 : 24),
+
+                  // ปุ่มลบ และ ยืนยันการแก้ไข / สร้างเป้าหมาย
+                  widget.goalId != null
+                      ? Row(
+                          children: [
+                            Expanded(
+                              child: SizedBox(
+                                height: 56,
+                                child: ElevatedButton(
+                                  onPressed: () => _deleteGoal(),
+                                  style: ElevatedButton.styleFrom(
+                                    backgroundColor: const Color(0xFFFF5959),
+                                    elevation: 0,
+                                    shape: RoundedRectangleBorder(
+                                        borderRadius: BorderRadius.circular(16)),
+                                  ),
+                                  child: const Text('ลบ',
+                                      style: TextStyle(
+                                          color: Colors.white,
+                                          fontWeight: FontWeight.bold,
+                                          fontSize: 16)),
+                                ),
                               ),
-                              child: const Text('ลบ', style: TextStyle(color: Colors.white, fontWeight: FontWeight.bold, fontSize: 16)),
                             ),
-                          ),
-                        ),
-                        const SizedBox(width: 14),
-                      ],
-                      Expanded(
-                        child: SizedBox(
+                            const SizedBox(width: 14),
+                            Expanded(
+                              child: SizedBox(
+                                height: 56,
+                                child: ElevatedButton(
+                                  onPressed: () => _saveGoal(),
+                                  style: ElevatedButton.styleFrom(
+                                    backgroundColor: const Color(0xFF3CAE63),
+                                    elevation: 0,
+                                    shape: RoundedRectangleBorder(
+                                        borderRadius: BorderRadius.circular(16)),
+                                  ),
+                                  child: const Text(
+                                    'ยืนยันการแก้ไข',
+                                    style: TextStyle(
+                                        color: Colors.white,
+                                        fontWeight: FontWeight.bold,
+                                        fontSize: 16),
+                                  ),
+                                ),
+                              ),
+                            ),
+                          ],
+                        )
+                      : SizedBox(
+                          width: double.infinity,
                           height: 56,
                           child: ElevatedButton(
                             onPressed: () => _saveGoal(),
@@ -706,15 +736,15 @@ class _EditGoalScreenState extends ConsumerState<EditGoalScreen> {
                               elevation: 0,
                               shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(16)),
                             ),
-                            child: Text(
-                              widget.goalId != null ? 'ยืนยันการแก้ไข' : 'บันทึกเป้าหมาย',
-                              style: const TextStyle(color: Colors.white, fontWeight: FontWeight.bold, fontSize: 16),
+                            child: const Text(
+                              'เพิ่มเป้าหมาย',
+                              style: TextStyle(
+                                  color: Colors.white,
+                                  fontWeight: FontWeight.bold,
+                                  fontSize: 16),
                             ),
                           ),
                         ),
-                      ),
-                    ],
-                  ),
                   const SizedBox(height: 32),
                 ],
               ),

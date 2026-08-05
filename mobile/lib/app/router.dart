@@ -8,6 +8,7 @@ import '../features/auth/forgot_password_screen.dart'; // ➕ อิมพอร
 import '../features/dashboard/dashboard_screen.dart';
 import '../features/dashboard/financial_dashboard_screen.dart';
 import '../features/transactions/slip_screen.dart';
+import '../features/transactions/select_date_screen.dart';
 import '../features/transactions/transaction.dart';
 import '../features/chat/chat_screen.dart';
 import '../features/profile/profile_screen.dart';
@@ -84,6 +85,12 @@ final routerProvider = Provider<GoRouter>((ref) {
         path: '/slip',
         builder: (_, state) => SlipScreen(
           startInManualMode: state.uri.queryParameters['mode'] == 'manual',
+        ),
+      ),
+      GoRoute(
+        path: '/transactions/select-date',
+        builder: (_, state) => SelectDateScreen(
+          initialDate: state.extra as DateTime?,
         ),
       ),
       GoRoute(path: '/chat', builder: (_, __) => const ChatScreen()),

@@ -1,5 +1,7 @@
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:hive/hive.dart';
+import '../../core/api/api_client.dart';
+import '../auth/auth_controller.dart';
 
 class GoalModel {
   GoalModel({
@@ -118,9 +120,10 @@ class GoalModel {
 }
 
 class GoalsNotifier extends StateNotifier<List<GoalModel>> {
-  GoalsNotifier() : super([]) {
+  GoalsNotifier(this._ref) : super([]) {
     _loadGoals();
   }
+  final Ref _ref;
 
   static const _boxName = 'goals_box';
 
@@ -186,11 +189,12 @@ class GoalsNotifier extends StateNotifier<List<GoalModel>> {
     ];
   }
 
-  void addGoal(String name, int target, DateTime? deadline, String type,
+  Future<void> addGoal(String name, int target, DateTime? deadline, String type,
       String emoji, String? imagePath,
-      {DateTime? startDate}) {
+      {DateTime? startDate}) async {
+    final newId = 'goal-${DateTime.now().millisecondsSinceEpoch}';
     final newGoal = GoalModel(
-      id: 'goal-${DateTime.now().millisecondsSinceEpoch}',
+      id: newId,
       name: name,
       target: target,
       current: 0,
@@ -202,7 +206,19 @@ class GoalsNotifier extends StateNotifier<List<GoalModel>> {
       createdAt: DateTime.now(),
     );
     state = [...state, newGoal];
-    _saveToHive();
+    await _saveToHive();
+
+    try {
+      final dio = _ref.read(dioProvider);
+      await dio.post('/goals', data: {
+        'id': newId,
+        'name': name,
+        'target': target,
+        'current': 0,
+        if (deadline != null) 'deadline': deadline.toUtc().toIso8601String(),
+      });
+      _ref.read(authControllerProvider.notifier).refreshProfile();
+    } catch (_) {}
   }
 
   void updateGoal(String id, String name, int target, DateTime? deadline,
@@ -227,23 +243,36 @@ class GoalsNotifier extends StateNotifier<List<GoalModel>> {
     _saveToHive();
   }
 
-  void deleteGoal(String id) {
+  Future<void> deleteGoal(String id) async {
     state = state.where((g) => g.id != id).toList();
-    _saveToHive();
+    await _saveToHive();
+
+    try {
+      final dio = _ref.read(dioProvider);
+      await dio.delete('/goals/$id');
+    } catch (_) {}
   }
 
-  void addSavings(String goalId, int amount) {
+  Future<void> addSavings(String goalId, int amount) async {
     state = state.map((g) {
       if (g.id == goalId) {
         return g.copyWith(current: g.current + amount);
       }
       return g;
     }).toList();
-    _saveToHive();
+    await _saveToHive();
+
+    try {
+      final dio = _ref.read(dioProvider);
+      await dio.post('/goals/$goalId/deposit', data: {
+        'amount': amount,
+      });
+      _ref.read(authControllerProvider.notifier).refreshProfile();
+    } catch (_) {}
   }
 }
 
 final goalsProvider =
     StateNotifierProvider<GoalsNotifier, List<GoalModel>>((ref) {
-  return GoalsNotifier();
+  return GoalsNotifier(ref);
 });
