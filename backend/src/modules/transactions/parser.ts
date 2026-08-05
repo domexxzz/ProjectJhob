@@ -96,21 +96,50 @@ export function parseMerchant(text: string): string | null {
   return null;
 }
 
+// ⚠️ ชื่อหมวด (key) ต้องตรงกับ Category.name ใน DB เป๊ะ ๆ (ดู prisma/seed.ts)
+// เรียงหมวด "เฉพาะเจาะจง/ดักง่าย" ไว้ก่อน (Cafe/Fuel/Debt/Housing) กันชนกับหมวดกว้าง (Food/Transport/Shopping)
+// autoCategorize เลือกเฉพาะหมวดที่ type ตรงกัน → keyword รายรับ/รายจ่ายอยู่รวมกันได้
 const CATEGORY_KEYWORDS: Record<string, string[]> = {
-  "Food": ["ร้านอาหาร", "ส้มตำ", "ชาบู", "กะเพรา", "กาแฟ", "cafe", "coffee", "7-Eleven", "เซเว่น", "food", "ก๋วยเตี๋ยว", "ชาไข่มุก", "sushi", "หมูกระทะ", "อร่อย"],
-  "Shopping": ["Shopee", "Lazada", "TikTok Shop", "เสื้อผ้า", "ห้าง", "Mall", "fashion", "gadget", "Uniqlo", "Zara", "H&M"],
-  "Transport": ["BTS", "MRT", "วินมอเตอร์ไซค์", "แท็กซี่", "taxi", "Grab", "Bolt", "น้ำมัน", "ปตท", "shell", "caltex", "ทางด่วน", "ตั๋วเครื่องบิน"],
-  "Bills": ["การไฟฟ้า", "การประปา", "อินเทอร์เน็ต", "AIS", "True", "DTAC", "Netflix", "Spotify", "บัตรเครดิต"],
-  "Entertainment": ["โรงหนัง", "Major", "SF Cinema", "คาราโอเกะ", "เหล้า", "เบียร์", "ผับ", "บาร์", "concert", "เกม", "Steam", "PlayStation"],
-  "Health": ["โรงพยาบาล", "คลินิก", "ยา", "pharmacy", "Watson", "Boots", "ฟิตเนส", "gym"],
+  // ── รายจ่าย: เฉพาะเจาะจงก่อน ──
+  "Debt": ["ค่างวด", "งวดรถ", "งวดบ้าน", "งวดมือถือ", "งวดโทรศัพท์", "ผ่อนรถ", "ผ่อนบ้าน", "ผ่อน", "หนี้", "กยศ", "สินเชื่อ", "กู้", "ดอกเบี้ย"],
+  "Housing": ["ค่าเช่า", "ค่าห้อง", "ค่าหอ", "หอพัก", "ค่าคอนโด", "ค่าบ้าน", "ที่พักรายเดือน"],
+  "MobileInternet": ["ค่าเน็ต", "ค่าไวไฟ", "wifi", "ค่าโทรศัพท์", "ค่าโทร", "ค่ามือถือ", "แพ็กเกจเน็ต", "เติมเงินมือถือ", "ais", "dtac", "ทรูมูฟ", "truemove"],
+  "Subscription": ["netflix", "spotify", "youtube premium", "disney", "icloud", "prime video", "ค่าสมาชิก", "สมาชิกรายเดือน", "subscription"],
+  "Bills": ["ค่าไฟ", "ค่าไฟฟ้า", "ค่าน้ำ", "ค่าประปา", "การไฟฟ้า", "การประปา", "ค่าส่วนกลาง", "ค่าขยะ"],
+  "Fuel": ["น้ำมัน", "เติมน้ำมัน", "ปตท", "ptt", "shell", "esso", "เอสโซ่", "caltex", "บางจาก", "เบนซิน", "ดีเซล", "แก๊สรถ"],
+  "Cafe": ["กาแฟ", "coffee", "คาเฟ่", "cafe", "ชาไข่มุก", "ชานม", "อเมซอน", "amazon coffee", "starbucks", "สตาร์บัค", "เครื่องดื่ม", "ชาเขียว", "โกโก้", "น้ำผลไม้"],
+  "Groceries": ["ของใช้", "ซูเปอร์", "supermarket", "บิ๊กซี", "โลตัส", "แม็คโคร", "makro", "tops", "villa", "ยาสีฟัน", "สบู่", "แชมพู", "ทิชชู", "ผงซักฟอก", "ของเข้าบ้าน"],
+  "Fitness": ["ฟิตเนส", "gym", "ยิม", "ออกกำลังกาย", "โยคะ", "yoga", "ว่ายน้ำ", "แบดมินตัน", "ตีแบด", "ฟุตบอล"],
+  "Beauty": ["ทำผม", "ตัดผม", "ทำเล็บ", "สปา", "spa", "เสริมสวย", "เครื่องสำอาง", "สกินแคร์", "ครีมบำรุง", "นวดหน้า"],
+  "Health": ["โรงพยาบาล", "รพ.", "คลินิก", "หาหมอ", "ค่ายา", "ซื้อยา", "pharmacy", "ร้านยา", "watson", "วัตสัน", "boots", "ตรวจสุขภาพ", "ทำฟัน", "หมอฟัน"],
+  "Education": ["ค่าเทอม", "ค่าหน่วยกิต", "หนังสือเรียน", "คอร์สเรียน", "เรียนพิเศษ", "ติว", "ค่าอบรม", "สอบ"],
+  "Insurance": ["ประกันชีวิต", "ประกันรถ", "ประกันสุขภาพ", "เบี้ยประกัน", "ค่าประกัน"],
+  "Pet": ["สัตว์เลี้ยง", "อาหารหมา", "อาหารแมว", "ค่าหมอสัตว์", "โรงพยาบาลสัตว์", "ทรายแมว"],
+  "Gift": ["ของขวัญ", "บริจาค", "ทำบุญ", "ซองงาน", "ของฝาก", "ใส่ซอง"],
+  "Family": ["ให้พ่อ", "ให้แม่", "ให้ที่บ้าน", "ค่าเลี้ยงดู", "ส่งเงินให้พ่อแม่"],
+  "Savings": ["ออมเงิน", "เงินออม", "ลงทุน", "ซื้อหุ้น", "กองทุน", "ฝากประจำ", "dca"],
+  "Travel": ["ท่องเที่ยว", "ไปเที่ยว", "ทริป", "ตั๋วเครื่องบิน", "โรงแรม", "ที่พักต่างจังหวัด", "รีสอร์ท"],
+  "Transport": ["bts", "mrt", "วินมอเตอร์ไซค์", "แท็กซี่", "taxi", "grab", "แกร็บ", "bolt", "ทางด่วน", "ค่ารถ", "ค่าเดินทาง", "ค่าโดยสาร", "รถเมล์", "รถไฟฟ้า", "ค่าทางด่วน"],
+  "Entertainment": ["โรงหนัง", "ดูหนัง", "major", "sf cinema", "คาราโอเกะ", "เหล้า", "เบียร์", "ผับ", "บาร์", "คอนเสิร์ต", "เกม", "steam", "playstation"],
+  "Shopping": ["shopee", "ชอปปี้", "ช้อปปี้", "lazada", "ลาซาด้า", "tiktok shop", "เสื้อผ้า", "รองเท้า", "กระเป๋า", "ห้าง", "central", "uniqlo", "zara", "h&m", "gadget"],
+  "Food": ["ข้าว", "ก๋วยเตี๋ยว", "ก๋วยจั๊บ", "ส้มตำ", "ชาบู", "หมูกระทะ", "กะเพรา", "ข้าวมันไก่", "sushi", "ซูชิ", "ร้านอาหาร", "อาหาร", "kfc", "แมค", "mcdonald", "พิซซ่า", "ข้าวเที่ยง", "ข้าวเย็น", "ข้าวเช้า", "โจ๊ก", "ส่งข้าว"],
+  // ── รายรับ ──
   "Salary": ["เงินเดือน", "salary", "paycheck"],
+  "Bonus": ["โบนัส", "bonus"],
+  "Freelance": ["ฟรีแลนซ์", "freelance", "รับจ้าง", "รับงาน", "งานนอก"],
+  "PartTime": ["พาร์ทไทม์", "part-time", "parttime", "งานพิเศษ"],
+  "Business": ["ค้าขาย", "ขายของ", "ขายได้", "ยอดขาย", "กำไรร้าน"],
+  "Investment": ["ดอกเบี้ย", "ปันผล", "dividend", "ผลตอบแทน", "กำไรหุ้น", "ขายหุ้น"],
+  "Allowance": ["ค่าขนม", "ครอบครัวให้", "เงินจากพ่อแม่", "พ่อแม่ให้"],
+  "Refund": ["เงินคืน", "เงินทอน", "refund", "คืนเงิน", "cashback", "แคชแบ็ก"],
 };
 
 export async function autoCategorize(
-  text: string, 
-  merchant: string, 
+  text: string,
+  merchant: string,
   type: 'income' | 'expense',
-  userId?: string
+  userId?: string,
+  customFallback?: string, // หมวดสำรองเฉพาะกรณี เช่น ใบเสร็จร้านค้า → Groceries
 ): Promise<string | null> {
   // User Correction Learning: check past transactions for this user with same merchant
   if (userId && merchant) {
@@ -146,7 +175,9 @@ export async function autoCategorize(
     }
   }
   
-  const fallbackName = type === 'income' ? 'OtherIncome' : 'Food';
+  // ⭐ ไม่แมตช์ keyword → หมวด "อื่นๆ" (ไม่ใช่ 'Food') เพื่อไม่ให้เดาผิดเป็นอาหารทุกอย่าง
+  // (customFallback ใช้กับใบเสร็จร้านค้า → Groceries แทน)
+  const fallbackName = customFallback ?? (type === 'income' ? 'OtherIncome' : 'OtherExpense');
   const defaultCat = await prisma.category.findFirst({ where: { name: fallbackName, type } });
   return defaultCat ? defaultCat.id : null;
 }
