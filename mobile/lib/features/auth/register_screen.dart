@@ -1,4 +1,5 @@
 import 'package:flutter/material.dart';
+import 'package:flutter/services.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:go_router/go_router.dart';
 
@@ -55,8 +56,8 @@ class _RegisterScreenState extends ConsumerState<RegisterScreen> {
             children: [
               const SizedBox(height: 12),
               // จัดหัวข้อให้อยู่ตรงกลางเหมือนหน้า Login ด้วยรูปแบบฟอนต์เดียวกัน
-              Center(
-                child: const Text(
+              const Center(
+                child: Text(
                   'สมัครสมาชิก',
                   textAlign: TextAlign.center,
                   style: TextStyle(
@@ -101,8 +102,12 @@ class _RegisterScreenState extends ConsumerState<RegisterScreen> {
               _LabeledField(
                 label: 'Phone number',
                 controller: _phone,
-                hint: 'ใส่เบอร์โทรศัพท์',
+                hint: 'ใส่เบอร์โทรศัพท์ (10 หลัก)',
                 keyboardType: TextInputType.phone,
+                inputFormatters: [
+                  FilteringTextInputFormatter.digitsOnly,
+                  LengthLimitingTextInputFormatter(10),
+                ],
               ),
 
               if (auth.error != null) ...[
@@ -190,6 +195,7 @@ class _LabeledField extends StatelessWidget {
     this.obscureText = false,
     this.keyboardType,
     this.suffixIcon,
+    this.inputFormatters,
   });
 
   final String label;
@@ -198,6 +204,7 @@ class _LabeledField extends StatelessWidget {
   final bool obscureText;
   final TextInputType? keyboardType;
   final Widget? suffixIcon;
+  final List<TextInputFormatter>? inputFormatters;
 
   @override
   Widget build(BuildContext context) {
@@ -215,6 +222,7 @@ class _LabeledField extends StatelessWidget {
           controller: controller,
           obscureText: obscureText,
           keyboardType: keyboardType,
+          inputFormatters: inputFormatters,
           style: const TextStyle(color: Colors.white),
           decoration: InputDecoration(
             hintText: hint,

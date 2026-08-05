@@ -8,6 +8,7 @@ import '../transactions/transaction.dart';
 import '../transactions/transactions_repository.dart';
 import '../auth/auth_controller.dart'; 
 import '../settings/settings_screen.dart';
+import '../profile/profile_avatar.dart';
 import '../../widgets/app_bottom_nav_bar.dart';
 import 'package:intl/intl.dart';
 
@@ -42,6 +43,7 @@ class BudgetListScreen extends ConsumerWidget {
           _GreenHeader(
             name: user?.displayName ?? 'Fanta Inazuma',
             streak: user?.streak ?? 20,
+            avatarUrl: user?.avatarUrl,
           ),
 
           // 2. ส่วนแสดงเนื้อหารายการงบประมาณ
@@ -347,9 +349,15 @@ class BudgetListScreen extends ConsumerWidget {
 // 1. Green Header (ปรับแต่ง Gradient ให้ตรงกับหน้า GoalsScreen เป๊ะๆ)
 // ─────────────────────────────────────────────────────────────────────────────
 class _GreenHeader extends StatelessWidget {
-  const _GreenHeader({required this.name, required this.streak});
+  const _GreenHeader({
+    required this.name,
+    required this.streak,
+    this.avatarUrl,
+  });
+
   final String name;
   final int streak;
+  final String? avatarUrl;
 
   @override
   Widget build(BuildContext context) {
@@ -370,15 +378,7 @@ class _GreenHeader extends StatelessWidget {
       ),
       child: Row(
         children: [
-          Container(
-            width: 48,
-            height: 48,
-            decoration: const BoxDecoration(
-              shape: BoxShape.circle,
-              color: Color(0xFF5E6E85),
-            ),
-            child: const Icon(Icons.person, color: Colors.white, size: 30),
-          ),
+          ProfileAvatar(imageUrl: avatarUrl, size: 48),
           const SizedBox(width: 14),
           Expanded(
             child: Column(

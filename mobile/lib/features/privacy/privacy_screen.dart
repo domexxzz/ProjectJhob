@@ -124,86 +124,138 @@ class PrivacyScreen extends ConsumerWidget {
     final notifier = ref.read(privacySettingsProvider.notifier);
 
     return Scaffold(
-      backgroundColor: const Color(0xFF111211),
+      backgroundColor: const Color(0xFF0D1110),
       appBar: AppBar(
-        backgroundColor: const Color(0xFF111211),
-        elevation: 0,
+        backgroundColor: const Color(0xFF0D1110),
+        surfaceTintColor: Colors.transparent,
         centerTitle: true,
         leading: IconButton(
-          icon: const Icon(Icons.arrow_back, color: Colors.white),
-          onPressed: () => context.pop(),
+          onPressed: () {
+            if (Navigator.of(context).canPop() || context.canPop()) {
+              context.pop();
+            } else {
+              context.go('/');
+            }
+          },
+          icon: const Icon(Icons.arrow_back, color: Colors.white, size: 24),
         ),
         title: const Text(
           'ความเป็นส่วนตัว',
-          style: TextStyle(color: Colors.white, fontSize: 18),
+          style: TextStyle(
+            color: Colors.white,
+            fontSize: 18,
+            fontWeight: FontWeight.w700,
+          ),
         ),
       ),
-      body: ListView(
-        padding: const EdgeInsets.fromLTRB(22, 14, 22, 110),
-        children: [
-          _PrivacySwitch(
-            title: 'แสดงคำแนะนำเฉพาะบุคคล',
-            subtitle: 'ใช้ข้อมูลการเงินเพื่อปรับคำแนะนำให้เหมาะกับคุณ',
-            value: settings.personalizedRecommendations,
-            onChanged: notifier.setPersonalizedRecommendations,
-          ),
-          _PrivacySwitch(
-            title: 'บันทึกประวัติสนทนาเพื่อพัฒนาคำตอบ',
-            subtitle: 'ปิดแล้วข้อความใหม่จะไม่ถูกบันทึกไว้บนเซิร์ฟเวอร์',
-            value: settings.shareForAiImprovement,
-            onChanged: notifier.setShareForAiImprovement,
-          ),
-          _PrivacySwitch(
-            title: 'อนุญาตให้ AI วิเคราะห์ข้อมูลการเงิน',
-            subtitle:
-                'ให้พี่เงินใช้รายรับ รายจ่าย และงบประมาณในการวิเคราะห์',
-            value: settings.allowFinancialAnalysis,
-            onChanged: notifier.setAllowFinancialAnalysis,
-          ),
-          const SizedBox(height: 22),
-          const Text(
-            'App Security',
-            style: TextStyle(color: Colors.white70, fontSize: 16),
-          ),
-          const SizedBox(height: 10),
-          _PrivacySwitch(
-            title: 'Face ID / ลายนิ้วมือ',
-            subtitle: 'ล็อกแอปด้วยข้อมูลชีวมิติบนอุปกรณ์ที่รองรับ',
-            value: settings.biometricLock,
-            onChanged: (value) => _setBiometric(context, notifier, value),
-          ),
-          _PrivacySwitch(
-            title: 'ล็อกอินอัตโนมัติ',
-            subtitle: 'คงสถานะเข้าสู่ระบบเมื่อเปิดแอปครั้งถัดไป',
-            value: settings.autoLogin,
-            onChanged: notifier.setAutoLogin,
-          ),
-          _PrivacySwitch(
-            title: 'ซ่อนข้อมูลเมื่อเปิด Recent Apps',
-            subtitle: 'ป้องกันข้อมูลสำคัญปรากฏในภาพตัวอย่างแอปล่าสุด',
-            value: settings.hideInRecentApps,
-            onChanged: (value) async {
-              await notifier.setHideInRecentApps(value);
-              await NativeSecurityService.setRecentAppsPrivacy(value);
-            },
-          ),
-          const SizedBox(height: 8),
-          TextButton(
-            onPressed: () => _showPrivacyPolicy(context),
-            child: const Text(
-              'นโยบายความเป็นส่วนตัว',
-              style: TextStyle(
-                color: Color(0xFFFF4D57),
-                fontSize: 16,
-                fontWeight: FontWeight.w700,
-              ),
+      body: CustomScrollView(
+        slivers: [
+          SliverPadding(
+            padding: const EdgeInsets.fromLTRB(18, 22, 18, 110),
+            sliver: SliverList(
+              delegate: SliverChildListDelegate([
+                const _SectionTitle(
+                  icon: Icons.shield_outlined,
+                  title: 'ความเป็นส่วนตัวและการใช้ข้อมูล',
+                  subtitle: 'กำหนดการนำข้อมูลไปใช้วิเคราะห์และพัฒนาคำแนะนำ',
+                ),
+                const SizedBox(height: 12),
+                _SettingsGroup(
+                  children: [
+                    _SettingsSwitchTile(
+                      icon: Icons.psychology_outlined,
+                      title: 'แสดงคำแนะนำเฉพาะบุคคล',
+                      subtitle: 'ใช้ข้อมูลการเงินเพื่อปรับคำแนะนำให้เหมาะกับคุณ',
+                      value: settings.personalizedRecommendations,
+                      onChanged: notifier.setPersonalizedRecommendations,
+                    ),
+                    _SettingsSwitchTile(
+                      icon: Icons.chat_bubble_outline_rounded,
+                      title: 'บันทึกประวัติสนทนาเพื่อพัฒนาคำตอบ',
+                      subtitle: 'ปิดแล้วข้อความใหม่จะไม่ถูกบันทึกไว้บนเซิร์ฟเวอร์',
+                      value: settings.shareForAiImprovement,
+                      onChanged: notifier.setShareForAiImprovement,
+                    ),
+                    _SettingsSwitchTile(
+                      icon: Icons.auto_awesome_outlined,
+                      title: 'อนุญาตให้ AI วิเคราะห์ข้อมูลการเงิน',
+                      subtitle:
+                          'ให้พี่เงินใช้รายรับ รายจ่าย และงบประมาณในการวิเคราะห์',
+                      value: settings.allowFinancialAnalysis,
+                      onChanged: notifier.setAllowFinancialAnalysis,
+                    ),
+                  ],
+                ),
+                const SizedBox(height: 26),
+                const _SectionTitle(
+                  icon: Icons.security_outlined,
+                  title: 'ความปลอดภัยของแอป (App Security)',
+                  subtitle: 'ปกป้องแอปพลิเคชันและการเข้าถึงข้อมูลชีวมิติ',
+                ),
+                const SizedBox(height: 12),
+                _SettingsGroup(
+                  children: [
+                    _SettingsSwitchTile(
+                      icon: Icons.fingerprint_rounded,
+                      title: 'Face ID / ลายนิ้วมือ',
+                      subtitle: 'ล็อกแอปด้วยข้อมูลชีวมิติบนอุปกรณ์ที่รองรับ',
+                      value: settings.biometricLock,
+                      onChanged: (value) =>
+                          _setBiometric(context, notifier, value),
+                    ),
+                    _SettingsSwitchTile(
+                      icon: Icons.login_rounded,
+                      title: 'ล็อกอินอัตโนมัติ',
+                      subtitle: 'คงสถานะเข้าสู่ระบบเมื่อเปิดแอปครั้งถัดไป',
+                      value: settings.autoLogin,
+                      onChanged: notifier.setAutoLogin,
+                    ),
+                    _SettingsSwitchTile(
+                      icon: Icons.visibility_off_outlined,
+                      title: 'ซ่อนข้อมูลเมื่อเปิด Recent Apps',
+                      subtitle:
+                          'ป้องกันข้อมูลสำคัญปรากฏในภาพตัวอย่างแอปล่าสุด',
+                      value: settings.hideInRecentApps,
+                      onChanged: (value) async {
+                        await notifier.setHideInRecentApps(value);
+                        await NativeSecurityService.setRecentAppsPrivacy(value);
+                      },
+                    ),
+                  ],
+                ),
+                const SizedBox(height: 26),
+                const _SectionTitle(
+                  icon: Icons.gavel_outlined,
+                  title: 'ข้อตกลงและนโยบาย',
+                  subtitle: 'อ่านรายละเอียดนโยบายการคุ้มครองข้อมูลส่วนบุคคล',
+                ),
+                const SizedBox(height: 12),
+                _SettingsGroup(
+                  children: [
+                    _SettingsActionTile(
+                      icon: Icons.policy_outlined,
+                      title: 'นโยบายความเป็นส่วนตัว',
+                      value: 'อ่านนโยบาย',
+                      onTap: () => _showPrivacyPolicy(context),
+                    ),
+                  ],
+                ),
+                const SizedBox(height: 28),
+                const Center(
+                  child: Text(
+                    'พี่เงิน · ระบบคุ้มครองข้อมูลส่วนบุคคล',
+                    style: TextStyle(color: Colors.white38, fontSize: 12),
+                  ),
+                ),
+              ]),
             ),
           ),
         ],
       ),
       floatingActionButton: const AppFloatingActionButton(),
       floatingActionButtonLocation: kFixedCenterDockedFabLocation,
-      bottomNavigationBar: const AppBottomNavigationBar(currentTab: AppTab.none),
+      bottomNavigationBar:
+          const AppBottomNavigationBar(currentTab: AppTab.none),
     );
   }
 
@@ -262,14 +314,88 @@ class PrivacyScreen extends ConsumerWidget {
   }
 }
 
-class _PrivacySwitch extends StatelessWidget {
-  const _PrivacySwitch({
+class _SectionTitle extends StatelessWidget {
+  const _SectionTitle({
+    required this.icon,
+    required this.title,
+    required this.subtitle,
+  });
+
+  final IconData icon;
+  final String title;
+  final String subtitle;
+
+  @override
+  Widget build(BuildContext context) {
+    return Row(
+      crossAxisAlignment: CrossAxisAlignment.start,
+      children: [
+        Container(
+          width: 40,
+          height: 40,
+          decoration: BoxDecoration(
+            color: const Color(0xFF173522),
+            borderRadius: BorderRadius.circular(12),
+          ),
+          child: Icon(icon, color: const Color(0xFF4CD97B), size: 22),
+        ),
+        const SizedBox(width: 12),
+        Expanded(
+          child: Column(
+            crossAxisAlignment: CrossAxisAlignment.start,
+            children: [
+              Text(title,
+                  style: const TextStyle(
+                      color: Colors.white,
+                      fontSize: 17,
+                      fontWeight: FontWeight.w700)),
+              const SizedBox(height: 3),
+              Text(subtitle,
+                  style: const TextStyle(color: Colors.white38, fontSize: 12)),
+            ],
+          ),
+        ),
+      ],
+    );
+  }
+}
+
+class _SettingsGroup extends StatelessWidget {
+  const _SettingsGroup({required this.children});
+  final List<Widget> children;
+
+  @override
+  Widget build(BuildContext context) {
+    return Container(
+      width: double.infinity,
+      decoration: BoxDecoration(
+        color: const Color(0xFF202421),
+        borderRadius: BorderRadius.circular(18),
+        border: Border.all(color: const Color(0xFF314338)),
+      ),
+      child: Column(
+        children: [
+          for (var i = 0; i < children.length; i++) ...[
+            children[i],
+            if (i < children.length - 1)
+              const Divider(height: 1, indent: 62, color: Color(0xFF323632)),
+          ],
+        ],
+      ),
+    );
+  }
+}
+
+class _SettingsSwitchTile extends StatelessWidget {
+  const _SettingsSwitchTile({
+    required this.icon,
     required this.title,
     required this.subtitle,
     required this.value,
     required this.onChanged,
   });
 
+  final IconData icon;
   final String title;
   final String subtitle;
   final bool value;
@@ -277,38 +403,55 @@ class _PrivacySwitch extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
-    return Container(
-      margin: const EdgeInsets.only(bottom: 8),
-      decoration: BoxDecoration(
-        color: const Color(0xFF262826),
-        borderRadius: BorderRadius.circular(10),
-        border: Border.all(
-          color: value ? const Color(0xFF1C5835) : Colors.white10,
-        ),
-      ),
-      child: SwitchListTile.adaptive(
-        value: value,
-        onChanged: onChanged,
-        activeThumbColor: const Color(0xFF44C878),
-        activeTrackColor: const Color(0xFF205F3A),
-        inactiveThumbColor: Colors.white70,
-        inactiveTrackColor: const Color(0xFF454845),
-        contentPadding: const EdgeInsets.symmetric(horizontal: 14, vertical: 4),
-        title: Text(
-          title,
+    return SwitchListTile.adaptive(
+      value: value,
+      onChanged: onChanged,
+      activeThumbColor: const Color(0xFF4CD97B),
+      activeTrackColor: const Color(0xFF215F39),
+      contentPadding: const EdgeInsets.symmetric(horizontal: 14, vertical: 5),
+      secondary: Icon(icon, color: Colors.white70, size: 23),
+      title: Text(title,
           style: const TextStyle(
-            color: Colors.white,
-            fontSize: 15,
-            fontWeight: FontWeight.w700,
-          ),
-        ),
-        subtitle: Padding(
-          padding: const EdgeInsets.only(top: 3),
-          child: Text(
-            subtitle,
-            style: const TextStyle(color: Colors.white54, fontSize: 11),
-          ),
-        ),
+              color: Colors.white,
+              fontSize: 14,
+              fontWeight: FontWeight.w600)),
+      subtitle: Text(subtitle,
+          style: const TextStyle(color: Colors.white38, fontSize: 11)),
+    );
+  }
+}
+
+class _SettingsActionTile extends StatelessWidget {
+  const _SettingsActionTile({
+    required this.icon,
+    required this.title,
+    required this.value,
+    required this.onTap,
+  });
+
+  final IconData icon;
+  final String title;
+  final String value;
+  final VoidCallback onTap;
+
+  @override
+  Widget build(BuildContext context) {
+    return ListTile(
+      onTap: onTap,
+      contentPadding: const EdgeInsets.symmetric(horizontal: 14, vertical: 7),
+      leading: Icon(icon, color: Colors.white70, size: 23),
+      title: Text(title,
+          style: const TextStyle(
+              color: Colors.white, fontSize: 14, fontWeight: FontWeight.w600)),
+      trailing: Row(
+        mainAxisSize: MainAxisSize.min,
+        children: [
+          Text(value,
+              style: const TextStyle(color: Color(0xFF8BAA96), fontSize: 13)),
+          const SizedBox(width: 8),
+          const Icon(Icons.chevron_right_rounded,
+              color: Colors.white38, size: 22),
+        ],
       ),
     );
   }

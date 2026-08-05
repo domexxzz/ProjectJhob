@@ -10,6 +10,7 @@ import '../transactions/transactions_repository.dart';
 import '../notifications/notif_bell.dart';
 import '../goals/goals_provider.dart';
 import '../settings/settings_screen.dart';
+import '../profile/profile_avatar.dart';
 import '../../widgets/app_bottom_nav_bar.dart';
 
 // ─────────────────────────────────────────────────────────────────────────────
@@ -28,18 +29,19 @@ class DashboardScreen extends ConsumerWidget {
     final dashboard = ref.watch(dashboardProvider);
 
     return Scaffold(
-      backgroundColor: const Color(0xFF121212),
+      backgroundColor: const Color(0xFF0D0F0E),
       body: Column(
         children: [
           // ── Header (Gradient Top Bar จากภาพ Home.png) ─────────────────────
           _GreenHeader(
             name: user?.displayName ?? 'Fanta Inazuma',
             streak: user?.streak ?? 20,
+            avatarUrl: user?.avatarUrl,
           ),
           // ── Scrollable content ─────────────────────────────────────────────
           Expanded(
             child: RefreshIndicator(
-              color: const Color(0xFF3CAE63),
+              color: AppColors.primary,
               onRefresh: () async {
                 await ref.read(transactionsRepoProvider).syncPending();
                 ref.invalidate(dashboardProvider);
@@ -108,9 +110,15 @@ class DashboardScreen extends ConsumerWidget {
 // Header (ตามภาพ Home.png)
 // ─────────────────────────────────────────────────────────────────────────────
 class _GreenHeader extends StatelessWidget {
-  const _GreenHeader({required this.name, required this.streak});
+  const _GreenHeader({
+    required this.name,
+    required this.streak,
+    this.avatarUrl,
+  });
+
   final String name;
   final int streak;
+  final String? avatarUrl;
 
   @override
   Widget build(BuildContext context) {
@@ -131,15 +139,7 @@ class _GreenHeader extends StatelessWidget {
       ),
       child: Row(
         children: [
-          Container(
-            width: 48,
-            height: 48,
-            decoration: const BoxDecoration(
-              shape: BoxShape.circle,
-              color: Color(0xFF5E6E85),
-            ),
-            child: const Icon(Icons.person, color: Colors.white, size: 30),
-          ),
+          ProfileAvatar(imageUrl: avatarUrl, size: 48),
           const SizedBox(width: 14),
           Expanded(
             child: Column(
@@ -199,12 +199,12 @@ class _BalanceCard extends StatelessWidget {
       padding: const EdgeInsets.all(20),
       decoration: BoxDecoration(
         gradient: const LinearGradient(
-          colors: [Color(0xFF010C0C), Color(0xFF3CAE63)],
+          colors: [Color(0xFF071B13), Color(0xFF151817)],
           begin: Alignment.topCenter,
           end: Alignment.bottomCenter,
         ),
         borderRadius: BorderRadius.circular(20),
-        border: Border.all(color: Colors.white.withOpacity(0.08)),
+        border: Border.all(color: Colors.white.withValues(alpha: 0.06)),
       ),
       child: Column(
         crossAxisAlignment: CrossAxisAlignment.start,
@@ -599,15 +599,15 @@ class _BudgetsCard extends ConsumerWidget {
           padding: const EdgeInsets.all(18),
           decoration: BoxDecoration(
             gradient: const LinearGradient(
-              colors: [Color(0xFF010F0C), Color(0xFF061E13)],
+              colors: [Color(0xFF071B13), Color(0xFF151817)],
               begin: Alignment.topCenter,
               end: Alignment.bottomCenter,
             ),
             borderRadius: BorderRadius.circular(20),
-            border: Border.all(color: Colors.white.withOpacity(0.08)),
+            border: Border.all(color: Colors.white.withValues(alpha: 0.06)),
             boxShadow: [
               BoxShadow(
-                  color: Colors.black.withOpacity(0.2),
+                  color: Colors.black.withValues(alpha: 0.2),
                   blurRadius: 8,
                   offset: const Offset(0, 4))
             ],
@@ -859,9 +859,9 @@ class _QuickActionsGrid extends StatelessWidget {
     return Container(
       padding: const EdgeInsets.all(18),
       decoration: BoxDecoration(
-        color: const Color(0xFF061A13),
+        color: const Color(0xFF151817),
         borderRadius: BorderRadius.circular(20),
-        border: Border.all(color: const Color(0xFF3CAE63).withOpacity(0.2)),
+        border: Border.all(color: Colors.white.withValues(alpha: 0.06)),
       ),
       child: Row(
         mainAxisAlignment: MainAxisAlignment.spaceAround,
@@ -874,16 +874,16 @@ class _QuickActionsGrid extends StatelessWidget {
                   width: 60,
                   height: 60,
                   decoration: BoxDecoration(
-                    color: Colors.white,
+                    color: const Color(0xFF1F2823),
                     borderRadius: BorderRadius.circular(16),
                   ),
-                  child: Icon(it.icon, color: Colors.black87, size: 28),
+                  child: Icon(it.icon, color: AppColors.primary, size: 28),
                 ),
                 const SizedBox(height: 8),
                 Text(
                   it.label,
                   style: const TextStyle(
-                      color: Color(0xFF4CD97B),
+                      color: Colors.white,
                       fontSize: 12,
                       fontWeight: FontWeight.w500),
                   textAlign: TextAlign.center,

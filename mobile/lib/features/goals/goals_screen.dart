@@ -8,6 +8,7 @@ import '../../app/theme.dart';
 import '../../core/money.dart';
 import 'goals_provider.dart';
 import '../auth/auth_controller.dart'; // เพิ่มบรรทัดนี้ตามโครงสร้างโปรเจกต์ของคุณ[cite: 20]
+import '../profile/profile_avatar.dart';
 import '../../widgets/app_bottom_nav_bar.dart';
 
 class GoalsScreen extends ConsumerWidget {
@@ -27,6 +28,7 @@ class GoalsScreen extends ConsumerWidget {
           _GreenHeader(
             name: user?.displayName ?? 'Fanta Inazuma',
             streak: user?.streak ?? 20,
+            avatarUrl: user?.avatarUrl,
           ),
 
           Expanded(
@@ -99,9 +101,15 @@ class GoalsScreen extends ConsumerWidget {
 // 1. Green Header (ปรับปรุง Gradient คอนทราสต์ให้เข้าเซ็ตตามดีไซน์ Dashboard)
 // ─────────────────────────────────────────────────────────────────────────────
 class _GreenHeader extends StatelessWidget {
-  const _GreenHeader({required this.name, required this.streak});
+  const _GreenHeader({
+    required this.name,
+    required this.streak,
+    this.avatarUrl,
+  });
+
   final String name;
   final int streak;
+  final String? avatarUrl;
 
   @override
   Widget build(BuildContext context) {
@@ -122,15 +130,7 @@ class _GreenHeader extends StatelessWidget {
       ),
       child: Row(
         children: [
-          Container(
-            width: 48,
-            height: 48,
-            decoration: const BoxDecoration(
-              shape: BoxShape.circle,
-              color: Color(0xFF5E6E85),
-            ),
-            child: const Icon(Icons.person, color: Colors.white, size: 30),
-          ),
+          ProfileAvatar(imageUrl: avatarUrl, size: 48),
           const SizedBox(width: 14),
           Expanded(
             child: Column(

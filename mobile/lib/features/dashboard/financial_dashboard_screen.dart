@@ -11,6 +11,7 @@ import '../transactions/transactions_repository.dart';
 import '../settings/settings_screen.dart';
 import '../auth/auth_controller.dart';
 import '../notifications/notif_bell.dart';
+import '../profile/profile_avatar.dart';
 import '../../widgets/app_bottom_nav_bar.dart';
 
 enum _DashboardRange { day, week, month, year }
@@ -26,6 +27,7 @@ class FinancialDashboardScreen extends ConsumerStatefulWidget {
 class _FinancialDashboardScreenState
     extends ConsumerState<FinancialDashboardScreen> {
   _DashboardRange _range = _DashboardRange.month;
+  DateTime _selectedDate = DateTime.now();
   bool _showIncomeCategories = false;
 
   @override
@@ -44,6 +46,7 @@ class _FinancialDashboardScreenState
           _GreenHeader(
             name: user?.displayName ?? 'Fanta Inazuma',
             streak: user?.streak ?? 20,
+            avatarUrl: user?.avatarUrl,
           ),
           Expanded(
             child: RefreshIndicator(
@@ -77,7 +80,7 @@ class _FinancialDashboardScreenState
             ],
           ),
           data: (data) {
-            final visible = _filterTransactions(data.items, _range);
+            final visible = _filterTransactions(data.items, _range, _selectedDate);
             final income = visible
                 .where((item) => item.isIncome)
                 .fold<int>(0, (sum, item) => sum + item.amount);
@@ -92,6 +95,51 @@ class _FinancialDashboardScreenState
                 _RangeSelector(
                   selected: _range,
                   onChanged: (range) => setState(() => _range = range),
+                ),
+                _DateNavigator(
+                  range: _range,
+                  selectedDate: _selectedDate,
+                  onPrevious: () {
+                    setState(() {
+                      switch (_range) {
+                        case _DashboardRange.day:
+                          _selectedDate =
+                              _selectedDate.subtract(const Duration(days: 1));
+                        case _DashboardRange.week:
+                          _selectedDate =
+                              _selectedDate.subtract(const Duration(days: 7));
+                        case _DashboardRange.month:
+                          _selectedDate = DateTime(
+                              _selectedDate.year, _selectedDate.month - 1, 1);
+                        case _DashboardRange.year:
+                          _selectedDate =
+                              DateTime(_selectedDate.year - 1, 1, 1);
+                      }
+                    });
+                  },
+                  onNext: () {
+                    setState(() {
+                      switch (_range) {
+                        case _DashboardRange.day:
+                          _selectedDate =
+                              _selectedDate.add(const Duration(days: 1));
+                        case _DashboardRange.week:
+                          _selectedDate =
+                              _selectedDate.add(const Duration(days: 7));
+                        case _DashboardRange.month:
+                          _selectedDate = DateTime(
+                              _selectedDate.year, _selectedDate.month + 1, 1);
+                        case _DashboardRange.year:
+                          _selectedDate =
+                              DateTime(_selectedDate.year + 1, 1, 1);
+                      }
+                    });
+                  },
+                  onSelectDate: (newDate) {
+                    setState(() {
+                      _selectedDate = newDate;
+                    });
+                  },
                 ),
                 const SizedBox(height: 16),
                 _TrendCard(transactions: visible, range: _range),
@@ -130,24 +178,36 @@ class _FinancialDashboardScreenState
   }
 }
 
-List<Txn> _filterTransactions(List<Txn> transactions, _DashboardRange range) {
-  final now = DateTime.now();
+List<Txn> _filterTransactions(
+    List<Txn> transactions, _DashboardRange range, DateTime selectedDate) {
+  final year = selectedDate.year;
+  final month = selectedDate.month;
+  final day = selectedDate.day;
+
   late final DateTime start;
+  late final DateTime end;
 
   switch (range) {
     case _DashboardRange.day:
-      start = DateTime(now.year, now.month, now.day);
+      start = DateTime(year, month, day);
+      end = start.add(const Duration(days: 1));
     case _DashboardRange.week:
-      start = DateTime(now.year, now.month, now.day)
-          .subtract(Duration(days: now.weekday - 1));
+      start = DateTime(year, month, day)
+          .subtract(Duration(days: selectedDate.weekday - 1));
+      end = start.add(const Duration(days: 7));
     case _DashboardRange.month:
-      start = DateTime(now.year, now.month, 1);
+      start = DateTime(year, month, 1);
+      end = DateTime(year, month + 1, 1);
     case _DashboardRange.year:
-      start = DateTime(now.year, 1, 1);
+      start = DateTime(year, 1, 1);
+      end = DateTime(year + 1, 1, 1);
   }
 
   final result = transactions
-      .where((item) => !item.occurredAt.toLocal().isBefore(start))
+      .where((item) {
+        final date = item.occurredAt.toLocal();
+        return !date.isBefore(start) && date.isBefore(end);
+      })
       .toList()
     ..sort((a, b) => b.occurredAt.compareTo(a.occurredAt));
   return result;
@@ -937,9 +997,15 @@ class _TransactionList extends StatelessWidget {
 // Green Header (แถบโปรไฟล์ผู้ใช้ด้านบน)
 // ─────────────────────────────────────────────────────────────────────────────
 class _GreenHeader extends StatelessWidget {
-  const _GreenHeader({required this.name, required this.streak});
+  const _GreenHeader({
+    required this.name,
+    required this.streak,
+    this.avatarUrl,
+  });
+
   final String name;
   final int streak;
+  final String? avatarUrl;
 
   @override
   Widget build(BuildContext context) {
@@ -968,15 +1034,7 @@ class _GreenHeader extends StatelessWidget {
             ),
             const SizedBox(width: 4),
           ],
-          Container(
-            width: 48,
-            height: 48,
-            decoration: const BoxDecoration(
-              shape: BoxShape.circle,
-              color: Color(0xFF5E6E85),
-            ),
-            child: const Icon(Icons.person, color: Colors.white, size: 30),
-          ),
+          ProfileAvatar(imageUrl: avatarUrl, size: 48),
           const SizedBox(width: 14),
           Expanded(
             child: Column(
@@ -994,7 +1052,7 @@ class _GreenHeader extends StatelessWidget {
                 Container(
                   padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 4),
                   decoration: BoxDecoration(
-                    color: Colors.white.withOpacity(0.2),
+                    color: Colors.white.withValues(alpha: 0.2),
                     borderRadius: BorderRadius.circular(12),
                   ),
                   child: Text(
@@ -1010,6 +1068,293 @@ class _GreenHeader extends StatelessWidget {
             ),
           ),
           const NotifBell(),
+        ],
+      ),
+    );
+  }
+}
+
+class _DateNavigator extends StatelessWidget {
+  const _DateNavigator({
+    required this.range,
+    required this.selectedDate,
+    required this.onPrevious,
+    required this.onNext,
+    required this.onSelectDate,
+  });
+
+  final _DashboardRange range;
+  final DateTime selectedDate;
+  final VoidCallback onPrevious;
+  final VoidCallback onNext;
+  final ValueChanged<DateTime> onSelectDate;
+
+  String _formatLabel() {
+    switch (range) {
+      case _DashboardRange.day:
+        return DateFormat('d MMMM yyyy', 'th').format(selectedDate);
+      case _DashboardRange.week:
+        final startOfWeek =
+            selectedDate.subtract(Duration(days: selectedDate.weekday - 1));
+        final endOfWeek = startOfWeek.add(const Duration(days: 6));
+        final startStr = DateFormat('d MMM', 'th').format(startOfWeek);
+        final endStr = DateFormat('d MMM yyyy', 'th').format(endOfWeek);
+        return '$startStr - $endStr';
+      case _DashboardRange.month:
+        return DateFormat('MMMM yyyy', 'th').format(selectedDate);
+      case _DashboardRange.year:
+        return 'ปี ${selectedDate.year + 543} (${selectedDate.year})';
+    }
+  }
+
+  void _openSelector(BuildContext context) {
+    if (range == _DashboardRange.month) {
+      _showMonthPicker(context);
+    } else if (range == _DashboardRange.year) {
+      _showYearPicker(context);
+    } else if (range == _DashboardRange.day) {
+      showDatePicker(
+        context: context,
+        initialDate: selectedDate,
+        firstDate: DateTime(2000),
+        lastDate: DateTime(2100),
+      ).then((date) {
+        if (date != null) onSelectDate(date);
+      });
+    }
+  }
+
+  void _showMonthPicker(BuildContext context) {
+    showModalBottomSheet(
+      context: context,
+      backgroundColor: const Color(0xFF1D222B),
+      shape: const RoundedRectangleBorder(
+        borderRadius: BorderRadius.vertical(top: Radius.circular(24)),
+      ),
+      builder: (context) {
+        int tempYear = selectedDate.year;
+        return StatefulBuilder(
+          builder: (context, setModalState) {
+            final monthsTh = [
+              'มกราคม',
+              'กุมภาพันธ์',
+              'มีนาคม',
+              'เมษายน',
+              'พฤษภาคม',
+              'มิถุนายน',
+              'กรกฎาคม',
+              'สิงหาคม',
+              'กันยายน',
+              'ตุลาคม',
+              'พฤศจิกายน',
+              'ธันวาคม'
+            ];
+            return Padding(
+              padding: const EdgeInsets.all(20),
+              child: Column(
+                mainAxisSize: MainAxisSize.min,
+                children: [
+                  Row(
+                    mainAxisAlignment: MainAxisAlignment.spaceBetween,
+                    children: [
+                      IconButton(
+                        icon: const Icon(Icons.chevron_left_rounded,
+                            color: Colors.white),
+                        onPressed: () => setModalState(() => tempYear--),
+                      ),
+                      Text(
+                        'ปี ${tempYear + 543} ($tempYear)',
+                        style: const TextStyle(
+                          color: Colors.white,
+                          fontSize: 18,
+                          fontWeight: FontWeight.bold,
+                        ),
+                      ),
+                      IconButton(
+                        icon: const Icon(Icons.chevron_right_rounded,
+                            color: Colors.white),
+                        onPressed: () => setModalState(() => tempYear++),
+                      ),
+                    ],
+                  ),
+                  const SizedBox(height: 12),
+                  GridView.builder(
+                    shrinkWrap: true,
+                    physics: const NeverScrollableScrollPhysics(),
+                    gridDelegate:
+                        const SliverGridDelegateWithFixedCrossAxisCount(
+                      crossAxisCount: 3,
+                      childAspectRatio: 2.2,
+                      crossAxisSpacing: 10,
+                      mainAxisSpacing: 10,
+                    ),
+                    itemCount: 12,
+                    itemBuilder: (context, index) {
+                      final monthNum = index + 1;
+                      final isSelected = selectedDate.year == tempYear &&
+                          selectedDate.month == monthNum;
+                      return InkWell(
+                        onTap: () {
+                          onSelectDate(DateTime(tempYear, monthNum, 1));
+                          Navigator.pop(context);
+                        },
+                        borderRadius: BorderRadius.circular(12),
+                        child: Container(
+                          alignment: Alignment.center,
+                          decoration: BoxDecoration(
+                            color: isSelected
+                                ? AppColors.primary
+                                : const Color(0xFF2B313A),
+                            borderRadius: BorderRadius.circular(12),
+                          ),
+                          child: Text(
+                            monthsTh[index],
+                            style: TextStyle(
+                              color: isSelected ? Colors.black : Colors.white,
+                              fontSize: 13,
+                              fontWeight:
+                                  isSelected ? FontWeight.bold : FontWeight.w500,
+                            ),
+                          ),
+                        ),
+                      );
+                    },
+                  ),
+                  const SizedBox(height: 16),
+                ],
+              ),
+            );
+          },
+        );
+      },
+    );
+  }
+
+  void _showYearPicker(BuildContext context) {
+    showModalBottomSheet(
+      context: context,
+      backgroundColor: const Color(0xFF1D222B),
+      shape: const RoundedRectangleBorder(
+        borderRadius: BorderRadius.vertical(top: Radius.circular(24)),
+      ),
+      builder: (context) {
+        final currentYear = DateTime.now().year;
+        final years = List.generate(10, (i) => currentYear - 5 + i);
+        return Padding(
+          padding: const EdgeInsets.all(20),
+          child: Column(
+            mainAxisSize: MainAxisSize.min,
+            children: [
+              const Text(
+                'เลือกปี',
+                style: TextStyle(
+                  color: Colors.white,
+                  fontSize: 18,
+                  fontWeight: FontWeight.bold,
+                ),
+              ),
+              const SizedBox(height: 16),
+              GridView.builder(
+                shrinkWrap: true,
+                physics: const NeverScrollableScrollPhysics(),
+                gridDelegate:
+                    const SliverGridDelegateWithFixedCrossAxisCount(
+                  crossAxisCount: 3,
+                  childAspectRatio: 2.2,
+                  crossAxisSpacing: 10,
+                  mainAxisSpacing: 10,
+                ),
+                itemCount: years.length,
+                itemBuilder: (context, index) {
+                  final y = years[index];
+                  final isSelected = selectedDate.year == y;
+                  return InkWell(
+                    onTap: () {
+                      onSelectDate(DateTime(y, selectedDate.month, 1));
+                      Navigator.pop(context);
+                    },
+                    borderRadius: BorderRadius.circular(12),
+                    child: Container(
+                      alignment: Alignment.center,
+                      decoration: BoxDecoration(
+                        color: isSelected
+                            ? AppColors.primary
+                            : const Color(0xFF2B313A),
+                        borderRadius: BorderRadius.circular(12),
+                      ),
+                      child: Text(
+                        '$y',
+                        style: TextStyle(
+                          color: isSelected ? Colors.black : Colors.white,
+                          fontSize: 14,
+                          fontWeight:
+                              isSelected ? FontWeight.bold : FontWeight.w500,
+                        ),
+                      ),
+                    ),
+                  );
+                },
+              ),
+              const SizedBox(height: 16),
+            ],
+          ),
+        );
+      },
+    );
+  }
+
+  @override
+  Widget build(BuildContext context) {
+    return Container(
+      margin: const EdgeInsets.only(top: 8),
+      padding: const EdgeInsets.symmetric(horizontal: 6, vertical: 4),
+      decoration: BoxDecoration(
+        color: const Color(0xFF151817),
+        borderRadius: BorderRadius.circular(12),
+        border: Border.all(color: Colors.white.withValues(alpha: 0.06)),
+      ),
+      child: Row(
+        mainAxisAlignment: MainAxisAlignment.spaceBetween,
+        children: [
+          IconButton(
+            icon: const Icon(Icons.chevron_left_rounded,
+                color: Colors.white70, size: 22),
+            onPressed: onPrevious,
+            padding: EdgeInsets.zero,
+            constraints: const BoxConstraints(),
+          ),
+          InkWell(
+            onTap: () => _openSelector(context),
+            borderRadius: BorderRadius.circular(8),
+            child: Padding(
+              padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 4),
+              child: Row(
+                children: [
+                  const Icon(Icons.calendar_month_rounded,
+                      color: AppColors.primary, size: 16),
+                  const SizedBox(width: 6),
+                  Text(
+                    _formatLabel(),
+                    style: const TextStyle(
+                      color: Colors.white,
+                      fontSize: 13,
+                      fontWeight: FontWeight.w600,
+                    ),
+                  ),
+                  const SizedBox(width: 4),
+                  const Icon(Icons.arrow_drop_down_rounded,
+                      color: Colors.white54, size: 18),
+                ],
+              ),
+            ),
+          ),
+          IconButton(
+            icon: const Icon(Icons.chevron_right_rounded,
+                color: Colors.white70, size: 22),
+            onPressed: onNext,
+            padding: EdgeInsets.zero,
+            constraints: const BoxConstraints(),
+          ),
         ],
       ),
     );

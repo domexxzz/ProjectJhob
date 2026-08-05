@@ -267,14 +267,14 @@ class _EditProfileScreenState extends ConsumerState<EditProfileScreen> {
                           keyboardType: TextInputType.phone,
                           textInputAction: TextInputAction.next,
                           inputFormatters: [
-                            FilteringTextInputFormatter.allow(
-                                RegExp(r'[0-9+\- ]'))
+                            FilteringTextInputFormatter.digitsOnly,
+                            LengthLimitingTextInputFormatter(10),
                           ],
                           validator: (value) {
                             final digits =
                                 (value ?? '').replaceAll(RegExp(r'\D'), '');
-                            if (digits.isNotEmpty && digits.length < 9) {
-                              return 'กรุณากรอกเบอร์โทรให้ครบ';
+                            if (digits.isNotEmpty && digits.length != 10) {
+                              return 'กรุณากรอกเบอร์โทรให้ครบ 10 หลัก';
                             }
                             return null;
                           },
