@@ -15,6 +15,7 @@ class AppUser {
     this.monthlyIncome = 0,
     this.level = 1,
     this.streak = 0,
+    this.points = 0,
     this.avatarUrl,
     this.createdAt,
   });
@@ -26,6 +27,7 @@ class AppUser {
   final int monthlyIncome;
   final int level;
   final int streak;
+  final int points;
   final String? avatarUrl;
   final DateTime? createdAt;
 
@@ -37,6 +39,7 @@ class AppUser {
         monthlyIncome: (j['monthlyIncome'] ?? 0) as int,
         level: (j['level'] ?? 1) as int,
         streak: (j['streak'] ?? 0) as int,
+        points: (j['points'] ?? 0) as int,
         avatarUrl: j['avatarUrl'] as String?,
         createdAt: j['createdAt'] != null
             ? DateTime.tryParse(j['createdAt'] as String)
@@ -197,6 +200,16 @@ class AuthController extends StateNotifier<AuthState> {
           error: 'ล็อกอิน Facebook ไม่สำเร็จ (ตรวจการตั้งค่า OAuth)');
       return false;
     }
+  }
+
+  Future<void> refreshProfile() async {
+    final token = await _tokens.read();
+    if (token == null) return;
+    try {
+      final res = await _dio.get('/auth/me');
+      state = state.copyWith(
+          user: AppUser.fromJson(res.data['user'] as Map<String, dynamic>));
+    } catch (_) {}
   }
 
   Future<void> logout() async {

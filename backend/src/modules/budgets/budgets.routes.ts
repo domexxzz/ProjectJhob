@@ -4,6 +4,7 @@ import { asyncHandler, HttpError } from '../../lib/http';
 import { requireAuth } from '../../lib/auth';
 import { z } from 'zod';
 import { cache } from '../../lib/cache';
+import { awardPoints } from '../auth/auth.service';
 
 export const budgetsRouter = Router();
 budgetsRouter.use(requireAuth);
@@ -12,6 +13,9 @@ const createBudgetSchema = z.object({
   name: z.string().min(1, 'กรุณาใส่ชื่อหัวข้องบประมาณ').optional(),
   categoryId: z.string().nullable().optional(),
   amount: z.number().int().positive('amount ต้องมากกว่า 0'),
+  period: z.enum(['monthly', 'weekly']).default('monthly').optional(),
+  startDate: z.string().nullable().optional(),
+  endDate: z.string().nullable().optional(),
   showOnDashboard: z.boolean().default(true).optional(),
 });
 
@@ -144,11 +148,13 @@ budgetsRouter.post(
         period: data.period,
         startDate: data.startDate ? new Date(data.startDate) : undefined,
         endDate: data.endDate ? new Date(data.endDate) : undefined,
+        showOnDashboard: data.showOnDashboard,
       },
       include: { category: true },
     });
 
     await cache.delPattern(`user:${req.userId!}:*`);
+    await awardPoints(req.userId!, 10);
     res.status(201).json({ budget });
   }),
 );
@@ -172,6 +178,7 @@ budgetsRouter.patch(
         period: data.period,
         startDate: data.startDate !== undefined ? (data.startDate ? new Date(data.startDate) : null) : undefined,
         endDate: data.endDate !== undefined ? (data.endDate ? new Date(data.endDate) : null) : undefined,
+        ...(data.showOnDashboard !== undefined ? { showOnDashboard: data.showOnDashboard } : {}),
       },
       include: { category: true },
     });

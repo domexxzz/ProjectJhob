@@ -18,6 +18,7 @@ import 'chat_repository.dart';
 import '../transactions/transactions_repository.dart';
 import '../transactions/transaction.dart' show Category;
 import '../privacy/privacy_screen.dart';
+import '../auth/auth_controller.dart';
 
 enum CoachMood { idle, listening, thinking }
 
@@ -138,14 +139,7 @@ class _ChatScreenState extends ConsumerState<ChatScreen> {
         _typingId = reply.id; // ให้ค่อย ๆ พิมพ์ออกมา
         _sending = false;
       });
-    } on DioException catch (e) {
-      if (!mounted) return;
-      // ผู้ใช้กดหยุดเอง — ไม่ต้องขึ้น error
-      if (CancelToken.isCancel(e)) {
-        setState(() => _sending = false);
-      } else {
-        _addErrorBubble();
-      }
+      ref.read(authControllerProvider.notifier).refreshProfile();
     } catch (_) {
       if (!mounted) return;
       _addErrorBubble();

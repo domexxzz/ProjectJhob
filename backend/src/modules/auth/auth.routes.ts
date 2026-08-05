@@ -35,6 +35,7 @@ const profileSelect = {
   monthlyIncome: true,
   level: true,
   streak: true,
+  points: true,
   avatarUrl: true,
   provider: true,
   createdAt: true,
@@ -82,9 +83,69 @@ authRouter.get(
   asyncHandler(async (req, res) => {
     const user = await prisma.user.findUnique({
       where: { id: req.userId! },
-      select: profileSelect,
     });
-    res.json({ user });
+    if (!user) throw new HttpError(404, 'ไม่พบผู้ใช้');
+
+    const now = new Date();
+    let pointsAwarded = false;
+    let newPoints = user.points;
+
+    if (!user.lastLoginAt) {
+      pointsAwarded = true;
+      newPoints += 10;
+    } else {
+      const lastLoginDate = new Date(user.lastLoginAt);
+      const diffMs = now.getTime() - lastLoginDate.getTime();
+      const hoursDiff = diffMs / (1000 * 60 * 60);
+
+      if (
+        now.getUTCFullYear() !== lastLoginDate.getUTCFullYear() ||
+        now.getUTCMonth() !== lastLoginDate.getUTCMonth() ||
+        now.getUTCDate() !== lastLoginDate.getUTCDate()
+      ) {
+        pointsAwarded = true;
+
+        if (hoursDiff >= 24) {
+          const periodsMissed = Math.floor(hoursDiff / 24);
+          const penalty = periodsMissed * 2;
+          newPoints = Math.max(0, newPoints - penalty);
+        }
+
+        newPoints += 10;
+      }
+    }
+
+    let updatedUser = user;
+    if (pointsAwarded) {
+      let newLevel = 1;
+      if (newPoints >= 500) newLevel = 3;
+      else if (newPoints >= 100) newLevel = 2;
+
+      updatedUser = await prisma.user.update({
+        where: { id: req.userId! },
+        data: {
+          lastLoginAt: now,
+          points: newPoints,
+          level: newLevel,
+        },
+      });
+    }
+
+    res.json({
+      user: {
+        id: updatedUser.id,
+        email: updatedUser.email,
+        phone: updatedUser.phone ?? null,
+        displayName: updatedUser.displayName,
+        monthlyIncome: updatedUser.monthlyIncome,
+        level: updatedUser.level,
+        streak: updatedUser.streak,
+        points: updatedUser.points,
+        avatarUrl: updatedUser.avatarUrl ?? null,
+        provider: updatedUser.provider,
+        createdAt: updatedUser.createdAt.toISOString(),
+      }
+    });
   }),
 );
 

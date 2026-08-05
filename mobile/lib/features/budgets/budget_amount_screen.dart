@@ -11,6 +11,7 @@ import '../goals/set_deadline_screen.dart';
 import '../transactions/transactions_repository.dart';
 import '../settings/settings_screen.dart';
 import '../../core/money.dart';
+import '../auth/auth_controller.dart';
 
 class BudgetAmountScreen extends ConsumerStatefulWidget {
   const BudgetAmountScreen({super.key});
@@ -58,6 +59,7 @@ class _BudgetAmountScreenState extends ConsumerState<BudgetAmountScreen> {
 
       ref.invalidate(budgetsListProvider);
       ref.invalidate(dashboardProvider);
+      ref.read(authControllerProvider.notifier).refreshProfile();
 
       if (mounted) {
         _showMessage('สร้างงบประมาณสำเร็จแล้ว');

@@ -12,6 +12,7 @@ import 'transaction.dart';
 import 'transactions_repository.dart';
 import '../notifications/notifications_repository.dart';
 import '../settings/settings_screen.dart';
+import '../auth/auth_controller.dart';
 
 const _thMonths = [
   '',
@@ -49,7 +50,6 @@ class _SlipScreenState extends ConsumerState<SlipScreen> {
   final _amount = TextEditingController();
   final _desc = TextEditingController();
 
-  late bool _imageMode; // true = เลือกไฟล์รูป, false = เขียนเอง
   String _type = 'expense';
   String? _categoryId;
   Budget? _selectedBudget; // งบประมาณที่ผู้ใช้เลือกจาก slip screen
@@ -61,7 +61,6 @@ class _SlipScreenState extends ConsumerState<SlipScreen> {
   @override
   void initState() {
     super.initState();
-    _imageMode = !widget.startInManualMode;
     _amount.addListener(_onAmountChanged);
   }
 
@@ -116,11 +115,9 @@ class _SlipScreenState extends ConsumerState<SlipScreen> {
   }
 
   Future<void> _pickDate() async {
-    final picked = await showDatePicker(
-      context: context,
-      initialDate: _date ?? DateTime.now(),
-      firstDate: DateTime(2020),
-      lastDate: DateTime(2100),
+    final picked = await context.push<DateTime>(
+      '/transactions/select-date',
+      extra: _date ?? DateTime.now(),
     );
     if (picked != null) setState(() => _date = picked);
   }
@@ -177,6 +174,40 @@ class _SlipScreenState extends ConsumerState<SlipScreen> {
                           Text('เลือกงบประมาณ',
                               style: const TextStyle(color: Colors.white, fontSize: 16, fontWeight: FontWeight.bold)),
                         ],
+                      ),
+                    ),
+                    GestureDetector(
+                      onTap: () {
+                        setState(() {
+                          _selectedBudget = null;
+                        });
+                        Navigator.pop(ctx);
+                        _pickCategory();
+                      },
+                      child: Container(
+                        margin: const EdgeInsets.fromLTRB(16, 0, 16, 12),
+                        padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 14),
+                        decoration: BoxDecoration(
+                          color: _selectedBudget == null ? const Color(0xFF0C2E1B) : AppColors.bg,
+                          borderRadius: BorderRadius.circular(14),
+                          border: Border.all(
+                            color: _selectedBudget == null ? AppColors.primary : const Color(0xFF1E293B),
+                            width: _selectedBudget == null ? 2 : 1,
+                          ),
+                        ),
+                        child: Row(
+                          children: [
+                            const Text('📁', style: TextStyle(fontSize: 22)),
+                            const SizedBox(width: 12),
+                            Text(
+                              'ไม่จัดเข้างบประมาณ (ระบุหมวดหมู่ทั่วไป)',
+                              style: TextStyle(
+                                color: _selectedBudget == null ? Colors.white : Colors.white70,
+                                fontWeight: _selectedBudget == null ? FontWeight.bold : FontWeight.normal,
+                              ),
+                            ),
+                          ],
+                        ),
                       ),
                     ),
                     Flexible(
@@ -245,6 +276,106 @@ class _SlipScreenState extends ConsumerState<SlipScreen> {
     );
   }
 
+  void _pickCategory() {
+    showModalBottomSheet(
+      context: context,
+      isScrollControlled: true,
+      backgroundColor: AppColors.surface,
+      shape: const RoundedRectangleBorder(
+          borderRadius: BorderRadius.vertical(top: Radius.circular(20))),
+      builder: (_) => SafeArea(
+        child: ConstrainedBox(
+          constraints: BoxConstraints(maxHeight: MediaQuery.of(context).size.height * 0.7),
+          child: Consumer(builder: (ctx, ref2, __) {
+            final asyncVal = ref2.watch(categoriesProvider);
+            return asyncVal.when(
+              loading: () => const SizedBox(
+                  height: 160,
+                  child: Center(
+                      child: CircularProgressIndicator(color: AppColors.primary))),
+              error: (e, _) => Padding(
+                padding: const EdgeInsets.all(20),
+                child: Text('โหลดหมวดหมู่ไม่ได้: $e', style: const TextStyle(color: Colors.redAccent)),
+              ),
+              data: (cats) {
+                if (cats.isEmpty) {
+                  return const Padding(
+                    padding: EdgeInsets.all(32),
+                    child: Center(
+                      child: Text('ไม่มีหมวดหมู่ในระบบ', style: TextStyle(color: Colors.white54)),
+                    ),
+                  );
+                }
+                return Column(
+                  mainAxisSize: MainAxisSize.min,
+                  crossAxisAlignment: CrossAxisAlignment.start,
+                  children: [
+                    Padding(
+                      padding: const EdgeInsets.fromLTRB(18, 16, 18, 8),
+                      child: Row(
+                        children: [
+                          const Icon(Icons.category_rounded, color: AppColors.primary, size: 20),
+                          const SizedBox(width: 8),
+                          const Text('เลือกหมวดหมู่',
+                              style: TextStyle(color: Colors.white, fontSize: 16, fontWeight: FontWeight.bold)),
+                        ],
+                      ),
+                    ),
+                    Flexible(
+                      child: ListView.separated(
+                        padding: const EdgeInsets.fromLTRB(16, 0, 16, 16),
+                        shrinkWrap: true,
+                        itemCount: cats.length,
+                        separatorBuilder: (_, __) => const SizedBox(height: 8),
+                        itemBuilder: (ctx2, i) {
+                          final c = cats[i];
+                          final sel = c.id == _categoryId && _selectedBudget == null;
+                          return GestureDetector(
+                            onTap: () {
+                              setState(() {
+                                _categoryId = c.id;
+                                _selectedBudget = null;
+                              });
+                              Navigator.pop(ctx);
+                            },
+                            child: Container(
+                              padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 14),
+                              decoration: BoxDecoration(
+                                color: sel ? const Color(0xFF0C2E1B) : AppColors.bg,
+                                borderRadius: BorderRadius.circular(14),
+                                border: Border.all(
+                                  color: sel ? AppColors.primary : const Color(0xFF1E293B),
+                                  width: sel ? 2 : 1,
+                                ),
+                              ),
+                              child: Row(
+                                children: [
+                                  Text(c.icon, style: const TextStyle(fontSize: 22)),
+                                  const SizedBox(width: 12),
+                                  Text(
+                                    c.nameTh,
+                                    style: TextStyle(
+                                      color: sel ? Colors.white : Colors.white70,
+                                      fontWeight: sel ? FontWeight.bold : FontWeight.normal,
+                                    ),
+                                  ),
+                                ],
+                              ),
+                            ),
+                          );
+                        },
+                      ),
+                    ),
+                  ],
+                );
+              },
+            );
+          }),
+        ),
+      ),
+    );
+  }
+
   Future<void> _confirm() async {
     final baht = double.tryParse(_amount.text.replaceAll(',', '').trim());
     if (baht == null || baht <= 0) {
@@ -260,12 +391,13 @@ class _SlipScreenState extends ConsumerState<SlipScreen> {
             categoryId: _selectedBudget?.categoryId ?? _categoryId,
             budgetId: _selectedBudget?.id,
             note: _desc.text.trim(),
-            source: _imageMode ? 'ocr' : 'manual',
+            source: _fileName != null ? 'ocr' : 'manual',
             occurredAt: _date,
           );
       ref.invalidate(dashboardProvider);
       ref.invalidate(
           notificationsProvider); // รีเฟรชการแจ้งเตือนการทำนาย/งบประมาณล่วงหน้า
+      ref.read(authControllerProvider.notifier).refreshProfile();
       await ref
           .read(dashboardProvider.future); // รอให้ดึงข้อมูลเสร็จก่อนเด้งกลับ
       if (!mounted) return;
@@ -303,6 +435,22 @@ class _SlipScreenState extends ConsumerState<SlipScreen> {
     ref.watch(budgetsListProvider);
     final budgetDisplayName = _selectedBudget?.displayName;
 
+    final categoriesAsync = ref.watch(categoriesProvider);
+    final categoryList = categoriesAsync.value ?? [];
+    final selectedCategory = categoryList.firstWhere(
+      (c) => c.id == _categoryId,
+      orElse: () => Category(
+        id: '',
+        nameTh: 'เลือกหมวดหมู่ทั่วไป',
+        icon: '📁',
+        color: '#FFFFFF',
+        type: 'expense',
+      ),
+    );
+    final categoryDisplayName = _categoryId != null
+        ? '${selectedCategory.icon} ${selectedCategory.nameTh}'
+        : 'เลือกหมวดหมู่ทั่วไป';
+
     return Scaffold(
       backgroundColor: AppColors.bg,
       appBar: AppBar(
@@ -337,45 +485,36 @@ class _SlipScreenState extends ConsumerState<SlipScreen> {
               child: ListView(
                 padding: const EdgeInsets.fromLTRB(18, 8, 18, 24),
                 children: [
-                  // ── Tabs: เลือกไฟล์รูป / เขียนเอง ──
-                  _ModeTabs(
-                    imageMode: _imageMode,
-                    onChanged: (v) => setState(() => _imageMode = v),
-                  ),
-                  const SizedBox(height: 18),
-
                   // ── กล่องเลือกไฟล์ (เฉพาะโหมดรูป) ──
-                  if (_imageMode) ...[
-                    GestureDetector(
-                      onTap: _pickSlip,
-                      child: Container(
-                        padding: const EdgeInsets.symmetric(
-                            horizontal: 16, vertical: 18),
-                        decoration: _boxDeco(),
-                        child: Row(children: [
-                          const Icon(Icons.cloud_upload_outlined,
-                              color: AppColors.primary, size: 26),
-                          const SizedBox(width: 14),
-                          Expanded(
-                            child: Text(
-                              _fileName ?? 'แตะเพื่อเลือกรูปสลิป',
-                              style: TextStyle(
-                                  color: _fileName != null
-                                      ? Colors.white
-                                      : AppColors.textMuted,
-                                  fontSize: 14),
-                              maxLines: 1,
-                              overflow: TextOverflow.ellipsis,
-                            ),
+                  GestureDetector(
+                    onTap: _pickSlip,
+                    child: Container(
+                      padding: const EdgeInsets.symmetric(
+                          horizontal: 16, vertical: 18),
+                      decoration: _boxDeco(),
+                      child: Row(children: [
+                        const Icon(Icons.cloud_upload_outlined,
+                            color: AppColors.primary, size: 26),
+                        const SizedBox(width: 14),
+                        Expanded(
+                          child: Text(
+                            _fileName ?? 'แตะเพื่อเลือกรูปสลิป',
+                            style: TextStyle(
+                                color: _fileName != null
+                                    ? Colors.white
+                                    : AppColors.textMuted,
+                                fontSize: 14),
+                            maxLines: 1,
+                            overflow: TextOverflow.ellipsis,
                           ),
-                        ]),
-                      ),
+                        ),
+                      ]),
                     ),
-                    const SizedBox(height: 20),
-                  ],
+                  ),
+                  const SizedBox(height: 20),
 
-                  Text(_imageMode ? 'ข้อมูลที่ได้จากสลิป' : 'กรอกข้อมูลรายการ',
-                      style: const TextStyle(
+                  const Text('กรอกข้อมูลรายการ',
+                      style: TextStyle(
                           color: Colors.white,
                           fontSize: 15,
                           fontWeight: FontWeight.w600)),
@@ -469,7 +608,7 @@ class _SlipScreenState extends ConsumerState<SlipScreen> {
                       decoration: _boxDeco(),
                       child: Row(children: [
                         Expanded(
-                          child: Text(budgetDisplayName ?? 'เลือกงบประมาณ',
+                          child: Text(budgetDisplayName ?? 'ไม่จัดเข้างบประมาณ (ระบุหมวดหมู่ทั่วไป)',
                               style: TextStyle(
                                   color: budgetDisplayName != null ? Colors.white : AppColors.primary,
                                   fontSize: 16, fontWeight: FontWeight.bold),
@@ -477,6 +616,46 @@ class _SlipScreenState extends ConsumerState<SlipScreen> {
                         ),
                         const Icon(Icons.keyboard_arrow_down,
                             color: AppColors.textMuted),
+                      ]),
+                    ),
+                  ),
+                  const SizedBox(height: 16),
+
+                  // ── หมวดหมู่ธุรกรรม ──
+                  const Text('หมวดหมู่ธุรกรรม', style: TextStyle(color: Colors.white, fontSize: 14, fontWeight: FontWeight.w600)),
+                  const SizedBox(height: 8),
+                  GestureDetector(
+                    onTap: _selectedBudget != null
+                        ? () {
+                            ScaffoldMessenger.of(context).showSnackBar(
+                              const SnackBar(
+                                content: Text('หมวดหมู่จะอิงตามงบประมาณที่เลือก เปลี่ยนได้โดยกดไม่จัดเข้างบประมาณ'),
+                                duration: Duration(seconds: 2),
+                              ),
+                            );
+                          }
+                        : _pickCategory,
+                    child: Container(
+                      padding: const EdgeInsets.symmetric(
+                          horizontal: 16, vertical: 18),
+                      decoration: _boxDeco(),
+                      child: Row(children: [
+                        Expanded(
+                          child: Text(
+                              _selectedBudget != null
+                                  ? '${_selectedBudget!.category?.icon ?? '📊'} ${_selectedBudget!.category?.nameTh ?? 'งบประมาณ'}'
+                                  : categoryDisplayName,
+                              style: TextStyle(
+                                  color: (_selectedBudget != null || _categoryId != null) ? Colors.white : AppColors.primary,
+                                  fontSize: 16, fontWeight: FontWeight.bold),
+                              maxLines: 1, overflow: TextOverflow.ellipsis),
+                        ),
+                        if (_selectedBudget == null)
+                          const Icon(Icons.keyboard_arrow_down,
+                              color: AppColors.textMuted)
+                        else
+                          const Icon(Icons.lock_outline_rounded,
+                              color: AppColors.textMuted, size: 18),
                       ]),
                     ),
                   ),
@@ -524,9 +703,9 @@ class _SlipScreenState extends ConsumerState<SlipScreen> {
                               width: 22,
                               child: CircularProgressIndicator(
                                   strokeWidth: 2, color: Colors.white))
-                          : Text(
-                              _imageMode ? 'ยืนยันบันทึกสลิป' : 'บันทึกสลิป',
-                              style: const TextStyle(
+                          : const Text(
+                              'ยืนยันบันทึกสลิป',
+                              style: TextStyle(
                                   fontSize: 16, fontWeight: FontWeight.bold),
                             ),
                     ),
@@ -750,49 +929,7 @@ class _SlipScreenState extends ConsumerState<SlipScreen> {
 }
 
 /// แท็บสลับโหมด — เลือกไฟล์รูป (เขียว) / เขียนเอง (แดงเมื่อเลือก)
-class _ModeTabs extends StatelessWidget {
-  const _ModeTabs({required this.imageMode, required this.onChanged});
-  final bool imageMode;
-  final ValueChanged<bool> onChanged;
 
-  @override
-  Widget build(BuildContext context) {
-    return Container(
-      padding: const EdgeInsets.all(4),
-      decoration: BoxDecoration(
-          color: const Color(0xFF0F1712),
-          borderRadius: BorderRadius.circular(30),
-          border: Border.all(color: _boxBorder)),
-      child: Row(children: [
-        _tab('เลือกไฟล์รูป', imageMode, AppColors.primary,
-            () => onChanged(true)),
-        _tab('เขียนเอง', !imageMode, AppColors.expense, () => onChanged(false)),
-      ]),
-    );
-  }
-
-  Widget _tab(
-          String label, bool active, Color activeColor, VoidCallback onTap) =>
-      Expanded(
-        child: GestureDetector(
-          onTap: onTap,
-          child: AnimatedContainer(
-            duration: const Duration(milliseconds: 180),
-            padding: const EdgeInsets.symmetric(vertical: 11),
-            decoration: BoxDecoration(
-              color: active ? activeColor : Colors.transparent,
-              borderRadius: BorderRadius.circular(26),
-            ),
-            alignment: Alignment.center,
-            child: Text(label,
-                style: TextStyle(
-                    color: active ? Colors.white : AppColors.textMuted,
-                    fontWeight: FontWeight.bold,
-                    fontSize: 14)),
-          ),
-        ),
-      );
-}
 
 /// ปิ่นรายรับ/รายจ่าย
 class _TypePill extends StatelessWidget {
