@@ -21,14 +21,19 @@ class ChatRepository {
     bool includeFinancialContext = true,
     bool personalizedRecommendations = true,
     bool storeConversationHistory = true,
+    CancelToken? cancelToken,
   }) async {
-    final res = await _dio.post('/chat', data: {
-      'message': message,
-      if (imageBase64 != null) 'imageBase64': imageBase64,
-      'includeFinancialContext': includeFinancialContext,
-      'personalizedRecommendations': personalizedRecommendations,
-      'storeConversationHistory': storeConversationHistory,
-    });
+    final res = await _dio.post(
+      '/chat',
+      data: {
+        'message': message,
+        if (imageBase64 != null) 'imageBase64': imageBase64,
+        'includeFinancialContext': includeFinancialContext,
+        'personalizedRecommendations': personalizedRecommendations,
+        'storeConversationHistory': storeConversationHistory,
+      },
+      cancelToken: cancelToken,
+    );
     return ChatMessage.fromJson(
         (res.data as Map<String, dynamic>)['message'] as Map<String, dynamic>);
   }

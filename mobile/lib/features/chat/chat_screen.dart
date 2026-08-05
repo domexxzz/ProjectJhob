@@ -1,7 +1,9 @@
 import 'dart:async';
 import 'dart:convert';
 
+import 'package:dio/dio.dart' show CancelToken, DioException;
 import 'package:flutter/material.dart';
+import 'package:flutter/services.dart' show Clipboard, ClipboardData;
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:go_router/go_router.dart';
 import 'package:image_picker/image_picker.dart';
@@ -13,6 +15,8 @@ import '../../app/theme.dart';
 import '../../core/api/api_client.dart';
 import 'chat_message.dart';
 import 'chat_repository.dart';
+import '../transactions/transactions_repository.dart';
+import '../transactions/transaction.dart' show Category;
 import '../privacy/privacy_screen.dart';
 import '../auth/auth_controller.dart';
 
@@ -39,6 +43,12 @@ class _ChatScreenState extends ConsumerState<ChatScreen> {
   bool _menuExpanded = false;
   bool _showJumpToLatest = false;
   String? _typingId; // id ข้อความพี่เงินที่กำลัง "พิมพ์ทีละตัว" (typewriter)
+
+  String? _pendingImage; // รูปที่แนบรอส่ง (dataUrl) — ยังไม่ส่งจนกว่าจะกดส่ง
+  CancelToken? _cancelToken; // ใช้กดหยุดระหว่างพี่เงินกำลังตอบ
+  String? _lastUserText; // เก็บข้อความล่าสุดไว้ "ส่งซ้ำ"
+  String? _lastUserImage;
+  int _localSeq = 0; // กัน id ซ้ำของข้อความฝั่ง client
 
   CoachMood get _mood => _listening
       ? CoachMood.listening
@@ -87,30 +97,41 @@ class _ChatScreenState extends ConsumerState<ChatScreen> {
   }
 
   Future<void> _send(String text, {String? imageBase64}) async {
-    final msg = text.trim();
-    if (msg.isEmpty || _sending) return;
+    if (_sending) return;
+    final img = imageBase64 ?? _pendingImage;
+    var msg = text.trim();
+    if (msg.isEmpty && img == null) return;
+    // แนบรูปแต่ไม่พิมพ์ข้อความ → ใส่คำถามเริ่มต้นให้
+    if (msg.isEmpty && img != null) msg = 'ช่วยดูรูปนี้ให้หน่อยครับ';
     if (_listening) await _stopListening();
     _controller.clear();
+    _lastUserText = text.trim();
+    _lastUserImage = img;
+
+    final cancel = CancelToken();
+    _cancelToken = cancel;
     setState(() {
       _messages.add(ChatMessage(
-        id: 'local',
+        id: 'local-${_localSeq++}',
         role: 'user',
         content: msg,
         createdAt: DateTime.now(),
-        hasImage: imageBase64 != null,
+        hasImage: img != null,
       ));
       _sending = true;
       _menuExpanded = false;
+      _pendingImage = null; // ส่งแล้วเคลียร์รูปที่แนบไว้
     });
     _scrollToBottom();
     try {
       final privacy = ref.read(privacySettingsProvider);
       final reply = await ref.read(chatRepoProvider).send(
             msg,
-            imageBase64: imageBase64,
+            imageBase64: img,
             includeFinancialContext: privacy.allowFinancialAnalysis,
             personalizedRecommendations: privacy.personalizedRecommendations,
             storeConversationHistory: privacy.shareForAiImprovement,
+            cancelToken: cancel,
           );
       if (!mounted) return;
       setState(() {
@@ -121,18 +142,40 @@ class _ChatScreenState extends ConsumerState<ChatScreen> {
       ref.read(authControllerProvider.notifier).refreshProfile();
     } catch (_) {
       if (!mounted) return;
-      setState(() {
-        _messages.add(ChatMessage(
-          id: 'err',
-          role: 'assistant',
-          content:
-              'ขอโทษนะ ตอนนี้พี่เงินตอบไม่ได้ ลองใหม่อีกครั้ง 🙏 (เช็คว่า backend รันอยู่)',
-          createdAt: DateTime.now(),
-        ));
-        _sending = false;
-      });
+      _addErrorBubble();
     }
     _scrollToBottom();
+  }
+
+  void _addErrorBubble() {
+    setState(() {
+      _messages.add(ChatMessage(
+        id: 'err-${_localSeq++}',
+        role: 'assistant',
+        content:
+            'ขอโทษนะ ตอนนี้พี่เงินตอบไม่ได้ ลองใหม่อีกครั้ง 🙏 (เช็คว่า backend รันอยู่)',
+        createdAt: DateTime.now(),
+      ));
+      _sending = false;
+    });
+  }
+
+  /// หยุดพี่เงินระหว่างกำลังตอบ (เหมือนกดหยุดใน Claude)
+  void _stopGenerating() {
+    _cancelToken?.cancel('user_stopped');
+    if (mounted) setState(() => _sending = false);
+  }
+
+  /// ส่งข้อความล่าสุดซ้ำ (regenerate)
+  void _resendLast() {
+    final t = _lastUserText;
+    if (t == null || _sending) return;
+    _send(t, imageBase64: _lastUserImage);
+  }
+
+  Future<void> _copyText(String text) async {
+    await Clipboard.setData(ClipboardData(text: text));
+    _snack('คัดลอกข้อความแล้ว');
   }
 
   Future<void> _toggleMic() async {
@@ -170,15 +213,11 @@ class _ChatScreenState extends ConsumerState<ChatScreen> {
       final dataUrl = 'data:image/jpeg;base64,${base64Encode(bytes)}';
 
       if (!mounted) return;
-      setState(() => _attaching = false);
-
-      // ดึงข้อความในช่องพิมพ์มาส่งร่วมด้วย หากไม่มีจะใช้ข้อความเริ่มต้น
-      final textToSend = _controller.text.trim().isNotEmpty
-          ? _controller.text.trim()
-          : 'ช่วยวิเคราะห์รูปภาพนี้ให้หน่อยครับ';
-
-      _controller.clear();
-      _send(textToSend, imageBase64: dataUrl);
+      // แนบไว้ก่อน (ยังไม่ส่ง) — ให้ผู้ใช้พิมพ์ข้อความแล้วค่อยกดส่ง
+      setState(() {
+        _attaching = false;
+        _pendingImage = dataUrl;
+      });
     } catch (e) {
       if (mounted) setState(() => _attaching = false);
       _snack('แนบรูปไม่สำเร็จ: $e');
@@ -266,6 +305,16 @@ class _ChatScreenState extends ConsumerState<ChatScreen> {
                                     message: m,
                                     animate: !m.isUser && m.id == _typingId,
                                     onGrow: _followLatestMessage,
+                                    // แสดงปุ่ม คัดลอก/ส่งซ้ำ เฉพาะข้อความพี่เงินที่พิมพ์เสร็จแล้ว
+                                    onCopy: !m.isUser && m.id != _typingId
+                                        ? () => _copyText(m.content)
+                                        : null,
+                                    onRetry: !m.isUser &&
+                                            m.id != _typingId &&
+                                            m.id == _messages.last.id &&
+                                            !_sending
+                                        ? _resendLast
+                                        : null,
                                     onTypingComplete: !m.isUser &&
                                             m.id == _typingId
                                         ? () {
@@ -318,9 +367,12 @@ class _ChatScreenState extends ConsumerState<ChatScreen> {
               listening: _listening,
               attaching: _attaching,
               busy: _sending,
+              pendingImage: _pendingImage,
               onMic: _toggleMic,
               onImage: _attachImage,
+              onRemoveImage: () => setState(() => _pendingImage = null),
               onSend: () => _send(_controller.text),
+              onStop: _stopGenerating,
             ),
           ],
         ),
@@ -841,12 +893,16 @@ class _Bubble extends StatelessWidget {
     this.animate = false,
     this.onGrow,
     this.onTypingComplete,
+    this.onCopy,
+    this.onRetry,
   });
   final ChatMessage message;
   final bool
       animate; // true = ค่อย ๆ พิมพ์ออกมา (เฉพาะข้อความพี่เงินที่เพิ่งตอบ)
   final VoidCallback? onGrow;
   final VoidCallback? onTypingComplete;
+  final VoidCallback? onCopy; // คัดลอกข้อความ (เฉพาะข้อความพี่เงิน)
+  final VoidCallback? onRetry; // ส่งซ้ำ (เฉพาะข้อความล่าสุด)
 
   @override
   Widget build(BuildContext context) {
@@ -919,7 +975,444 @@ class _Bubble extends StatelessWidget {
               const SizedBox(height: 10),
               _DownloadButton(att: message.attachment!),
             ],
+            // การ์ด "จดสำเร็จ" เมื่อพี่เงินบันทึกรายรับ-รายจ่ายให้
+            if (!isUser && message.cards.isNotEmpty) ...[
+              const SizedBox(height: 10),
+              ...message.cards.map((c) => Padding(
+                    padding: const EdgeInsets.only(bottom: 8),
+                    child: _TxnSuccessCard(card: c, createdAt: message.createdAt),
+                  )),
+            ],
+            // แถวปุ่ม คัดลอก / ส่งซ้ำ (เฉพาะข้อความพี่เงิน)
+            if (!isUser && (onCopy != null || onRetry != null)) ...[
+              const SizedBox(height: 4),
+              Row(
+                mainAxisSize: MainAxisSize.min,
+                children: [
+                  if (onCopy != null)
+                    _MsgAction(icon: Icons.copy_rounded, label: 'คัดลอก', onTap: onCopy!),
+                  if (onRetry != null)
+                    _MsgAction(icon: Icons.refresh_rounded, label: 'ส่งซ้ำ', onTap: onRetry!),
+                ],
+              ),
+            ],
           ],
+        ),
+      ),
+    );
+  }
+}
+
+/// ปุ่มเล็กใต้ข้อความพี่เงิน (คัดลอก/ส่งซ้ำ) — สไตล์เดียวกับปุ่มใน Claude
+class _MsgAction extends StatelessWidget {
+  const _MsgAction({required this.icon, required this.label, required this.onTap});
+  final IconData icon;
+  final String label;
+  final VoidCallback onTap;
+
+  @override
+  Widget build(BuildContext context) {
+    return InkWell(
+      onTap: onTap,
+      borderRadius: BorderRadius.circular(8),
+      child: Padding(
+        padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 5),
+        child: Row(
+          mainAxisSize: MainAxisSize.min,
+          children: [
+            Icon(icon, size: 15, color: const Color(0xFF94A3B8)),
+            const SizedBox(width: 4),
+            Text(label,
+                style: const TextStyle(
+                    color: Color(0xFF94A3B8),
+                    fontSize: 12,
+                    fontWeight: FontWeight.w500)),
+          ],
+        ),
+      ),
+    );
+  }
+}
+
+const List<String> _thMonths = [
+  'ม.ค.', 'ก.พ.', 'มี.ค.', 'เม.ย.', 'พ.ค.', 'มิ.ย.',
+  'ก.ค.', 'ส.ค.', 'ก.ย.', 'ต.ค.', 'พ.ย.', 'ธ.ค.',
+];
+
+String _thaiDateTime(DateTime d) {
+  final t =
+      '${d.hour.toString().padLeft(2, '0')}:${d.minute.toString().padLeft(2, '0')}';
+  return '${d.day} ${_thMonths[d.month - 1]} ${d.year + 543} $t';
+}
+
+/// การ์ด "จดสำเร็จ" — ยืนยันการบันทึกรายการที่พี่เงินทำให้ พร้อมปุ่มลบ/แก้ไข (แบบป้านวล)
+class _TxnSuccessCard extends ConsumerStatefulWidget {
+  const _TxnSuccessCard({required this.card, required this.createdAt});
+  final TxnCard card;
+  final DateTime createdAt;
+
+  @override
+  ConsumerState<_TxnSuccessCard> createState() => _TxnSuccessCardState();
+}
+
+class _TxnSuccessCardState extends ConsumerState<_TxnSuccessCard> {
+  late num _amountBaht = widget.card.amountBaht;
+  late String _note = widget.card.note;
+  late String? _categoryId = widget.card.categoryId;
+  late String _category = widget.card.category;
+  bool _deleted = false;
+  bool _busy = false;
+
+  Future<void> _delete() async {
+    setState(() => _busy = true);
+    try {
+      await ref.read(transactionsRepoProvider).delete(widget.card.id);
+      ref.invalidate(dashboardProvider);
+      if (mounted) setState(() => _deleted = true);
+    } catch (_) {
+      if (mounted) {
+        setState(() => _busy = false);
+        ScaffoldMessenger.of(context).showSnackBar(
+          const SnackBar(content: Text('ลบไม่สำเร็จ ลองใหม่อีกครั้ง')),
+        );
+      }
+    }
+  }
+
+  Future<void> _edit() async {
+    // โหลดหมวดตามประเภทรายการ (รายรับ/รายจ่าย) สำหรับตัวเลือกในหน้าแก้
+    List<Category> cats = const [];
+    try {
+      final all = await ref.read(categoriesProvider.future);
+      cats = all.where((c) => c.type == widget.card.type).toList();
+    } catch (_) {}
+    if (!mounted) return;
+
+    final amountCtl = TextEditingController(text: _amountBaht.toString());
+    final noteCtl = TextEditingController(text: _note);
+    String? selCatId = _categoryId;
+    String selCatName = _category;
+
+    final saved = await showModalBottomSheet<bool>(
+      context: context,
+      isScrollControlled: true,
+      backgroundColor: const Color(0xFF1E293B),
+      shape: const RoundedRectangleBorder(
+          borderRadius: BorderRadius.vertical(top: Radius.circular(18))),
+      builder: (ctx) => StatefulBuilder(
+        builder: (ctx, setSheet) => Padding(
+          padding: EdgeInsets.only(
+              left: 20,
+              right: 20,
+              top: 18,
+              bottom: MediaQuery.of(ctx).viewInsets.bottom + 20),
+          child: Column(
+            mainAxisSize: MainAxisSize.min,
+            crossAxisAlignment: CrossAxisAlignment.start,
+            children: [
+              const Text('แก้ไขรายการ',
+                  style: TextStyle(
+                      color: Colors.white,
+                      fontSize: 16,
+                      fontWeight: FontWeight.w700)),
+              const SizedBox(height: 14),
+              TextField(
+                controller: amountCtl,
+                keyboardType:
+                    const TextInputType.numberWithOptions(decimal: true),
+                style: const TextStyle(color: Colors.white),
+                decoration: const InputDecoration(
+                  labelText: 'จำนวนเงิน (บาท)',
+                  labelStyle: TextStyle(color: Colors.white54),
+                  enabledBorder: OutlineInputBorder(
+                      borderSide: BorderSide(color: Colors.white24)),
+                ),
+              ),
+              const SizedBox(height: 12),
+              TextField(
+                controller: noteCtl,
+                style: const TextStyle(color: Colors.white),
+                decoration: const InputDecoration(
+                  labelText: 'บันทึกช่วยจำ',
+                  labelStyle: TextStyle(color: Colors.white54),
+                  enabledBorder: OutlineInputBorder(
+                      borderSide: BorderSide(color: Colors.white24)),
+                ),
+              ),
+              if (cats.isNotEmpty) ...[
+                const SizedBox(height: 16),
+                const Text('หมวดหมู่',
+                    style: TextStyle(color: Colors.white54, fontSize: 13)),
+                const SizedBox(height: 8),
+                ConstrainedBox(
+                  constraints: const BoxConstraints(maxHeight: 180),
+                  child: SingleChildScrollView(
+                    child: Wrap(
+                      spacing: 8,
+                      runSpacing: 8,
+                      children: cats.map((c) {
+                        final selected = c.id == selCatId;
+                        return GestureDetector(
+                          onTap: () => setSheet(() {
+                            selCatId = c.id;
+                            selCatName = c.nameTh;
+                          }),
+                          child: Container(
+                            padding: const EdgeInsets.symmetric(
+                                horizontal: 12, vertical: 8),
+                            decoration: BoxDecoration(
+                              color: selected
+                                  ? AppColors.primary
+                                  : const Color(0xFF334155),
+                              borderRadius: BorderRadius.circular(20),
+                            ),
+                            child: Text('${c.icon} ${c.nameTh}',
+                                style: TextStyle(
+                                    color: selected
+                                        ? Colors.white
+                                        : Colors.white70,
+                                    fontSize: 13,
+                                    fontWeight: selected
+                                        ? FontWeight.w700
+                                        : FontWeight.w500)),
+                          ),
+                        );
+                      }).toList(),
+                    ),
+                  ),
+                ),
+              ],
+              const SizedBox(height: 18),
+              SizedBox(
+                width: double.infinity,
+                child: ElevatedButton(
+                  style: ElevatedButton.styleFrom(
+                      backgroundColor: AppColors.primary),
+                  onPressed: () => Navigator.pop(ctx, true),
+                  child: const Text('บันทึก'),
+                ),
+              ),
+            ],
+          ),
+        ),
+      ),
+    );
+    if (saved != true) {
+      return;
+    }
+    final newAmount = double.tryParse(amountCtl.text.trim());
+    if (newAmount == null || newAmount <= 0) {
+      return;
+    }
+    setState(() => _busy = true);
+    try {
+      await ref.read(transactionsRepoProvider).update(
+            widget.card.id,
+            type: widget.card.type,
+            amount: (newAmount * 100).round(),
+            categoryId: selCatId,
+            note: noteCtl.text.trim(),
+          );
+      ref.invalidate(dashboardProvider);
+      if (mounted) {
+        setState(() {
+          _amountBaht = newAmount;
+          _note = noteCtl.text.trim();
+          _categoryId = selCatId;
+          _category = selCatName;
+          _busy = false;
+        });
+      }
+    } catch (_) {
+      if (mounted) {
+        setState(() => _busy = false);
+        ScaffoldMessenger.of(context).showSnackBar(
+          const SnackBar(content: Text('แก้ไขไม่สำเร็จ ลองใหม่อีกครั้ง')),
+        );
+      }
+    }
+  }
+
+  @override
+  Widget build(BuildContext context) {
+    final c = widget.card;
+    final isIncome = c.isIncome;
+    final pillColor =
+        isIncome ? const Color(0xFF16A34A) : const Color(0xFFDB2777);
+
+    if (_deleted) {
+      return Container(
+        padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 12),
+        decoration: BoxDecoration(
+          color: const Color(0xFFF1F5F9),
+          borderRadius: BorderRadius.circular(14),
+        ),
+        child: const Row(children: [
+          Icon(Icons.delete_outline, color: Color(0xFF94A3B8), size: 18),
+          SizedBox(width: 8),
+          Text('ลบรายการแล้ว',
+              style: TextStyle(
+                  color: Color(0xFF94A3B8),
+                  fontWeight: FontWeight.w600,
+                  decoration: TextDecoration.lineThrough)),
+        ]),
+      );
+    }
+
+    return Container(
+      constraints: const BoxConstraints(minWidth: 240),
+      padding: const EdgeInsets.fromLTRB(14, 12, 12, 12),
+      decoration: BoxDecoration(
+        color: Colors.white,
+        borderRadius: BorderRadius.circular(14),
+        boxShadow: [
+          BoxShadow(
+              color: Colors.black.withValues(alpha: 0.15),
+              blurRadius: 8,
+              offset: const Offset(0, 3)),
+        ],
+      ),
+      child: Column(
+        crossAxisAlignment: CrossAxisAlignment.start,
+        mainAxisSize: MainAxisSize.min,
+        children: [
+          // แถวหัว: จดสำเร็จ + ป้ายประเภท
+          Row(
+            children: [
+              const Icon(Icons.check_box, color: Color(0xFF16A34A), size: 20),
+              const SizedBox(width: 6),
+              const Text('จดสำเร็จ',
+                  style: TextStyle(
+                      color: Color(0xFF16A34A),
+                      fontSize: 14,
+                      fontWeight: FontWeight.w700)),
+              const Spacer(),
+              Container(
+                padding:
+                    const EdgeInsets.symmetric(horizontal: 12, vertical: 5),
+                decoration: BoxDecoration(
+                    color: pillColor,
+                    borderRadius: BorderRadius.circular(20)),
+                child: Text(isIncome ? 'รายรับ' : 'รายจ่าย',
+                    style: const TextStyle(
+                        color: Colors.white,
+                        fontSize: 12,
+                        fontWeight: FontWeight.w700)),
+              ),
+            ],
+          ),
+          const SizedBox(height: 12),
+          // แถวกลาง: ชื่อรายการ + ยอด + ปุ่มลบ
+          Row(
+            crossAxisAlignment: CrossAxisAlignment.start,
+            children: [
+              Expanded(
+                child: Text(
+                  _note.isEmpty ? c.category : _note,
+                  style: const TextStyle(
+                      color: Color(0xFF0F172A),
+                      fontSize: 15,
+                      fontWeight: FontWeight.w600,
+                      height: 1.25),
+                ),
+              ),
+              const SizedBox(width: 10),
+              Text('฿${_amountBaht.toStringAsFixed(_amountBaht == _amountBaht.roundToDouble() ? 0 : 2)}',
+                  style: const TextStyle(
+                      color: Color(0xFF0F172A),
+                      fontSize: 17,
+                      fontWeight: FontWeight.w800)),
+              const SizedBox(width: 8),
+              _CardIconButton(
+                icon: Icons.close,
+                bg: const Color(0xFFFEE2E2),
+                fg: const Color(0xFFDC2626),
+                busy: _busy,
+                onTap: _delete,
+              ),
+            ],
+          ),
+          const Divider(height: 20, color: Color(0xFFE2E8F0)),
+          // แถวล่าง: หมวด + วันที่ + ปุ่มแก้
+          Row(
+            crossAxisAlignment: CrossAxisAlignment.end,
+            children: [
+              Expanded(
+                child: Column(
+                  crossAxisAlignment: CrossAxisAlignment.start,
+                  children: [
+                    _kv('หมวด', _category),
+                    const SizedBox(height: 3),
+                    _kv('วันที่', _thaiDateTime(widget.createdAt)),
+                  ],
+                ),
+              ),
+              const SizedBox(width: 8),
+              _CardIconButton(
+                icon: Icons.edit_outlined,
+                bg: const Color(0xFFFEF3C7),
+                fg: const Color(0xFFB45309),
+                busy: _busy,
+                onTap: _edit,
+              ),
+            ],
+          ),
+        ],
+      ),
+    );
+  }
+
+  Widget _kv(String k, String v) => Row(
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: [
+          SizedBox(
+            width: 44,
+            child: Text(k,
+                style: const TextStyle(
+                    color: Color(0xFF94A3B8), fontSize: 12.5)),
+          ),
+          Expanded(
+            child: Text(v,
+                style: const TextStyle(
+                    color: Color(0xFF475569),
+                    fontSize: 12.5,
+                    fontWeight: FontWeight.w600)),
+          ),
+        ],
+      );
+}
+
+class _CardIconButton extends StatelessWidget {
+  const _CardIconButton({
+    required this.icon,
+    required this.bg,
+    required this.fg,
+    required this.onTap,
+    this.busy = false,
+  });
+  final IconData icon;
+  final Color bg;
+  final Color fg;
+  final VoidCallback onTap;
+  final bool busy;
+
+  @override
+  Widget build(BuildContext context) {
+    return Material(
+      color: bg,
+      borderRadius: BorderRadius.circular(9),
+      child: InkWell(
+        borderRadius: BorderRadius.circular(9),
+        onTap: busy ? null : onTap,
+        child: SizedBox(
+          width: 36,
+          height: 36,
+          child: busy
+              ? const Padding(
+                  padding: EdgeInsets.all(10),
+                  child: CircularProgressIndicator(strokeWidth: 2),
+                )
+              : Icon(icon, color: fg, size: 20),
         ),
       ),
     );
@@ -1046,17 +1539,23 @@ class _InputBar extends StatelessWidget {
     required this.listening,
     required this.attaching,
     required this.busy,
+    required this.pendingImage,
     required this.onMic,
     required this.onImage,
+    required this.onRemoveImage,
     required this.onSend,
+    required this.onStop,
   });
   final TextEditingController controller;
   final bool listening;
   final bool attaching;
   final bool busy;
+  final String? pendingImage; // dataUrl ของรูปที่แนบรอส่ง
   final VoidCallback onMic;
   final VoidCallback onImage;
+  final VoidCallback onRemoveImage;
   final VoidCallback onSend;
+  final VoidCallback onStop;
 
   @override
   Widget build(BuildContext context) {
@@ -1064,6 +1563,42 @@ class _InputBar extends StatelessWidget {
       padding: const EdgeInsets.fromLTRB(12, 6, 12, 10),
       child: Column(
         children: [
+          // พรีวิวรูปที่แนบไว้ (ยังไม่ส่ง) — มีปุ่มลบ
+          if (pendingImage != null)
+            Align(
+              alignment: Alignment.centerLeft,
+              child: Padding(
+                padding: const EdgeInsets.only(bottom: 6, left: 6),
+                child: Stack(
+                  clipBehavior: Clip.none,
+                  children: [
+                    ClipRRect(
+                      borderRadius: BorderRadius.circular(12),
+                      child: Image.memory(
+                        base64Decode(pendingImage!.split(',').last),
+                        width: 72,
+                        height: 72,
+                        fit: BoxFit.cover,
+                      ),
+                    ),
+                    Positioned(
+                      top: -6,
+                      right: -6,
+                      child: GestureDetector(
+                        onTap: onRemoveImage,
+                        child: Container(
+                          decoration: const BoxDecoration(
+                              color: Color(0xFF0F172A), shape: BoxShape.circle),
+                          padding: const EdgeInsets.all(3),
+                          child: const Icon(Icons.close,
+                              size: 16, color: Colors.white),
+                        ),
+                      ),
+                    ),
+                  ],
+                ),
+              ),
+            ),
           Container(
             padding: const EdgeInsets.all(4),
             decoration: BoxDecoration(
@@ -1112,19 +1647,20 @@ class _InputBar extends StatelessWidget {
                     ),
                   ),
                 ),
+                // กำลังตอบ → ปุ่มหยุด (เหมือน Claude) · ปกติ → ปุ่มส่ง
                 Container(
                   width: 44,
                   height: 44,
-                  decoration: const BoxDecoration(
-                    color: AppColors.primary,
+                  decoration: BoxDecoration(
+                    color: busy ? const Color(0xFF334155) : AppColors.primary,
                     shape: BoxShape.circle,
                   ),
                   child: IconButton(
-                    tooltip: 'ส่งข้อความ',
+                    tooltip: busy ? 'หยุด' : 'ส่งข้อความ',
                     padding: EdgeInsets.zero,
-                    icon: const Icon(Icons.send_rounded,
-                        color: Colors.white, size: 20),
-                    onPressed: busy ? null : onSend,
+                    icon: Icon(busy ? Icons.stop_rounded : Icons.send_rounded,
+                        color: Colors.white, size: busy ? 22 : 20),
+                    onPressed: busy ? onStop : onSend,
                   ),
                 ),
               ],

@@ -5,7 +5,7 @@ import { requireAuth } from '../../lib/auth';
 import { prisma } from '../../lib/prisma';
 import { cache } from '../../lib/cache';
 import { buildContext } from './context_builder';
-import { generateReply, ChatTurn, ocrImage } from './coach';
+import { generateReply, generateReplyWithTools, ChatTurn, ocrImage } from './coach';
 import {
   detectExportRequest,
   buildExportReply,
@@ -13,6 +13,8 @@ import {
   ChatAttachment,
 } from './export_intent';
 import { checkFinanceScope, OUT_OF_SCOPE_REPLY } from './finance_scope';
+import { detectQuickLog, quickCreate } from './tools';
+import { extractReceiptItems, logReceiptItems, analyzeContract } from './receipt';
 
 export const chatRouter = Router();
 chatRouter.use(requireAuth);
@@ -133,6 +135,66 @@ chatRouter.post(
       return;
     }
 
+    // ── เอกสารสัญญา/ซื้อรถ (ไม่ใช่ใบเสร็จ) → ไม่แตกรายการ แต่แนะนำให้จดเป็นรายการเดียว ──
+    if (includeFinancialContext && ocrText) {
+      const contract = await analyzeContract(ocrText);
+      if (contract.isContract) {
+        const veh = contract.vehicle ? `ซื้อ${contract.vehicle}` : 'สัญญา/ซื้อรถ';
+        const amt = contract.downPaymentBaht;
+        const reply = amt
+          ? `📄 นี่เป็นเอกสาร${veh} ไม่ใช่ใบเสร็จซื้อของหลายรายการ พี่เงินเลยไม่จดแยกทั้งใบให้นะครับ (กันจดยอดสัญญาเป็นรายจ่ายผิด)\n\n` +
+            `พี่เงินอ่านคร่าว ๆ ว่าจ่ายวันนี้ประมาณ **${amt.toLocaleString('en-US')} บาท** — เป็นลายมือ OCR อาจคลาดเคลื่อน ถ้าจะบันทึกเป็นค่างวด/ดาวน์ พิมพ์ยืนยันได้เลย เช่น \`ดาวน์รถ ${amt}\` (ถ้าเลขไม่ตรง พิมพ์เลขที่ถูกแทนครับ) จะเข้าหมวด **ผ่อน/หนี้** ให้ 😊`
+          : `📄 นี่เป็นเอกสาร${veh} ไม่ใช่ใบเสร็จซื้อของ พี่เงินเลยไม่จดแยกให้นะครับ (กันจดยอดสัญญาผิด)\n\n` +
+            'ถ้าจะบันทึกเงินดาวน์หรือค่างวดที่จ่ายจริง พิมพ์สั้น ๆ ได้เลย เช่น `ดาวน์รถ 5000` หรือ `ค่างวดรถ 2500` จะเข้าหมวด **ผ่อน/หนี้** พร้อมการ์ดให้ตรวจครับ 😊';
+        const saved = await saveMessage('assistant', reply, JSON.stringify({ source: 'contract-doc' }));
+        res.status(201).json({ message: saved, source: 'contract-doc' });
+        return;
+      }
+    }
+
+    // ── สแกนใบเสร็จหลายรายการ → แยกสินค้า → จดหลายรายการ + การ์ดหลายใบ ──
+    if (includeFinancialContext && ocrText) {
+      const items = await extractReceiptItems(ocrText);
+      if (items.length >= 2) {
+        const cards = await logReceiptItems(userId, items);
+        if (cards.length) {
+          const total = cards.reduce((s, c) => s + Number(c.amountBaht), 0);
+          const reply =
+            `จดจากใบเสร็จให้แล้ว ${cards.length} รายการ รวม ${total.toLocaleString('en-US')} บาท ✅\n\n` +
+            'ตรวจแต่ละรายการที่การ์ดด้านล่างได้เลย ถ้าผิดกดแก้หรือลบได้ครับ 😊';
+          const saved = await saveMessage(
+            'assistant',
+            reply,
+            JSON.stringify({ source: 'receipt-scan', cards }),
+          );
+          res.status(201).json({ message: saved, source: 'receipt-scan', cards });
+          return;
+        }
+      }
+    }
+
+    // ── การจดแบบสั้นสไตล์ป้านวล "ก๋วยเตี๋ยว 55" / "เงินเดือน 30000" → สร้างเองในโค้ด การ์ดขึ้นชัวร์ 100% ──
+    // (ไม่ต้องพึ่ง LLM เรียก tool ซึ่งบางโมเดลไม่นิ่ง โดยเฉพาะรายรับ)
+    if (includeFinancialContext && !imageBase64) {
+      const quick = detectQuickLog(message);
+      if (quick) {
+        const card = await quickCreate(userId, quick);
+        if (card) {
+          const kind = card.type === 'income' ? 'รายรับ' : 'รายจ่าย';
+          const reply =
+            `จดให้แล้วครับ ✅ ${kind}: ${card.note} ${card.amountBaht.toLocaleString('en-US')} บาท (หมวด${card.category})\n\n` +
+            'ถ้าผิดกดแก้หรือลบที่การ์ดด้านล่างได้เลยครับ 😊';
+          const saved = await saveMessage(
+            'assistant',
+            reply,
+            JSON.stringify({ source: 'quick-log', cards: [card] }),
+          );
+          res.status(201).json({ message: saved, source: 'quick-log', cards: [card] });
+          return;
+        }
+      }
+    }
+
     // ── ถ้าเป็นคำขอ "ไฟล์การเงิน" → พี่เงินสร้างไฟล์ + แนบปุ่มดาวน์โหลด ──
     const exp = detectExportRequest(message);
     if (exp) {
@@ -183,13 +245,18 @@ chatRouter.post(
       currentQuestion = `${message}\n\n[ข้อมูลที่แอปตรวจพบในรูปภาพที่ส่งมาในข้อความนี้: ${ocrText}]`;
     }
 
-    const { reply, source } = await generateReply(context, currentQuestion, history);
+    // เปิด function calling เมื่อผู้ใช้อนุญาตให้ใช้ context การเงิน (LLM query/บันทึกข้อมูลจริงได้)
+    // ถ้าปิด context ไว้ (โหมดไม่ผูกข้อมูล) ใช้เส้นทางเดิมที่ไม่มี tool
+    const result = includeFinancialContext
+      ? await generateReplyWithTools(context, currentQuestion, history, userId)
+      : { ...(await generateReply(context, currentQuestion, history)), cards: [] };
+    const { reply, source, cards } = result;
 
-    // เก็บคำตอบ (แนบ snapshot ว่า source อะไร)
+    // เก็บคำตอบ + การ์ดรายการที่ AI บันทึกให้ (mobile เอาไปวาดการ์ด "จดสำเร็จ" + ปุ่มลบ/แก้)
     const saved = await saveMessage(
       'assistant',
       reply,
-      JSON.stringify({ source }),
+      JSON.stringify(cards.length ? { source, cards } : { source }),
     );
 
     await awardChatPoints(userId);

@@ -25,6 +25,39 @@ class ChatAttachment {
       );
 }
 
+/// การ์ด "จดสำเร็จ" เมื่อพี่เงินบันทึกรายรับ-รายจ่ายให้ผ่านแชท (มีปุ่มลบ/แก้)
+class TxnCard {
+  TxnCard({
+    required this.id,
+    required this.type,
+    required this.amountBaht,
+    required this.category,
+    required this.categoryId,
+    required this.note,
+    required this.date,
+  });
+
+  final String id;
+  final String type; // income | expense
+  final num amountBaht;
+  final String category; // ชื่อหมวด (ไทย)
+  final String? categoryId; // ให้แก้ไขโดยคงหมวดเดิม
+  final String note;
+  final String date; // YYYY-MM-DD
+
+  bool get isIncome => type == 'income';
+
+  factory TxnCard.fromJson(Map<String, dynamic> j) => TxnCard(
+        id: j['id'] as String,
+        type: (j['type'] ?? 'expense') as String,
+        amountBaht: (j['amountBaht'] ?? 0) as num,
+        category: (j['category'] ?? 'ไม่ระบุ') as String,
+        categoryId: j['categoryId'] as String?,
+        note: (j['note'] ?? '') as String,
+        date: (j['date'] ?? '') as String,
+      );
+}
+
 class ChatMessage {
   ChatMessage({
     required this.id,
@@ -33,6 +66,7 @@ class ChatMessage {
     required this.createdAt,
     this.attachment,
     this.hasImage = false,
+    this.cards = const [],
   });
 
   final String id;
@@ -41,13 +75,15 @@ class ChatMessage {
   final DateTime createdAt;
   final ChatAttachment? attachment;
   final bool hasImage;
+  final List<TxnCard> cards; // การ์ดรายการที่พี่เงินบันทึกให้ในข้อความนี้
 
   bool get isUser => role == 'user';
 
   factory ChatMessage.fromJson(Map<String, dynamic> j) {
-    // attachment ฝังมาใน context (JSON: {source, attachment}) — ใช้ได้ทั้งข้อความใหม่และประวัติ
+    // attachment/cards ฝังมาใน context (JSON: {source, attachment, cards}) — ใช้ได้ทั้งข้อความใหม่และประวัติ
     ChatAttachment? att;
     bool hasImg = false;
+    List<TxnCard> cards = const [];
     final ctx = j['context'];
     if (ctx is String && ctx.isNotEmpty) {
       try {
@@ -60,6 +96,12 @@ class ChatMessage {
           if (parsed['hasImage'] == true) {
             hasImg = true;
           }
+          if (parsed['cards'] is List) {
+            cards = (parsed['cards'] as List)
+                .whereType<Map>()
+                .map((e) => TxnCard.fromJson(Map<String, dynamic>.from(e)))
+                .toList();
+          }
         }
       } catch (_) {}
     }
@@ -70,6 +112,7 @@ class ChatMessage {
       createdAt: DateTime.parse(j['createdAt'] as String),
       attachment: att,
       hasImage: hasImg,
+      cards: cards,
     );
   }
 }
