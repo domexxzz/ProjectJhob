@@ -24,6 +24,7 @@ class MenuScreen extends ConsumerWidget {
             name: user?.displayName ?? 'เพื่อน',
             streak: user?.streak ?? 0,
             avatarUrl: user?.avatarUrl,
+            level: user?.level ?? 1,
           ),
           Expanded(
             child: SingleChildScrollView(
@@ -92,14 +93,27 @@ class _MenuHeader extends StatelessWidget {
     required this.name,
     required this.streak,
     required this.avatarUrl,
+    required this.level,
   });
   final String name;
   final int streak;
   final String? avatarUrl;
+  final int level;
 
   @override
   Widget build(BuildContext context) {
     final topPad = MediaQuery.of(context).padding.top;
+
+    String rankName = 'Bronze';
+    Color rankColor = const Color(0xFFCD7F32); // Bronze
+    if (level == 3) {
+      rankName = 'Gold';
+      rankColor = const Color(0xFFFFD700); // Gold
+    } else if (level == 2) {
+      rankName = 'Silver';
+      rankColor = const Color(0xFFC0C0C0); // Silver
+    }
+
     return Container(
       width: double.infinity,
       padding: EdgeInsets.fromLTRB(20, topPad + 14, 20, 40),
@@ -125,20 +139,33 @@ class _MenuHeader extends StatelessWidget {
                         fontSize: 16,
                         fontWeight: FontWeight.bold)),
                 const SizedBox(height: 4),
-                Container(
-                  padding:
-                      const EdgeInsets.symmetric(horizontal: 10, vertical: 3),
-                  decoration: BoxDecoration(
-                    color: AppColors.primary.withValues(alpha: 0.25),
-                    borderRadius: BorderRadius.circular(12),
-                    border: Border.all(
-                        color: AppColors.primary.withValues(alpha: 0.4)),
-                  ),
-                  child: Text('ใช้งานต่อเนื่อง $streak วัน',
-                      style: const TextStyle(
-                          color: AppColors.primary,
-                          fontSize: 11,
-                          fontWeight: FontWeight.w600)),
+                Row(
+                  children: [
+                    Container(
+                      padding:
+                          const EdgeInsets.symmetric(horizontal: 10, vertical: 3),
+                      decoration: BoxDecoration(
+                        color: rankColor.withOpacity(0.2),
+                        borderRadius: BorderRadius.circular(12),
+                        border: Border.all(color: rankColor.withOpacity(0.4)),
+                      ),
+                      child: Row(
+                        mainAxisSize: MainAxisSize.min,
+                        children: [
+                          Icon(Icons.emoji_events_rounded, color: rankColor, size: 12),
+                          const SizedBox(width: 4),
+                          Text(
+                            rankName,
+                            style: TextStyle(
+                              color: rankColor,
+                              fontSize: 10,
+                              fontWeight: FontWeight.bold,
+                            ),
+                          ),
+                        ],
+                      ),
+                    ),
+                  ],
                 ),
               ],
             ),

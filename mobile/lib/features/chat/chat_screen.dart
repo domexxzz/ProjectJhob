@@ -14,6 +14,7 @@ import '../../core/api/api_client.dart';
 import 'chat_message.dart';
 import 'chat_repository.dart';
 import '../privacy/privacy_screen.dart';
+import '../auth/auth_controller.dart';
 
 enum CoachMood { idle, listening, thinking }
 
@@ -117,6 +118,7 @@ class _ChatScreenState extends ConsumerState<ChatScreen> {
         _typingId = reply.id; // ให้ค่อย ๆ พิมพ์ออกมา
         _sending = false;
       });
+      ref.read(authControllerProvider.notifier).refreshProfile();
     } catch (_) {
       if (!mounted) return;
       setState(() {

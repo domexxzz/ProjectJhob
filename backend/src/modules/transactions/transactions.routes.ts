@@ -4,6 +4,7 @@ import { asyncHandler, HttpError } from '../../lib/http';
 import { requireAuth } from '../../lib/auth';
 import { createTransactionSchema, updateTransactionSchema } from '../../lib/validate';
 import { prisma } from '../../lib/prisma';
+import { awardPoints } from '../auth/auth.service';
 import { parseAmount, parseDate, parseRef, parseMerchant, autoCategorize } from './parser';
 import { cache } from '../../lib/cache';
 import { ocrImage } from '../chat/coach';
@@ -130,6 +131,7 @@ transactionsRouter.post(
     });
 
     await cache.delPattern(`user:${req.userId!}:*`);
+    await awardPoints(req.userId!, 5);
 
     // รันการคำนวณทำนายเงินคงเหลือและการเตือนงบแบบ background ทันทีที่มีรายการใหม่
     Promise.all([

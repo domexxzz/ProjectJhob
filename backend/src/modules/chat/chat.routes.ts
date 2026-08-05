@@ -150,6 +150,7 @@ chatRouter.post(
         reply,
         JSON.stringify({ source: 'export', attachment }),
       );
+      await awardChatPoints(userId);
       res.status(201).json({ message: saved, source: 'export', attachment });
       return;
     }
@@ -191,6 +192,7 @@ chatRouter.post(
       JSON.stringify({ source }),
     );
 
+    await awardChatPoints(userId);
     res.status(201).json({ message: saved, source });
   }),
 );
@@ -210,3 +212,43 @@ chatRouter.post(
     }
   }),
 );
+
+async function awardChatPoints(userId: string) {
+  const user = await prisma.user.findUnique({
+    where: { id: userId },
+    select: { points: true, lastChatPointsDate: true },
+  });
+  if (!user) return;
+
+  const todayStr = new Date().toISOString().split('T')[0]; // YYYY-MM-DD
+  let pointsToday = 0;
+  let shouldUpdate = false;
+
+  if (user.lastChatPointsDate) {
+    const [datePart, countPart] = user.lastChatPointsDate.split(':');
+    if (datePart === todayStr) {
+      pointsToday = parseInt(countPart, 10) || 0;
+    }
+  }
+
+  if (pointsToday < 10) {
+    pointsToday += 2;
+    shouldUpdate = true;
+  }
+
+  if (shouldUpdate) {
+    const newPoints = user.points + 2;
+    let newLevel = 1;
+    if (newPoints >= 500) newLevel = 3;
+    else if (newPoints >= 100) newLevel = 2;
+
+    await prisma.user.update({
+      where: { id: userId },
+      data: {
+        points: newPoints,
+        level: newLevel,
+        lastChatPointsDate: `${todayStr}:${pointsToday}`,
+      },
+    });
+  }
+}

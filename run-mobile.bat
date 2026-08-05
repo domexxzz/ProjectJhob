@@ -6,6 +6,15 @@ set "FLUTTER=C:\flutter\bin\flutter.bat"
 if not exist "%FLUTTER%" set "FLUTTER=C:\src\flutter\bin\flutter.bat"
 if not exist "%FLUTTER%" set "FLUTTER=flutter"
 
+REM Verify Flutter is available
+call "%FLUTTER%" --version >nul 2>&1
+if errorlevel 1 (
+    echo [ERROR] Flutter command was not found. 
+    echo Please make sure Flutter is installed and added to PATH, or placed at C:\flutter
+    pause
+    exit /b 1
+)
+
 echo === Getting Flutter packages ===
 call "%FLUTTER%" pub get
 

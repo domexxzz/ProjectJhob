@@ -35,6 +35,7 @@ class GoalsScreen extends ConsumerWidget {
           _GreenHeader(
             name: user?.displayName ?? 'Fanta Inazuma',
             streak: user?.streak ?? 20,
+            level: user?.level ?? 1,
           ),
 
           Expanded(
@@ -109,13 +110,25 @@ class GoalsScreen extends ConsumerWidget {
 // 1. Green Header (ปรับปรุง Gradient คอนทราสต์ให้เข้าเซ็ตตามดีไซน์ Dashboard)
 // ─────────────────────────────────────────────────────────────────────────────
 class _GreenHeader extends StatelessWidget {
-  const _GreenHeader({required this.name, required this.streak});
+  const _GreenHeader({required this.name, required this.streak, required this.level});
   final String name;
   final int streak;
+  final int level;
 
   @override
   Widget build(BuildContext context) {
     final topPad = MediaQuery.of(context).padding.top;
+
+    String rankName = 'Bronze';
+    Color rankColor = const Color(0xFFCD7F32); // Bronze
+    if (level == 3) {
+      rankName = 'Gold';
+      rankColor = const Color(0xFFFFD700); // Gold
+    } else if (level == 2) {
+      rankName = 'Silver';
+      rankColor = const Color(0xFFC0C0C0); // Silver
+    }
+
     return Container(
       width: double.infinity,
       padding: EdgeInsets.fromLTRB(20, topPad + 16, 20, 24),
@@ -155,21 +168,33 @@ class _GreenHeader extends StatelessWidget {
                   ),
                 ),
                 const SizedBox(height: 6),
-                Container(
-                  padding:
-                      const EdgeInsets.symmetric(horizontal: 12, vertical: 4),
-                  decoration: BoxDecoration(
-                    color: Colors.white.withOpacity(0.2),
-                    borderRadius: BorderRadius.circular(12),
-                  ),
-                  child: Text(
-                    'ใช้งานต่อเนื่อง $streak วัน',
-                    style: const TextStyle(
-                      color: Colors.white,
-                      fontSize: 12,
-                      fontWeight: FontWeight.bold,
+                Row(
+                  children: [
+                    Container(
+                      padding:
+                          const EdgeInsets.symmetric(horizontal: 10, vertical: 4),
+                      decoration: BoxDecoration(
+                        color: rankColor.withOpacity(0.2),
+                        borderRadius: BorderRadius.circular(12),
+                        border: Border.all(color: rankColor.withOpacity(0.4)),
+                      ),
+                      child: Row(
+                        mainAxisSize: MainAxisSize.min,
+                        children: [
+                          Icon(Icons.emoji_events_rounded, color: rankColor, size: 12),
+                          const SizedBox(width: 4),
+                          Text(
+                            rankName,
+                            style: TextStyle(
+                              color: rankColor,
+                              fontSize: 11,
+                              fontWeight: FontWeight.bold,
+                            ),
+                          ),
+                        ],
+                      ),
                     ),
-                  ),
+                  ],
                 ),
               ],
             ),
