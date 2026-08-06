@@ -3,7 +3,8 @@
  * ใบเสร็จมีรูปแบบหลากหลายมาก จึงใช้ LLM แตกเป็น JSON แทน regex (ทนกว่า)
  */
 import { chatComplete } from './coach';
-import { quickCreate, TxnCard } from './tools';
+import { quickCreate, TxnCard, INCOME_HINT } from './tools';
+import { parseAmount, parseMerchant } from '../transactions/parser';
 
 export interface ReceiptItem {
   name: string;
@@ -104,6 +105,20 @@ export async function analyzeContract(ocrText: string): Promise<ContractInfo> {
   } catch {
     return { ...none, isContract: true };
   }
+}
+
+/**
+ * บันทึกสลิปโอนเงิน/จ่ายบิล "ยอดเดียว" เป็น 1 รายการ (deterministic → การ์ดขึ้นชัวร์ ไม่พึ่ง LLM)
+ * ใช้ parser ชุดเดียวกับ /parse-slip: อ่านยอด + ชื่อผู้รับ + เดา รายรับ/รายจ่าย จากคำในสลิป
+ * คืน null ถ้าอ่านยอดไม่เจอ (ปล่อยให้โค้ช LLM จัดการต่อ)
+ */
+export async function logTransferSlip(userId: string, ocrText: string): Promise<TxnCard | null> {
+  const amountSatang = parseAmount(ocrText);
+  if (!amountSatang || amountSatang <= 0) return null;
+  const type: 'income' | 'expense' = INCOME_HINT.test(ocrText) ? 'income' : 'expense';
+  const merchant = parseMerchant(ocrText);
+  const note = merchant || (type === 'income' ? 'เงินเข้า (สลิป)' : 'โอนเงิน (สลิป)');
+  return quickCreate(userId, { type, amountBaht: amountSatang / 100, note });
 }
 
 /** สร้าง transaction ต่อ 1 รายการสินค้า (เป็นรายจ่าย) → คืนการ์ดที่สร้างสำเร็จ */
