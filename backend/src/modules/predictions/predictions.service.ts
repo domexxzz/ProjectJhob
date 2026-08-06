@@ -25,7 +25,10 @@ interface FastApiResult {
  * คืน null ถ้า service ไม่พร้อม/ล้มเหลว (ผู้เรียกไปตัดสินใจ fallback เอง)
  * ใช้ร่วมกันทั้ง REST controller และ background trigger
  */
-export async function fetchPrediction(userId: string): Promise<PredictionResult | null> {
+// timeout กัน cold-start ของ FastAPI บน cloud (free tier หลับแล้วปลุกนาน) ค้าง request
+// - background triggers / GET notifications ใช้ค่า default (สั้น) → ไม่แช่ค้าง
+// - GET /predictions (ผู้ใช้กดดูพยากรณ์เอง รอได้) ส่ง timeout ยาวเพื่อรอ cold start
+export async function fetchPrediction(userId: string, timeoutMs = 15000): Promise<PredictionResult | null> {
   const [user, transactions] = await Promise.all([
     prisma.user.findUnique({ where: { id: userId } }),
     prisma.transaction.findMany({ where: { userId }, orderBy: { occurredAt: 'asc' } }),
@@ -53,9 +56,10 @@ export async function fetchPrediction(userId: string): Promise<PredictionResult 
       method: 'POST',
       headers: { 'Content-Type': 'application/json' },
       body: JSON.stringify(payload),
+      signal: AbortSignal.timeout(timeoutMs),
     });
   } catch (e) {
-    console.error('[predictions] FastAPI ไม่ตอบ (service ปิดอยู่?):', (e as Error).message);
+    console.error('[predictions] FastAPI ไม่ตอบ (service ปิด/ตอบช้าเกิน timeout?):', (e as Error).message);
     return null;
   }
   if (!res.ok) {
