@@ -53,7 +53,9 @@ async function main() {
   }
 
   const email = 'demo@bestimove.ai';
-  const user = await prisma.user.upsert({
+  // บัญชี demo สำหรับล็อกอินทดสอบ (demo@bestimove.ai / demo1234)
+  // ลบ sample transactions ปลอมออกแล้ว → บัญชีเริ่มต้นสะอาด ไม่มีประวัติหลอกโผล่ตอนเดโม
+  await prisma.user.upsert({
     where: { email },
     update: {},
     create: {
@@ -63,21 +65,6 @@ async function main() {
       monthlyIncome: 2_500_000, // 25,000 ฿
     },
   });
-
-  const existing = await prisma.transaction.count({ where: { userId: user.id } });
-  if (existing === 0) {
-    const cat = async (name: string) =>
-      (await prisma.category.findFirst({ where: { name, type: 'expense' } }))?.id;
-    const samples = [
-      { type: 'income', amount: 2_500_000, note: 'เงินเดือน', source: 'manual', categoryId: undefined },
-      { type: 'expense', amount: 650_000, note: 'ข้าวเที่ยง + กาแฟ', source: 'manual', categoryId: await cat('Food') },
-      { type: 'expense', amount: 420_000, note: 'Shopee', source: 'ocr', categoryId: await cat('Shopping') },
-      { type: 'expense', amount: 350_000, note: 'BTS + วิน', source: 'manual', categoryId: await cat('Transport') },
-    ];
-    for (const s of samples) {
-      await prisma.transaction.create({ data: { userId: user.id, ...s } });
-    }
-  }
 
   console.log(`✅ Seed complete: ${categories.length} categories · demo user ${email} / demo1234`);
 }

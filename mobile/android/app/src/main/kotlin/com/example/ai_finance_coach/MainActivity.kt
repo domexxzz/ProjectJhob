@@ -1,5 +1,9 @@
 package com.example.ai_finance_coach
 
+import android.app.NotificationChannel
+import android.app.NotificationManager
+import android.os.Build
+import android.os.Bundle
 import android.view.WindowManager
 import io.flutter.embedding.android.FlutterFragmentActivity
 import io.flutter.embedding.engine.FlutterEngine
@@ -7,6 +11,24 @@ import io.flutter.plugin.common.MethodChannel
 
 class MainActivity : FlutterFragmentActivity() {
     private val securityChannel = "com.projectjhob/security"
+
+    override fun onCreate(savedInstanceState: Bundle?) {
+        super.onCreate(savedInstanceState)
+        // สร้าง notification channel แบบ IMPORTANCE_HIGH ให้ push เด้งเด่น (heads-up) + มีเสียง
+        // FCM (ตอนแอปอยู่พื้นหลัง) จะใช้ channel นี้ผ่าน meta-data ใน AndroidManifest
+        if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.O) {
+            val channel = NotificationChannel(
+                "high_importance_channel",
+                "การแจ้งเตือนสำคัญ",
+                NotificationManager.IMPORTANCE_HIGH,
+            ).apply {
+                description = "แจ้งเตือนการเงินจากพี่เงิน (เตือนงบ/สลิป/ครบกำหนด)"
+                enableVibration(true)
+            }
+            getSystemService(NotificationManager::class.java)
+                ?.createNotificationChannel(channel)
+        }
+    }
 
     override fun configureFlutterEngine(flutterEngine: FlutterEngine) {
         super.configureFlutterEngine(flutterEngine)

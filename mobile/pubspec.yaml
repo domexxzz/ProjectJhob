@@ -29,6 +29,8 @@ dependencies:
   url_launcher: ^6.3.0
   image_cropper: ^12.2.1 # หรือเวอร์ชันล่าสุด
   local_auth: ^3.0.2
+  firebase_core: ^4.13.0
+  firebase_messaging: ^16.5.0
 
 dev_dependencies:
   flutter_lints: ^4.0.0

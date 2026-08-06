@@ -1,6 +1,14 @@
 # 📋 งานที่เหลือ — พี่เงิน (AI Finance Coach)
 
-> อัปเดต 17 ก.ค. 2569 · จากการอ่านโค้ดจริงทุกไฟล์ + เทียบแผน sprint
+> อัปเดต **6 ส.ค. 2569** · จากการอ่านโค้ดจริงทุกไฟล์ + เทียบแผน sprint
+
+## 🎉 เพิ่งปิดได้ (เซสชัน 6 ส.ค. 69)
+- ✅ **A1 · ลบข้อมูลปลอมทั้งหมด** (demo prefill, goal ปลอม, Fanta Inazuma, mock Gmail, demo seed) — compile ผ่าน 0 error
+- ✅ **D2 · FCM push จริง** — firebase-admin v14 + service account · เทส foreground/background/**heads-up+เสียง** บน Android ผ่าน · `NOTIF_CRON=on`
+- ✅ **Auth · Google + Facebook login ใช้ได้จริง** (แก้ oauth_client/SHA-1/audience + ตั้ง FB app)
+- ✅ **C2 · budget_duration** เขียนใหม่เป็นปฏิทินจริง
+- ✅ **แก้ build Android** (AGP9/Kotlin/compileSdk เข้ากับ flutter_facebook_auth) + ลบ duplicate backend tree + จับ Groq key leak
+
 > **หมายเหตุ:** `SPRINT_STATUS.md` (23 มิ.ย.) และ `tasks/PLAN_Dome_Next.md` (4 ก.ค.) **ล้าสมัยแล้ว** — งานหลายอย่างที่เอกสารนั้นบอกว่า "เหลือทำ" ทำเสร็จไปแล้ว เอกสารนี้คือสถานะจริง ณ ปัจจุบัน
 >
 > รายละเอียดเชิงลึก: [`ARCHITECTURE.md`](ARCHITECTURE.md) (ทะเบียนความเสี่ยง R-1…R-18) · [`CODE_MAP.md`](CODE_MAP.md) (ไฟล์ไหนทำอะไร)
@@ -11,15 +19,15 @@
 
 | ฟีเจอร์ | Backend | Mobile | หมายเหตุ |
 |---|:--:|:--:|---|
-| Auth (email + Google + Facebook) | ✅ | ✅ | ⚠️ OAuth ยังไม่ตรวจ audience (ดู B) |
+| Auth (email + Google + Facebook) | ✅ | ✅ | ✅ **login ทั้ง 3 ใช้ได้จริงแล้ว** · ⚠️ R-2 (email_verified) ยังเปิด (ดู B) |
 | Transaction + สแกนสลิป (Typhoon OCR) | ✅ | ✅ | |
 | Budget + สถานะงบ | ✅ | ✅ | ⚠️ "งบรวม" นับผิด (ดู A) |
 | Dashboard + กราฟ | — | ✅ | |
 | แชทพี่เงิน (multi-LLM + OCR + เสียง) | ✅ | ✅ | |
 | **Goals + AI แผนออม** | ✅ | ⚠️ | **mobile ยังไม่ต่อ backend — เก็บ Hive ล้วน (ดู D1)** |
 | **Recommendations** | ✅ | ⚠️ | backend เสร็จ, ต้องเช็คว่า mobile ผูกการ์ดครบ |
-| **Subscriptions + Gmail import** | ✅ | ⚠️ | mobile มี mock หลอกว่าคุย Google (ดู A) |
-| **Notifications + FCM** | ✅ | ✅ | ⚠️ push ซ้ำ + FCM ยังไม่มี creds จริง (ดู D2) |
+| **Subscriptions + Gmail import** | ✅ | ✅ | ✅ ลบ mock Gmail แล้ว เหลือ OAuth 2.0 จริง |
+| **Notifications + FCM** | ✅ | ✅ | ✅ FCM push + heads-up ใช้ได้จริง · ⚠️ push ซ้ำยังไม่แก้ (A3) |
 | **Predictions (FastAPI + Prophet)** | ✅ | ✅ | ⚠️ สูตรพยากรณ์ผิด (ดู A) |
 | **Export ไฟล์ (8 ฟอร์แมต)** | ✅ | ✅ | |
 | **Gamification (streak/badge/level)** | ❌ | ❌ | **ยังไม่เริ่ม** — schema `Achievement` มีแต่ไม่มี route (ดู C1) |
@@ -32,16 +40,17 @@
 
 งานพวกนี้ทำให้ **เดโมพัง หรือแสดงตัวเลขผิดต่อหน้ากรรมการ** ควรทำก่อนอื่น
 
-### A1 · ลบข้อมูล demo/mock ที่ฝังอยู่ในทางเดินจริง
-- [ ] `mobile/lib/features/auth/login_screen.dart:24-25` — ลบ prefill `demo@bestimove.ai` / `demo1234`
-- [ ] `mobile/lib/features/goals/goals_provider.dart:128-161` — ลบ goal ปลอม 3 อันที่ seed ให้ผู้ใช้ทุกคน
-- [ ] `mobile/lib/features/dashboard/dashboard_screen.dart:31-32` + `goals_screen.dart:27` + `budget_list_screen.dart:36` — ลบ fallback `'Fanta Inazuma'` / streak 20
-- [ ] `mobile/lib/features/subscriptions/subscriptions_screen.dart:123-217` — **โหมด mock Gmail ที่แสดงข้อความ "กำลังตรวจสอบสิทธิ์กับ Google" ทั้งที่ไม่ได้คุย** แล้ว hardcode 3 subscription ลง DB จริง — ต้องเอาออกหรือแทนด้วย OAuth จริง
-- [ ] `backend/prisma/seed.ts:55-65` — ใส่ guard `NODE_ENV !== 'production'` รอบ demo user
+### A1 · ลบข้อมูล demo/mock — ✅ **เสร็จหมดแล้ว (6 ส.ค. 69)**
+- [x] `login_screen.dart` — ลบ prefill `demo@bestimove.ai` / `demo1234` → ช่องว่าง
+- [x] `goals_provider.dart` — ลบ goal ปลอม 3 อัน → empty state
+- [x] `dashboard`/`goals`/`budget_list`/`financial_dashboard` — ลบ fallback `'Fanta Inazuma'` / streak 20 → `''`/`0`
+- [x] `subscriptions_screen.dart` — ลบ mock Gmail flow (Netflix/Spotify ปลอม + dead code 3 คลาส) → เหลือ OAuth 2.0 จริง
+- [x] `forgot_password_screen.dart` — ลบ email ปลอม `fantanaja@gmail.com`
+- [x] `prisma/seed.ts` — ลบ sample transactions ปลอม (เก็บ demo user ไว้ล็อกอิน)
 
 ### A2 · บั๊กตัวเลขผิด (กระทบความน่าเชื่อถือของแอปการเงิน)
 - [ ] `ai/predictions/app.py:76-77,174` — **สูตรพยากรณ์หารด้วยจำนวน *รายการ* แทนจำนวน *วัน*** → พยากรณ์ผิดเป็นเท่าตัว, เงินเดือน 25k กลายเป็นรายได้วันละ 25k
-- [ ] `backend/src/modules/transactions/parser.ts:149` — fallback หมวดเป็น `'Food'` → รายจ่ายที่จัดหมวดไม่ได้ทุกตัวไปกอง Food → กราฟ/งบ/คำแนะนำเพี้ยนต่อเนื่อง (เปลี่ยนเป็น `'Other'`)
+- [x] `backend/src/modules/transactions/parser.ts` — ✅ fallback `'Food'` → `OtherExpense`/`OtherIncome` แล้ว + เขียน keyword ครบ 32 หมวด
 - [ ] **"งบรวม" (categoryId=null) นับผิด 4 ที่** — `budgets.routes.ts:91`, `triggers.ts:20`, `context_builder.ts:49`, `export.service.ts:108` (แก้เป็น `...(b.categoryId ? { categoryId } : {})`)
 - [ ] `backend/src/modules/chat/chat.routes.ts:30-34` — `GET /chat` เรียงจากเก่าสุด → ผู้ใช้เกิน 100 ข้อความเห็นแต่ข้อความแรก ๆ (แก้เป็น `desc` + reverse)
 - [ ] `mobile/lib/features/predictions/predictions_screen.dart:228` — แกน Y ตรึงที่ 0 → ยอดติดลบ (เคสที่ควรเตือน) ถูกตัดหาย
@@ -80,7 +89,7 @@
 
 ### C2 · หน้าจอที่ยังเป็น stub
 - [ ] `mobile/lib/features/auth/forgot_password_screen.dart` — **stub ทั้ง 3 ขั้น** ไม่ส่ง OTP จริง กด next ทั้งที่ว่างก็ผ่าน password กับ confirm ไม่เคยเทียบกัน · ต้องต่อ backend (ยังไม่มี endpoint reset password ด้วย)
-- [ ] `mobile/lib/features/budgets/budget_duration_screen.dart` — mock ทั้งหน้า (ข้อมูล hardcode, ปุ่มกดไม่ได้, ปฏิทินเมษา 2026 ปลอม) · ตัดสินใจว่าจะทำจริงหรือลบ
+- [x] `mobile/lib/features/budgets/budget_duration_screen.dart` — ✅ เขียนใหม่เป็นปฏิทินจริง (เดือน/ปีปัจจุบัน เปลี่ยนเดือนได้ เลือกวันได้) แทน mock เมษา 2026
 - [ ] `mobile/lib/features/menu/menu_screen.dart` — การ์ด "ตั้งค่า" + "ความเป็นส่วนตัว" เป็น stub `_soon()`
 
 ### C3 · PDPA (Sprint 7)
@@ -97,11 +106,12 @@
 - [ ] ผูก list/create/edit/deposit เข้า API จริง + ผูกการ์ด "พี่เงินแนะนำ" กับ `POST /goals/:id/plan`
 - [ ] ลบ `_initialGoals()` (goal ปลอม 3 อัน) ออกตอนต่อ backend สำเร็จ
 
-### D2 · FCM push จริง (มี creds)
-- [ ] `cd backend && npm i firebase-admin` (ตอนนี้ยังไม่ได้ลง — โค้ด `fcm.ts` ใช้ dynamic import ไว้แล้ว)
-- [ ] สร้าง Firebase project → service account JSON → env `FIREBASE_SERVICE_ACCOUNT`
-- [ ] ทดสอบ push บน Android จริง (iOS ต้องตั้ง APNs เพิ่ม)
-- [ ] เปิด `NOTIF_CRON=on` บน staging (ตอนนี้ default ปิด)
+### D2 · FCM push จริง — ✅ **เสร็จแล้ว (6 ส.ค. 69)**
+- [x] `npm i firebase-admin` (v14.2.0 modular API)
+- [x] Firebase project `phee-ngern` → service account JSON → env `FIREBASE_SERVICE_ACCOUNT`
+- [x] ทดสอบ push บน Android — foreground/background/**heads-up + เสียง** ผ่าน (ยืนยันด้วย adb)
+- [x] `NOTIF_CRON=on`
+- [ ] iOS — ต้องตั้ง APNs เพิ่ม (ยังไม่ทำ)
 
 ### D3 · เก็บกวาด mobile-backend ที่ผูกไม่ครบ
 - [ ] `budget_list_screen.dart:78` — เช็ค empty ผิด list → ถ้า `/budgets/status` ล่มจะเห็นหน้าว่างเงียบ ๆ

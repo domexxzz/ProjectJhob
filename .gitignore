@@ -26,6 +26,7 @@ backend/prisma/dev.db*
 # Flutter / Dart
 mobile/.dart_tool/
 mobile/build/
+mobile/android/build/
 mobile/.flutter-plugins
 mobile/.flutter-plugins-dependencies
 mobile/ios/Pods/
@@ -57,3 +58,7 @@ scratch/
 
 # Flutter SDK must not live inside the repo (keep the SDK outside the project)
 /flutter/
+
+# Firebase Admin SDK private key (ห้าม commit เด็ดขาด)
+*firebase-adminsdk*.json
+*-adminsdk-*.json

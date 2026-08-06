@@ -682,7 +682,8 @@ class _EditGoalScreenState extends ConsumerState<EditGoalScreen> {
                         ],
                       ),
                     ),
-                  SizedBox(height: personalized ? 48 : 24),
+                  ),
+                  const SizedBox(height: 24),
 
                   // ปุ่มลบ และ ยืนยันการแก้ไข / สร้างเป้าหมาย
                   widget.goalId != null

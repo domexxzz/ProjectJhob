@@ -21,8 +21,8 @@ class LoginScreen extends ConsumerStatefulWidget {
 }
 
 class _LoginScreenState extends ConsumerState<LoginScreen> {
-  final _email = TextEditingController(text: 'demo@bestimove.ai');
-  final _password = TextEditingController(text: 'demo1234');
+  final _email = TextEditingController();
+  final _password = TextEditingController();
 
   bool _obscurePassword = true;
   bool _rememberMe = true;
