@@ -195,7 +195,7 @@ class _ForgotPasswordScreenState extends State<ForgotPasswordScreen> {
   Widget _buildOtpStep() {
     final displayEmail = _emailController.text.isNotEmpty 
         ? _emailController.text 
-        : 'fantanaja@gmail.com'; // อีเมล Default ถ้ายังไม่ได้พิมพ์
+        : 'อีเมลของคุณ'; // แสดง placeholder กลาง ๆ ถ้ายังไม่ได้พิมพ์อีเมล
 
     return Column(
       crossAxisAlignment: CrossAxisAlignment.start,

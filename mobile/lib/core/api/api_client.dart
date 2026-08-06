@@ -5,8 +5,10 @@ import 'package:flutter_secure_storage/flutter_secure_storage.dart';
 import 'package:shared_preferences/shared_preferences.dart';
 
 /// override ตอนรัน: flutter run --dart-define=API_BASE_URL=http://10.0.2.2:4000
-const String kApiBaseUrl = String.fromEnvironment('API_BASE_URL',
-    defaultValue: 'http://10.0.2.2:4000');
+const String _envApiBaseUrl = String.fromEnvironment('API_BASE_URL');
+final String kApiBaseUrl = _envApiBaseUrl.isNotEmpty
+    ? _envApiBaseUrl
+    : (kIsWeb ? 'http://localhost:4000' : 'http://10.0.2.2:4000');
 
 final secureStorageProvider =
     Provider<FlutterSecureStorage>((ref) => const FlutterSecureStorage());

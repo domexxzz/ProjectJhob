@@ -1,8 +1,10 @@
+import { readFileSync } from 'fs';
 import { prisma } from '../../lib/prisma';
 
 // 🔔 FCM push แบบ "เปิดได้ทีหลัง" — ถ้ายังไม่ลง firebase-admin หรือไม่มี creds
 // ทุกอย่างจะ no-op เงียบ ๆ (in-app notification center ยังทำงานปกติ)
-// เปิดใช้จริง: `npm i firebase-admin` + ตั้ง env FIREBASE_SERVICE_ACCOUNT = JSON ของ service account
+// เปิดใช้จริง: `npm i firebase-admin` + ตั้ง env FIREBASE_SERVICE_ACCOUNT
+//   = JSON string ของ service account  หรือ  path ไปยังไฟล์ .json ก็ได้ (เช่น ./service-account.json)
 
 let fcmReady: boolean | null = null;
 let messaging: any = null;
@@ -15,13 +17,17 @@ async function ensureFcm(): Promise<boolean> {
     return false;
   }
   try {
-    const mod: any = await import('firebase-admin' as any); // dynamic → ไม่พังตอน build ถ้ายังไม่ลง lib
-    const admin = mod.default ?? mod;
-    const serviceAccount = JSON.parse(creds); // ใส่เป็น JSON string ใน env
-    if (!admin.apps?.length) {
-      admin.initializeApp({ credential: admin.credential.cert(serviceAccount) });
+    // firebase-admin v13+ เป็น modular API — import submodule (dynamic → build ผ่านแม้ยังไม่ลง lib)
+    const appMod: any = await import('firebase-admin/app' as any);
+    const msgMod: any = await import('firebase-admin/messaging' as any);
+    // รับได้ทั้ง JSON string ตรง ๆ หรือ path ไปยังไฟล์ .json (สะดวกกว่าเวลา key ยาว)
+    const trimmed = creds.trim();
+    const json = trimmed.startsWith('{') ? trimmed : readFileSync(trimmed, 'utf8');
+    const serviceAccount = JSON.parse(json);
+    if (!appMod.getApps().length) {
+      appMod.initializeApp({ credential: appMod.cert(serviceAccount) });
     }
-    messaging = admin.messaging();
+    messaging = msgMod.getMessaging();
     fcmReady = true;
   } catch (e) {
     console.warn('[fcm] push ปิดอยู่ (ยังไม่ลง firebase-admin หรือ creds ไม่ถูก):', (e as Error).message);
@@ -36,7 +42,12 @@ export async function sendPush(userId: string, title: string, body: string): Pro
   const user = await prisma.user.findUnique({ where: { id: userId }, select: { deviceToken: true } });
   if (!user?.deviceToken) return;
   try {
-    await messaging.send({ token: user.deviceToken, notification: { title, body } });
+    await messaging.send({
+      token: user.deviceToken,
+      notification: { title, body },
+      // ใช้ channel IMPORTANCE_HIGH (สร้างใน MainActivity ฝั่งแอป) → เด้ง heads-up + มีเสียง
+      android: { priority: 'high', notification: { channelId: 'high_importance_channel' } },
+    });
   } catch (e) {
     console.error('[fcm] ส่ง push ล้มเหลว:', (e as Error).message);
   }

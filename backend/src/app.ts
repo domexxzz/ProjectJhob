@@ -23,6 +23,10 @@ export function createApp() {
   app.use(cors({ origin: env.corsOrigin }));
   app.use(express.json({ limit: "15mb" })); // รองรับรูป base64 (OCR สลิป/เอกสาร)
 
+  app.get('/', (req, res) => {
+    res.redirect('http://localhost:5000');
+  });
+
   app.use("/health", healthRouter);
   app.use("/api/v1/auth", authRouter);
   app.use("/api/v1/transactions", transactionsRouter);

@@ -155,38 +155,8 @@ class GoalsNotifier extends StateNotifier<List<GoalModel>> {
   }
 
   static List<GoalModel> _initialGoals() {
-    return [
-      GoalModel(
-        id: 'goal-1',
-        name: 'เที่ยวต่างประเทศ',
-        target: 400000, // 4,000.00 Baht (matching wireframe)
-        current: 240000, // 2,400.00 Baht (matching wireframe)
-        deadline: DateTime(2026, 12, 31),
-        type: 'short',
-        emoji: '🌴',
-        createdAt: DateTime(2026, 6, 1),
-      ),
-      GoalModel(
-        id: 'goal-2',
-        name: 'ซื้อตู้เย็น',
-        target: 400000, // 4,000.00 Baht (matching wireframe Home.png)
-        current: 240000, // 2,400.00 Baht
-        deadline: DateTime(2026, 9, 30),
-        type: 'short',
-        emoji: '🔌',
-        createdAt: DateTime(2026, 6, 10),
-      ),
-      GoalModel(
-        id: 'goal-3',
-        name: 'เงินสำรองฉุกเฉิน',
-        target: 10000000, // 100,000.00 Baht
-        current: 8000000, // 80,000.00 Baht
-        deadline: null,
-        type: 'long',
-        emoji: '🛡️',
-        createdAt: DateTime(2026, 5, 1),
-      ),
-    ];
+    // เริ่มต้นด้วยรายการว่าง — ให้ผู้ใช้สร้างเป้าหมายเอง (โชว์ empty state)
+    return [];
   }
 
   Future<void> addGoal(String name, int target, DateTime? deadline, String type,
