@@ -3,10 +3,15 @@
   "version": "0.1.0",
   "private": true,
   "description": "AI Finance Coach (พี่เงิน) — REST API",
+  "engines": {
+    "node": ">=20"
+  },
   "scripts": {
     "dev": "tsx watch src/index.ts",
     "build": "tsc -p tsconfig.json",
     "start": "node dist/index.js",
+    "postinstall": "prisma generate",
+    "render-build": "npm run build && prisma db push --accept-data-loss && npm run db:seed",
     "typecheck": "tsc --noEmit",
     "db:push": "prisma db push",
     "db:seed": "tsx prisma/seed.ts",

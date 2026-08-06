@@ -6,9 +6,12 @@ import 'package:shared_preferences/shared_preferences.dart';
 
 /// override ตอนรัน: flutter run --dart-define=API_BASE_URL=http://10.0.2.2:4000
 const String _envApiBaseUrl = String.fromEnvironment('API_BASE_URL');
+// เว็บ: ถ้าไม่ override → ใช้ path สัมพัทธ์ '' (เรียก /api/v1 ที่ origin เดียวกับที่เสิร์ฟเว็บ)
+// → เว็บ build เดียวใช้ได้ทุก domain (localhost/tunnel/cloud) เมื่อ backend เสิร์ฟเว็บ same-origin
+// มือถือ: default 10.0.2.2 (emulator) — production ใช้ --dart-define=API_BASE_URL=<cloud url>
 final String kApiBaseUrl = _envApiBaseUrl.isNotEmpty
     ? _envApiBaseUrl
-    : (kIsWeb ? 'http://localhost:4000' : 'http://10.0.2.2:4000');
+    : (kIsWeb ? '' : 'http://10.0.2.2:4000');
 
 final secureStorageProvider =
     Provider<FlutterSecureStorage>((ref) => const FlutterSecureStorage());

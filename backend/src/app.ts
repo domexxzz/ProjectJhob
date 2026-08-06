@@ -1,5 +1,6 @@
 import express from "express";
 import cors from "cors";
+import path from "path";
 import { env } from "./config/env";
 import { healthRouter } from "./modules/health/health.routes";
 import { authRouter } from "./modules/auth/auth.routes";
@@ -23,10 +24,6 @@ export function createApp() {
   app.use(cors({ origin: env.corsOrigin }));
   app.use(express.json({ limit: "15mb" })); // รองรับรูป base64 (OCR สลิป/เอกสาร)
 
-  app.get('/', (req, res) => {
-    res.redirect('http://localhost:5000');
-  });
-
   app.use("/health", healthRouter);
   app.use("/api/v1/auth", authRouter);
   app.use("/api/v1/transactions", transactionsRouter);
@@ -41,6 +38,24 @@ export function createApp() {
   app.use("/api/v1/predictions", predictionsRouter);
   app.use("/api/v1/export", exportRouter);
   app.use("/api/v1/currency", currencyRouter);
+
+  // ── เสิร์ฟ Flutter web (PWA) ── ให้เปิดเป็นเว็บ/เพิ่มลงหน้าจอโฮมบน iPhone ได้
+  // ไฟล์ web build ก็อปมาไว้ที่ backend/public (commit ไปกับ deploy) · static + SPA fallback
+  const webDir = path.resolve(__dirname, "../public");
+  app.use(express.static(webDir));
+  app.use((req, res, next) => {
+    if (
+      req.method === "GET" &&
+      !req.path.startsWith("/api") &&
+      !req.path.startsWith("/health")
+    ) {
+      res.sendFile(path.join(webDir, "index.html"), (err) => {
+        if (err) next();
+      });
+    } else {
+      next();
+    }
+  });
 
   app.use(notFound);
   app.use(errorHandler);
