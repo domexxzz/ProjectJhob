@@ -6,16 +6,29 @@ const THAI_MONTHS: Record<string, number> = {
 };
 
 export function parseAmount(text: string): number | null {
-  const m = text.match(/จำนวน(?:เงิน)?\s*(?::|：)?\s*([\d,]+\.\d{2})/);
-  if (m) {
-    return Math.round(parseFloat(m[1].replace(/,/g, "")) * 100);
+  // 1) ยอดที่มีป้ายกำกับชัดเจน เช่น "จำนวนเงิน: 440.00"
+  const labeled = text.match(/จำนวน(?:เงิน)?\s*(?::|：)?\s*([\d,]+\.\d{2})/);
+  if (labeled) {
+    return Math.round(parseFloat(labeled[1].replace(/,/g, "")) * 100);
   }
-  const amts: number[] = [];
-  const matches = text.matchAll(/([\d,]+\.\d{2})\s*บาท/g);
-  for (const match of matches) {
-    amts.push(Math.round(parseFloat(match[1].replace(/,/g, "")) * 100));
+  // 2) รูปแบบ "440.00 บาท"
+  const withBaht: number[] = [];
+  for (const match of text.matchAll(/([\d,]+\.\d{2})\s*บาท/g)) {
+    withBaht.push(Math.round(parseFloat(match[1].replace(/,/g, "")) * 100));
   }
-  return amts.length > 0 ? Math.max(...amts) : null;
+  if (withBaht.length > 0) return Math.max(...withBaht);
+
+  // 3) สำรอง — สลิปจ่ายบิล (ttb/ธนาคาร) โชว์ยอดลอย ๆ "440.00" ไม่มีคำว่า "บาท"/"จำนวนเงิน"
+  //    เก็บทุกจำนวนรูปแบบ N.NN แล้วตัดค่าที่นำหน้าด้วย ค่าธรรมเนียม/ยอดคงเหลือ/ส่วนลด ออก → เอาค่ามากสุด
+  const EXCLUDE = /(ค่าธรรมเนียม|ธรรมเนียม|ค่าบริการ|ยอดคงเหลือ|คงเหลือ|ส่วนลด|fee|balance|discount)[\s:：]*$/i;
+  const candidates: number[] = [];
+  for (const match of text.matchAll(/([\d,]+\.\d{2})/g)) {
+    const idx = match.index ?? 0;
+    const before = text.slice(Math.max(0, idx - 24), idx);
+    if (EXCLUDE.test(before)) continue; // ข้ามค่าธรรมเนียม/ยอดคงเหลือ
+    candidates.push(Math.round(parseFloat(match[1].replace(/,/g, "")) * 100));
+  }
+  return candidates.length > 0 ? Math.max(...candidates) : null;
 }
 
 export function parseDate(text: string): Date | null {
@@ -92,6 +105,13 @@ export function parseMerchant(text: string): string | null {
       const name = cleanName(m[1]);
       if (name) return name;
     }
+  }
+  // สลิปจ่ายบิล (ttb/ธนาคาร): ชื่อผู้รับบิลมักอยู่หน้าเลข biller/ผู้เสียภาษีในวงเล็บ
+  // เช่น "Banyabaramee (010753600031508)" / "TikTokShop Seller (010555609115221)"
+  const biller = text.match(/([^\n()]{2,60}?)\s*\(\s*\d{10,17}\s*\)/);
+  if (biller) {
+    const name = cleanName(biller[1]);
+    if (name) return name;
   }
   return null;
 }
