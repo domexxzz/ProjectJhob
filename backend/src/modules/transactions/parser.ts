@@ -6,27 +6,32 @@ const THAI_MONTHS: Record<string, number> = {
 };
 
 export function parseAmount(text: string): number | null {
-  // 1) ยอดที่มีป้ายกำกับชัดเจน เช่น "จำนวนเงิน: 440.00"
-  const labeled = text.match(/จำนวน(?:เงิน)?\s*(?::|：)?\s*([\d,]+\.\d{2})/);
-  if (labeled) {
-    return Math.round(parseFloat(labeled[1].replace(/,/g, "")) * 100);
-  }
-  // 2) รูปแบบ "440.00 บาท"
-  const withBaht: number[] = [];
-  for (const match of text.matchAll(/([\d,]+\.\d{2})\s*บาท/g)) {
-    withBaht.push(Math.round(parseFloat(match[1].replace(/,/g, "")) * 100));
-  }
-  if (withBaht.length > 0) return Math.max(...withBaht);
+  const toSatang = (s: string) => Math.round(parseFloat(s.replace(/,/g, "")) * 100);
+  // คำที่อยู่ "ก่อน" ตัวเลข แล้วไม่ใช่ยอดที่จ่ายจริง → ข้าม (ค่าธรรมเนียม, สิทธิร่วมจ่ายรัฐ, ส่วนลด, ยอดคงเหลือ)
+  const EXCLUDE = /(ค่าธรรมเนียม|ธรรมเนียม|ค่าบริการ|สิทธิ|ส่วนลด|discount|ยอดคงเหลือ|คงเหลือ|fee|balance)/i;
+  const skip = (idx: number) => EXCLUDE.test(text.slice(Math.max(0, idx - 28), idx));
 
-  // 3) สำรอง — สลิปจ่ายบิล (ttb/ธนาคาร) โชว์ยอดลอย ๆ "440.00" ไม่มีคำว่า "บาท"/"จำนวนเงิน"
-  //    เก็บทุกจำนวนรูปแบบ N.NN แล้วตัดค่าที่นำหน้าด้วย ค่าธรรมเนียม/ยอดคงเหลือ/ส่วนลด ออก → เอาค่ามากสุด
-  const EXCLUDE = /(ค่าธรรมเนียม|ธรรมเนียม|ค่าบริการ|ยอดคงเหลือ|คงเหลือ|ส่วนลด|fee|balance|discount)[\s:：]*$/i;
+  // 1) "ยอดที่ชำระจริง" — สำคัญสุด: สลิป co-pay (เป๋าตัง/คนละครึ่ง) ค่าสินค้า 60 − สิทธิ 36 = ชำระ 24 → เอา 24
+  const paid = text.match(
+    /(?:จำนวนเงินที่ชำระ|ยอดที่ต้องชำระ|ยอดที่ชำระ|ยอดชำระ|รวมชำระ|จำนวนที่ชำระ|ชำระเงิน|ยอดสุทธิ)\s*(?::|：)?\s*([\d,]+(?:\.\d{1,2})?)/,
+  );
+  if (paid) return toSatang(paid[1]);
+
+  // 2) ป้าย "จำนวนเงิน" ทั่วไป (จำนวนเต็มหรือทศนิยม)
+  const labeled = text.match(/จำนวน(?:เงิน)?\s*(?::|：)?\s*([\d,]+(?:\.\d{1,2})?)/);
+  if (labeled) return toSatang(labeled[1]);
+
+  // 3) "N บาท" / "N.NN บาท" (มีหน่วยต่อท้าย รองรับจำนวนเต็ม) — ตัด ค่าธรรมเนียม/สิทธิ/ส่วนลด แล้วเอามากสุด
+  const withUnit: number[] = [];
+  for (const m of text.matchAll(/([\d,]+(?:\.\d{1,2})?)\s*(?:บาท|฿)/g)) {
+    if (!skip(m.index ?? 0)) withUnit.push(toSatang(m[1]));
+  }
+  if (withUnit.length > 0) return Math.max(...withUnit);
+
+  // 4) สำรองสุดท้าย: จำนวนรูปแบบ N.NN (ทศนิยม) ที่ไม่ใช่ค่าธรรมเนียม — สลิปโอน ttb ที่โชว์ยอดลอย ๆ ไม่มี "บาท"
   const candidates: number[] = [];
-  for (const match of text.matchAll(/([\d,]+\.\d{2})/g)) {
-    const idx = match.index ?? 0;
-    const before = text.slice(Math.max(0, idx - 24), idx);
-    if (EXCLUDE.test(before)) continue; // ข้ามค่าธรรมเนียม/ยอดคงเหลือ
-    candidates.push(Math.round(parseFloat(match[1].replace(/,/g, "")) * 100));
+  for (const m of text.matchAll(/([\d,]+\.\d{2})/g)) {
+    if (!skip(m.index ?? 0)) candidates.push(toSatang(m[1]));
   }
   return candidates.length > 0 ? Math.max(...candidates) : null;
 }
