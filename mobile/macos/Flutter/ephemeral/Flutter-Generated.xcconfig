@@ -1,7 +1,6 @@
 // This is a generated file; do not edit or check into version control.
-FLUTTER_ROOT=C:\src\flutter
-FLUTTER_APPLICATION_PATH=E:\Project-JhobSAMNOR\mobile
-FLUTTER_FRAMEWORK_SWIFT_PACKAGE_PATH=E:\Project-JhobSAMNOR\mobile\macos\Flutter\ephemeral\Packages\.packages\FlutterFramework
+FLUTTER_ROOT=C:\Users\ta100\Downloads\flutter
+FLUTTER_APPLICATION_PATH=C:\Users\ta100\Desktop\ProjectJhob\mobile
 COCOAPODS_PARALLEL_CODE_SIGN=true
 FLUTTER_BUILD_DIR=build
 FLUTTER_BUILD_NAME=0.1.0

@@ -1,5 +1,12 @@
 @echo off
-title App (Android Emulator) - AI Finance Coach
+title App (Web Release) - AI Finance Coach
+
+echo Cleaning up port 5000 if in use...
+for /f "tokens=5" %%a in ('netstat -aon ^| findstr :5000 ^| findstr LISTENING') do (
+    echo Killing process with PID %%a occupying port 5000...
+    taskkill /f /pid %%a
+)
+
 cd /d "%~dp0mobile"
 
 set "FLUTTER="
@@ -21,7 +28,6 @@ if errorlevel 1 (
 echo === Getting Flutter packages ===
 call "%FLUTTER%" pub get
 
-echo === Launching on Android emulator - API http://10.0.2.2:4000 ===
-echo     (10.0.2.2 = how an Android emulator reaches this PC localhost)
-echo     For a REAL phone on the same Wi-Fi, use run-phone.bat instead.
-call "%FLUTTER%" run --dart-define=API_BASE_URL=http://10.0.2.2:4000
+echo === Launching app in Chrome (web release) on http://localhost:5000 - API http://localhost:4000 ===
+echo     First build takes ~40s; Chrome opens by itself. Please wait.
+call "%FLUTTER%" run -d chrome --release --web-hostname=localhost --web-port=5000 --dart-define=API_BASE_URL=http://localhost:4000
