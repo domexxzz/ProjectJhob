@@ -178,7 +178,7 @@ chatRouter.post(
     // ── สลิปโอนเงิน/จ่ายบิล "ยอดเดียว" (ไม่ใช่ใบเสร็จหลายรายการ) → จด 1 รายการจากยอดในสลิป ──
     // ใช้ parser เดียวกับ /parse-slip (deterministic) การ์ดขึ้นชัวร์ ไม่พึ่ง LLM เรียก tool
     if (includeFinancialContext && ocrText) {
-      const card = await logTransferSlip(userId, ocrText);
+      const card = await logTransferSlip(userId, ocrText, message);
       if (card) {
         const kind = card.type === 'income' ? 'รายรับ' : 'รายจ่าย';
         const reply =

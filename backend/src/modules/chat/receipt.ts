@@ -112,10 +112,17 @@ export async function analyzeContract(ocrText: string): Promise<ContractInfo> {
  * ใช้ parser ชุดเดียวกับ /parse-slip: อ่านยอด + ชื่อผู้รับ + เดา รายรับ/รายจ่าย จากคำในสลิป
  * คืน null ถ้าอ่านยอดไม่เจอ (ปล่อยให้โค้ช LLM จัดการต่อ)
  */
-export async function logTransferSlip(userId: string, ocrText: string): Promise<TxnCard | null> {
+export async function logTransferSlip(
+  userId: string,
+  ocrText: string,
+  userMessage = '',
+): Promise<TxnCard | null> {
   const amountSatang = parseAmount(ocrText);
   if (!amountSatang || amountSatang <= 0) return null;
-  const type: 'income' | 'expense' = INCOME_HINT.test(ocrText) ? 'income' : 'expense';
+  // เดา รายรับ/รายจ่าย จาก (ก) คำในสลิป OCR หรือ (ข) ข้อความที่ผู้ใช้พิมพ์คู่กับสลิป
+  // เช่น ส่งสลิป + พิมพ์ "เงินเดือนเข้าแล้ว" / "รับเงินค่าขายของ" → รายรับ · ไม่งั้น default = รายจ่าย
+  const type: 'income' | 'expense' =
+    INCOME_HINT.test(userMessage) || INCOME_HINT.test(ocrText) ? 'income' : 'expense';
   const merchant = parseMerchant(ocrText);
   const note = merchant || (type === 'income' ? 'เงินเข้า (สลิป)' : 'โอนเงิน (สลิป)');
   return quickCreate(userId, { type, amountBaht: amountSatang / 100, note });

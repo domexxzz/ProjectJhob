@@ -108,7 +108,8 @@ export function parseMerchant(text: string): string | null {
   }
   // สลิปจ่ายบิล (ttb/ธนาคาร): ชื่อผู้รับบิลมักอยู่หน้าเลข biller/ผู้เสียภาษีในวงเล็บ
   // เช่น "Banyabaramee (010753600031508)" / "TikTokShop Seller (010555609115221)"
-  const biller = text.match(/([^\n()]{2,60}?)\s*\(\s*\d{10,17}\s*\)/);
+  // ⚠️ Typhoon OCR คืนคำคั่นด้วย ", " บรรทัดเดียว → ห้ามคว้าข้ามคอมมา/บรรทัด ไม่งั้นไปโดนชื่อผู้โอน
+  const biller = text.match(/([^\n,()]{2,40}?)\s*[,\n]?\s*\(\s*\d{10,17}\s*\)/);
   if (biller) {
     const name = cleanName(biller[1]);
     if (name) return name;
