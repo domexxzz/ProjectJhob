@@ -128,65 +128,84 @@ class GoalsNotifier extends StateNotifier<List<GoalModel>> {
   static const _boxName = 'goals_box';
 
   Future<void> _loadGoals() async {
+    final user = _ref.read(authControllerProvider).user;
+    final userKey = user != null ? 'goals_${user.id}' : 'goals_guest';
+
+    // 1. Load locally from Hive first for offline/instant loading
     try {
       final box = await Hive.openBox(_boxName);
-      final List? cached = box.get('goals');
+      final List? cached = box.get(userKey);
       if (cached != null) {
         state = cached
             .map((item) =>
                 GoalModel.fromJson(Map<String, dynamic>.from(item as Map)))
             .toList();
-        return;
+      } else {
+        state = user == null ? _initialGoals() : [];
+        await _saveToHive();
       }
-      state = _initialGoals();
-      await _saveToHive();
     } catch (_) {
-      state = _initialGoals();
+      state = user == null ? _initialGoals() : [];
+    }
+
+    // 2. Fetch and sync with backend database if logged in
+    if (user != null) {
+      try {
+        final dio = _ref.read(dioProvider);
+        final res = await dio.get('/goals');
+        final List rawGoals = res.data['goals'] as List;
+
+        final onlineGoals = rawGoals.map((item) {
+          final j = Map<String, dynamic>.from(item as Map);
+          final String id = j['id'] as String;
+
+          GoalModel? local;
+          for (final g in state) {
+            if (g.id == id) {
+              local = g;
+              break;
+            }
+          }
+
+          return GoalModel(
+            id: id,
+            name: j['name'] as String,
+            target: (j['target'] ?? 0) as int,
+            current: (j['current'] ?? 0) as int,
+            deadline: j['deadline'] != null
+                ? DateTime.tryParse(j['deadline'] as String)
+                : null,
+            createdAt: j['createdAt'] != null
+                ? DateTime.tryParse(j['createdAt'] as String) ?? DateTime.now()
+                : DateTime.now(),
+            emoji: local?.emoji ?? '🎯',
+            type: local?.type ?? 'short',
+            imagePath: local?.imagePath,
+            startDate: local?.startDate,
+          );
+        }).toList();
+
+        state = onlineGoals;
+        await _saveToHive();
+      } catch (_) {
+        // Keep local state on API failure
+      }
     }
   }
 
   Future<void> _saveToHive() async {
+    final user = _ref.read(authControllerProvider).user;
+    final userKey = user != null ? 'goals_${user.id}' : 'goals_guest';
     try {
       final box = await Hive.openBox(_boxName);
-      await box.put('goals', state.map((g) => g.toJson()).toList());
+      await box.put(userKey, state.map((g) => g.toJson()).toList());
     } catch (_) {
       // ใช้งานต่อด้วย state ในหน่วยความจำ เมื่อ Web storage ไม่พร้อม
     }
   }
 
   static List<GoalModel> _initialGoals() {
-    return [
-      GoalModel(
-        id: 'goal-1',
-        name: 'เที่ยวต่างประเทศ',
-        target: 400000, // 4,000.00 Baht (matching wireframe)
-        current: 240000, // 2,400.00 Baht (matching wireframe)
-        deadline: DateTime(2026, 12, 31),
-        type: 'short',
-        emoji: '🌴',
-        createdAt: DateTime(2026, 6, 1),
-      ),
-      GoalModel(
-        id: 'goal-2',
-        name: 'ซื้อตู้เย็น',
-        target: 400000, // 4,000.00 Baht (matching wireframe Home.png)
-        current: 240000, // 2,400.00 Baht
-        deadline: DateTime(2026, 9, 30),
-        type: 'short',
-        emoji: '🔌',
-        createdAt: DateTime(2026, 6, 10),
-      ),
-      GoalModel(
-        id: 'goal-3',
-        name: 'เงินสำรองฉุกเฉิน',
-        target: 10000000, // 100,000.00 Baht
-        current: 8000000, // 80,000.00 Baht
-        deadline: null,
-        type: 'long',
-        emoji: '🛡️',
-        createdAt: DateTime(2026, 5, 1),
-      ),
-    ];
+    return [];
   }
 
   Future<void> addGoal(String name, int target, DateTime? deadline, String type,
@@ -221,9 +240,9 @@ class GoalsNotifier extends StateNotifier<List<GoalModel>> {
     } catch (_) {}
   }
 
-  void updateGoal(String id, String name, int target, DateTime? deadline,
+  Future<void> updateGoal(String id, String name, int target, DateTime? deadline,
       String type, String emoji, String? imagePath,
-      {DateTime? startDate}) {
+      {DateTime? startDate}) async {
     state = state.map((g) {
       if (g.id == id) {
         return g.copyWith(
@@ -240,7 +259,17 @@ class GoalsNotifier extends StateNotifier<List<GoalModel>> {
       }
       return g;
     }).toList();
-    _saveToHive();
+    await _saveToHive();
+
+    try {
+      final dio = _ref.read(dioProvider);
+      await dio.patch('/goals/$id', data: {
+        'name': name,
+        'target': target,
+        if (deadline != null) 'deadline': deadline.toUtc().toIso8601String(),
+      });
+      _ref.read(authControllerProvider.notifier).refreshProfile();
+    } catch (_) {}
   }
 
   Future<void> deleteGoal(String id) async {
@@ -274,5 +303,6 @@ class GoalsNotifier extends StateNotifier<List<GoalModel>> {
 
 final goalsProvider =
     StateNotifierProvider<GoalsNotifier, List<GoalModel>>((ref) {
+  ref.watch(authControllerProvider.select((s) => s.user?.id));
   return GoalsNotifier(ref);
 });

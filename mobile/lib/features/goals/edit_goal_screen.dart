@@ -7,6 +7,7 @@ import 'package:image_picker/image_picker.dart';
 import 'package:intl/intl.dart';
 
 import '../../core/money.dart';
+import '../privacy/privacy_screen.dart';
 import 'goals_provider.dart';
 
 class EditGoalScreen extends ConsumerStatefulWidget {
@@ -230,6 +231,7 @@ class _EditGoalScreenState extends ConsumerState<EditGoalScreen> {
   @override
   Widget build(BuildContext context) {
     final goals = ref.watch(goalsProvider);
+    final personalized = ref.watch(privacySettingsProvider).personalizedRecommendations;
     final int currentSavings = widget.goalId != null
         ? (goals.firstWhere((g) => g.id == widget.goalId, orElse: () => goals.first).current)
         : 0;
@@ -628,54 +630,57 @@ class _EditGoalScreenState extends ConsumerState<EditGoalScreen> {
                   ),
                   const SizedBox(height: 24),
                   
-                  const Text(
-                    'แนะนำสำหรับคุณ',
-                    style: TextStyle(color: Colors.white, fontSize: 18, fontWeight: FontWeight.bold, letterSpacing: 0.3),
-                  ),
-                  const SizedBox(height: 12),
+                  if (personalized)
+                    const Text(
+                      'แนะนำสำหรับคุณ',
+                      style: TextStyle(color: Colors.white, fontSize: 18, fontWeight: FontWeight.bold, letterSpacing: 0.3),
+                    ),
+                  if (personalized) const SizedBox(height: 12),
                   
                   // AI Smart Assistant Card
-                  Container(
-                    padding: const EdgeInsets.all(16),
-                    decoration: BoxDecoration(
-                      gradient: const LinearGradient(
-                        begin: Alignment.topLeft,
-                        end: Alignment.bottomRight,
-                        colors: [Color(0xFF0C241B), Color(0xFF071812)],
+                  if (personalized)
+                    Container(
+                      padding: const EdgeInsets.all(16),
+                      decoration: BoxDecoration(
+                        gradient: const LinearGradient(
+                          begin: Alignment.topLeft,
+                          end: Alignment.bottomRight,
+                          colors: [Color(0xFF0C241B), Color(0xFF071812)],
+                        ),
+                        borderRadius: BorderRadius.circular(18),
+                        border: Border.all(color: const Color(0xFF3CAE63).withOpacity(0.15)),
                       ),
-                      borderRadius: BorderRadius.circular(18),
-                      border: Border.all(color: const Color(0xFF3CAE63).withOpacity(0.15)),
-                    ),
-                    child: Row(
-                      children: [
-                        Container(
-                          width: 50,
-                          height: 50,
-                          decoration: const BoxDecoration(
-                            shape: BoxShape.circle,
-                            color: Color(0xFF133526),
+                      child: Row(
+                        children: [
+                          Container(
+                            width: 50,
+                            height: 50,
+                            decoration: const BoxDecoration(
+                              shape: BoxShape.circle,
+                              color: Color(0xFF133526),
+                            ),
+                            child: const Icon(Icons.smart_toy_rounded, color: Color(0xFF4CD97B), size: 28),
                           ),
-                          child: const Icon(Icons.smart_toy_rounded, color: Color(0xFF4CD97B), size: 28),
-                        ),
-                        const SizedBox(width: 14),
-                        Expanded(
-                          child: Column(
-                            crossAxisAlignment: CrossAxisAlignment.start,
-                            children: [
-                              const Text(
-                                'พี่เงินขอแนะนำ',
-                                style: TextStyle(fontWeight: FontWeight.bold, color: Colors.white, fontSize: 15),
-                              ),
-                              const SizedBox(height: 4),
-                              Text(
-                                'มีเวลาอีก 3 เดือน ให้แบ่งเก็บเดือนละ 1000 บาท',
-                                style: TextStyle(color: Colors.white.withOpacity(0.5), fontSize: 13),
-                               )
-                            ],
+                          const SizedBox(width: 14),
+                          Expanded(
+                            child: Column(
+                              crossAxisAlignment: CrossAxisAlignment.start,
+                              children: [
+                                const Text(
+                                  'พี่เงินขอแนะนำ',
+                                  style: TextStyle(fontWeight: FontWeight.bold, color: Colors.white, fontSize: 15),
+                                ),
+                                const SizedBox(height: 4),
+                                Text(
+                                  'มีเวลาอีก 3 เดือน ให้แบ่งเก็บเดือนละ 1000 บาท',
+                                  style: TextStyle(color: Colors.white.withOpacity(0.5), fontSize: 13),
+                                 )
+                              ],
+                            ),
                           ),
-                        ),
-                        const Icon(Icons.arrow_forward_ios_rounded, color: Colors.white30, size: 14),
-                      ],
+                          const Icon(Icons.arrow_forward_ios_rounded, color: Colors.white30, size: 14),
+                        ],
+                      ),
                     ),
                   SizedBox(height: personalized ? 48 : 24),
 
