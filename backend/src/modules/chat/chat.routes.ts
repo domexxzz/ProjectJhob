@@ -32,12 +32,14 @@ const sendSchema = z.object({
 chatRouter.get(
   '/',
   asyncHandler(async (req, res) => {
-    const messages = await prisma.chatMessage.findMany({
+    // เอา 100 ข้อความ "ล่าสุด" (desc) แล้ว reverse ให้เรียงเก่า→ใหม่สำหรับแสดงผล
+    // (เดิม asc+take:100 = ได้เก่าสุด 100 → ผู้ใช้ที่แชทเกิน 100 ครั้งไม่เห็นข้อความล่าสุด)
+    const latest = await prisma.chatMessage.findMany({
       where: { userId: req.userId! },
-      orderBy: { createdAt: 'asc' },
+      orderBy: { createdAt: 'desc' },
       take: 100,
     });
-    res.json({ messages });
+    res.json({ messages: latest.reverse() });
   }),
 );
 

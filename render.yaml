@@ -1,0 +1,34 @@
+# Render Blueprint — deploy backend "พี่เงิน" (เสิร์ฟทั้ง API + web PWA ที่ origin เดียว)
+# ใช้: Render → New → Blueprint → เลือก repo นี้ → Apply → แล้วตั้งค่า secret (sync:false) ใน dashboard
+services:
+  - type: web
+    name: phee-ngern
+    runtime: node
+    rootDir: backend
+    plan: free
+    region: singapore
+    buildCommand: npm install && npm run render-build
+    startCommand: npm start
+    healthCheckPath: /health
+    envVars:
+      - key: NODE_ENV
+        value: production
+      - key: CORS_ORIGIN
+        value: "*"
+      - key: NOTIF_CRON
+        value: "off"
+      # ── secret: ตั้งค่าใน Render dashboard (ไม่เก็บใน repo) ──
+      - key: DATABASE_URL          # จาก Neon Postgres (connection string)
+        sync: false
+      - key: JWT_SECRET            # Render สุ่มให้อัตโนมัติ
+        generateValue: true
+      - key: GROQ_API_KEY
+        sync: false
+      - key: GOOGLE_CLIENT_ID      # web client id ของ phee-ngern (+ Gmail client คั่น ,)
+        sync: false
+      - key: GOOGLE_CLIENT_SECRET
+        sync: false
+      - key: TYPHOON_API_KEY
+        sync: false
+      - key: FIREBASE_SERVICE_ACCOUNT   # วาง JSON ของ service account ทั้งก้อน
+        sync: false

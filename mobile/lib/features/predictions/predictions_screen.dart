@@ -247,8 +247,8 @@ class _PredictionsContent extends StatelessWidget {
     double minY = spots.map((s) => s.y).reduce((a, b) => a < b ? a : b);
     double maxY = spots.map((s) => s.y).reduce((a, b) => a > b ? a : b);
 
-    // Add margins to Y axis scale
-    minY = (minY - 500).clamp(0.0, double.infinity);
+    // เพิ่ม margin แกน Y — ให้ติดลบได้ถ้ายอดคาดการณ์ต่ำกว่า 0 (เคส "เงินจะหมด" ต้องเห็น ไม่ตัดทิ้ง)
+    minY = minY - 500;
     maxY = maxY + 1000;
 
     return Container(

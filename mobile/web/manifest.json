@@ -1,11 +1,11 @@
 {
-    "name": "ai_finance_coach",
-    "short_name": "ai_finance_coach",
+    "name": "พี่เงิน - AI Finance Coach",
+    "short_name": "พี่เงิน",
     "start_url": ".",
     "display": "standalone",
-    "background_color": "#0175C2",
-    "theme_color": "#0175C2",
-    "description": "A new Flutter project.",
+    "background_color": "#0D0F0E",
+    "theme_color": "#3CAE63",
+    "description": "พี่เงิน — ผู้ช่วยวางแผนการเงินส่วนตัวด้วย AI",
     "orientation": "portrait-primary",
     "prefer_related_applications": false,
     "icons": [

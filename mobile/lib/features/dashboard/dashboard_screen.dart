@@ -34,7 +34,7 @@ class DashboardScreen extends ConsumerWidget {
         children: [
           // ── Header (Gradient Top Bar จากภาพ Home.png) ─────────────────────
           _GreenHeader(
-            name: user?.displayName ?? 'Fanta Inazuma',
+            name: user?.displayName ?? '',
             level: user?.level ?? 1,
             avatarUrl: user?.avatarUrl,
           ),

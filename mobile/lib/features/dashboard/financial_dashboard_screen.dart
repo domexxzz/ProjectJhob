@@ -44,7 +44,7 @@ class _FinancialDashboardScreenState
       body: Column(
         children: [
           _GreenHeader(
-            name: user?.displayName ?? 'Fanta Inazuma',
+            name: user?.displayName ?? '',
             level: user?.level ?? 1,
             avatarUrl: user?.avatarUrl,
           ),
