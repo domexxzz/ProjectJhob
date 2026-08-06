@@ -53,7 +53,8 @@ final dioProvider = Provider<Dio>((ref) {
   final dio = Dio(BaseOptions(
     baseUrl: '$kApiBaseUrl/api/v1',
     connectTimeout: const Duration(seconds: 10),
-    receiveTimeout: const Duration(seconds: 10),
+    // LLM แชท/วิเคราะห์/OCR ใช้เวลานาน (function calling หลายสเต็ป) — 10s สั้นไปทำให้ล้มบ่อย
+    receiveTimeout: const Duration(seconds: 60),
     headers: {
       'Cache-Control': 'no-cache, no-store, must-revalidate',
       'Pragma': 'no-cache',

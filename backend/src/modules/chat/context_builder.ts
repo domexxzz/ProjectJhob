@@ -47,7 +47,8 @@ export async function buildContext(userId: string): Promise<CoachContext> {
 
   const budgetRemaining = budgets.map((b) => {
     const name = b.category?.nameTh ?? 'รวม';
-    const spent = catSpend.get(name) ?? 0;
+    // งบรวม (ไม่มี categoryId) นับรายจ่ายทุกหมวด = thisMonthSpent ไม่ใช่ lookup ชื่อ 'รวม' ที่ไม่มีจริง
+    const spent = b.categoryId ? (catSpend.get(name) ?? 0) : thisMonthSpent;
     return { category: name, remaining: b.amount - spent };
   });
 

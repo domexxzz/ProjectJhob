@@ -105,7 +105,8 @@ async function buildRows(userId: string, kind: ExportKind): Promise<{ sheet: str
     for (const budget of budgets) {
       const agg = await prisma.transaction.aggregate({
         _sum: { amount: true },
-        where: { userId, type: 'expense', categoryId: budget.categoryId ?? null, occurredAt: { gte: start, lt: end } },
+        // งบรวม (categoryId=null) นับรายจ่ายทุกหมวด ไม่ใช่เฉพาะรายการไม่มีหมวด
+        where: { userId, type: 'expense', ...(budget.categoryId ? { categoryId: budget.categoryId } : {}), occurredAt: { gte: start, lt: end } },
       });
       const spent = agg._sum.amount ?? 0;
       limit += budget.amount;

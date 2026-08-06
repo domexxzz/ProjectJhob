@@ -17,7 +17,8 @@ export async function runBudgetTriggers(userId: string) {
     if (b.amount <= 0) continue;
     const agg = await prisma.transaction.aggregate({
       _sum: { amount: true },
-      where: { userId, type: 'expense', categoryId: b.categoryId ?? null, occurredAt: { gte: start, lt: end } },
+      // งบรวม (categoryId=null) ต้องนับรายจ่าย "ทุกหมวด" ไม่ใช่เฉพาะรายการที่ไม่มีหมวด
+      where: { userId, type: 'expense', ...(b.categoryId ? { categoryId: b.categoryId } : {}), occurredAt: { gte: start, lt: end } },
     });
     const spent = agg._sum.amount ?? 0;
     const ratio = spent / b.amount;

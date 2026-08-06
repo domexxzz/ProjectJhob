@@ -64,18 +64,29 @@ class PredictionResponse(BaseModel):
 
 
 def run_fallback_forecast(
-    df_exp: pd.DataFrame, 
-    df_inc: pd.DataFrame, 
-    current_balance: float, 
-    forecast_days: int
+    df_exp: pd.DataFrame,
+    df_inc: pd.DataFrame,
+    current_balance: float,
+    forecast_days: int,
+    monthly_income: float = 0.0
 ) -> tuple:
     """Fallback forecasting method using simple linear averages if data is insufficient for Prophet."""
     logger.info("Running simple fallback linear forecasting...")
-    
-    # Calculate daily averages
-    avg_daily_expense = df_exp['amount'].mean() if not df_exp.empty else 0.0
-    avg_daily_income = df_inc['amount'].mean() if not df_inc.empty else 0.0
-    
+
+    def daily_average(df: pd.DataFrame) -> float:
+        """ค่าเฉลี่ยต่อ 'วัน' = ยอดรวม ÷ จำนวนวันที่มีข้อมูล (ไม่ใช่ mean ต่อ 'รายการ')."""
+        if df.empty:
+            return 0.0
+        total = df['amount'].sum()
+        span_days = (pd.to_datetime(df['date'].max()) - pd.to_datetime(df['date'].min())).days + 1
+        return total / max(span_days, 1)
+
+    # รายจ่าย: เฉลี่ยต่อวันจากประวัติจริง (ยอดรวม ÷ จำนวนวัน)
+    avg_daily_expense = daily_average(df_exp)
+    # รายรับ (เงินเดือน) มักเข้าก้อนเดียวต่อเดือน → เฉลี่ยรายวันจากธุรกรรมจะเพี้ยนหนัก
+    # ใช้ monthly_income ที่ผู้ใช้ตั้งไว้เป็นหลัก (÷30) ถ้าไม่มีค่อย fallback เป็นเฉลี่ยรายวัน
+    avg_daily_income = (monthly_income / 30.0) if monthly_income > 0 else daily_average(df_inc)
+
     # If no history exists, use heuristic values
     if avg_daily_expense == 0:
         avg_daily_expense = 300.0  # Assumed default daily spending
@@ -98,8 +109,8 @@ def run_fallback_forecast(
         
         forecast_list.append(ForecastDay(
             date=date_str,
-            balance=max(0.0, float(round(running_balance, 2))),
-            lower=max(0.0, float(round(running_balance - uncertainty, 2))),
+            balance=float(round(running_balance, 2)),
+            lower=float(round(running_balance - uncertainty, 2)),
             upper=float(round(running_balance + uncertainty, 2))
         ))
         
@@ -110,10 +121,11 @@ def run_fallback_forecast(
 
 
 def run_prophet_forecast(
-    df_exp: pd.DataFrame, 
-    df_inc: pd.DataFrame, 
-    current_balance: float, 
-    forecast_days: int
+    df_exp: pd.DataFrame,
+    df_inc: pd.DataFrame,
+    current_balance: float,
+    forecast_days: int,
+    monthly_income: float = 0.0
 ) -> tuple:
     """Run Facebook Prophet model on daily expense and income transactions."""
     logger.info("Fitting and predicting with Prophet model...")
@@ -146,7 +158,7 @@ def run_prophet_forecast(
         forecast_exp['yhat_lower'] = forecast_exp['yhat_lower'].clip(lower=0.0)
     except Exception as e:
         logger.error(f"Error fitting Prophet model for expenses: {e}. Falling back...")
-        return run_fallback_forecast(df_exp, df_inc, current_balance, forecast_days)
+        return run_fallback_forecast(df_exp, df_inc, current_balance, forecast_days, monthly_income)
 
     # Model incomes
     predicted_incomes = pd.DataFrame({'ds': forecast_exp['ds'], 'yhat': 0.0, 'yhat_lower': 0.0, 'yhat_upper': 0.0})
@@ -190,8 +202,8 @@ def run_prophet_forecast(
         
         forecast_list.append(ForecastDay(
             date=row_exp['ds'].strftime('%Y-%m-%d'),
-            balance=max(0.0, float(round(running_balance, 2))),
-            lower=max(0.0, float(round(running_balance - uncertainty, 2))),
+            balance=float(round(running_balance, 2)),
+            lower=float(round(running_balance - uncertainty, 2)),
             upper=float(round(running_balance + uncertainty, 2))
         ))
         
@@ -206,7 +218,8 @@ def predict_transactions(request: PredictionRequest):
     if not request.transactions:
         # Generate default empty prediction responses
         fallback_forecast, pred_exp, pred_inc = run_fallback_forecast(
-            pd.DataFrame(), pd.DataFrame(), request.current_balance, request.forecast_days
+            pd.DataFrame(), pd.DataFrame(), request.current_balance, request.forecast_days,
+            request.monthly_income
         )
         return PredictionResponse(
             forecast=fallback_forecast,
@@ -237,11 +250,11 @@ def predict_transactions(request: PredictionRequest):
     # Run appropriate model
     if unique_exp_days < 5:
         forecast_list, predicted_total_expense, predicted_total_income = run_fallback_forecast(
-            df_exp, df_inc, request.current_balance, request.forecast_days
+            df_exp, df_inc, request.current_balance, request.forecast_days, request.monthly_income
         )
     else:
         forecast_list, predicted_total_expense, predicted_total_income = run_prophet_forecast(
-            df_exp, df_inc, request.current_balance, request.forecast_days
+            df_exp, df_inc, request.current_balance, request.forecast_days, request.monthly_income
         )
         
     projected_ending_balance = forecast_list[-1].balance if forecast_list else request.current_balance
