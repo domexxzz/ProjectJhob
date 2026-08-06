@@ -116,13 +116,15 @@ export async function logTransferSlip(
   userId: string,
   ocrText: string,
   userMessage = '',
+  explicitType?: 'income' | 'expense',
 ): Promise<TxnCard | null> {
   const amountSatang = parseAmount(ocrText);
   if (!amountSatang || amountSatang <= 0) return null;
-  // เดา รายรับ/รายจ่าย จาก (ก) คำในสลิป OCR หรือ (ข) ข้อความที่ผู้ใช้พิมพ์คู่กับสลิป
-  // เช่น ส่งสลิป + พิมพ์ "เงินเดือนเข้าแล้ว" / "รับเงินค่าขายของ" → รายรับ · ไม่งั้น default = รายจ่าย
+  // รายรับ/รายจ่าย: (1) ใช้ที่ผู้ใช้เลือกตอนแนบสลิปก่อน → (2) เดาจากข้อความที่พิมพ์
+  // เช่น "เงินเดือนเข้าแล้ว" → (3) เดาจากคำในสลิป OCR → ไม่งั้น default = รายจ่าย
   const type: 'income' | 'expense' =
-    INCOME_HINT.test(userMessage) || INCOME_HINT.test(ocrText) ? 'income' : 'expense';
+    explicitType ??
+    (INCOME_HINT.test(userMessage) || INCOME_HINT.test(ocrText) ? 'income' : 'expense');
   const merchant = parseMerchant(ocrText);
   const note = merchant || (type === 'income' ? 'เงินเข้า (สลิป)' : 'โอนเงิน (สลิป)');
   return quickCreate(userId, { type, amountBaht: amountSatang / 100, note });

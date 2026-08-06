@@ -23,6 +23,7 @@ chatRouter.use(requireAuth);
 const sendSchema = z.object({
   message: z.string().min(1).max(8000),
   imageBase64: z.string().optional(), // ➕ รองรับการส่งรูปแบบ Base64
+  slipType: z.enum(['income', 'expense']).optional(), // ผู้ใช้เลือกตอนแนบสลิป: รายรับ/รายจ่าย
   includeFinancialContext: z.boolean().default(true),
   personalizedRecommendations: z.boolean().default(true),
   storeConversationHistory: z.boolean().default(true),
@@ -50,6 +51,7 @@ chatRouter.post(
     const {
       message,
       imageBase64,
+      slipType,
       includeFinancialContext,
       personalizedRecommendations,
       storeConversationHistory,
@@ -178,7 +180,7 @@ chatRouter.post(
     // ── สลิปโอนเงิน/จ่ายบิล "ยอดเดียว" (ไม่ใช่ใบเสร็จหลายรายการ) → จด 1 รายการจากยอดในสลิป ──
     // ใช้ parser เดียวกับ /parse-slip (deterministic) การ์ดขึ้นชัวร์ ไม่พึ่ง LLM เรียก tool
     if (includeFinancialContext && ocrText) {
-      const card = await logTransferSlip(userId, ocrText, message);
+      const card = await logTransferSlip(userId, ocrText, message, slipType);
       if (card) {
         const kind = card.type === 'income' ? 'รายรับ' : 'รายจ่าย';
         const reply =
