@@ -66,6 +66,7 @@ class ChatMessage {
     required this.createdAt,
     this.attachment,
     this.hasImage = false,
+    this.imageDataUrl,
     this.cards = const [],
   });
 
@@ -75,6 +76,7 @@ class ChatMessage {
   final DateTime createdAt;
   final ChatAttachment? attachment;
   final bool hasImage;
+  final String? imageDataUrl; // dataUrl รูปที่ผู้ใช้ส่ง (เฉพาะข้อความในเซสชันนี้ — ประวัติจาก backend ไม่เก็บรูป)
   final List<TxnCard> cards; // การ์ดรายการที่พี่เงินบันทึกให้ในข้อความนี้
 
   bool get isUser => role == 'user';

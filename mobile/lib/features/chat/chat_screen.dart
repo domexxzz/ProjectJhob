@@ -117,6 +117,7 @@ class _ChatScreenState extends ConsumerState<ChatScreen> {
         content: msg,
         createdAt: DateTime.now(),
         hasImage: img != null,
+        imageDataUrl: img, // เก็บรูปไว้โชว์ในฟองแชท (ไม่ใช่แค่ไอคอน)
       ));
       _sending = true;
       _menuExpanded = false;
@@ -938,7 +939,24 @@ class _Bubble extends StatelessWidget {
               ),
               const SizedBox(height: 5),
             ],
-            if (isUser && message.hasImage) ...[
+            if (isUser && message.imageDataUrl != null) ...[
+              // โชว์รูปที่ผู้ใช้ส่งจริง (สลิป/ใบเสร็จ) ในฟองแชท
+              ClipRRect(
+                borderRadius: BorderRadius.circular(12),
+                child: ConstrainedBox(
+                  constraints: const BoxConstraints(maxHeight: 240, maxWidth: 220),
+                  child: Image.memory(
+                    base64Decode(message.imageDataUrl!.split(',').last),
+                    fit: BoxFit.cover,
+                    gaplessPlayback: true,
+                    errorBuilder: (_, __, ___) => const Icon(Icons.broken_image_outlined,
+                        color: Colors.white70, size: 32),
+                  ),
+                ),
+              ),
+              const SizedBox(height: 8),
+            ] else if (isUser && message.hasImage) ...[
+              // ประวัติเก่า (backend ไม่เก็บรูป) → ป้ายบอกว่าเคยส่งรูป
               const Row(
                 mainAxisSize: MainAxisSize.min,
                 children: [
