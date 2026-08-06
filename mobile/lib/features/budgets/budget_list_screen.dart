@@ -41,8 +41,8 @@ class BudgetListScreen extends ConsumerWidget {
         children: [
           // 1. Top Green Gradient Header Bar (ถอดดีไซน์ไล่ระดับสีแบบเดียวกับ Goals Screen เป๊ะๆ)
           _GreenHeader(
-            name: user?.displayName ?? 'Fanta Inazuma',
-            streak: user?.streak ?? 20,
+            name: user?.displayName ?? '',
+            streak: user?.streak ?? 0,
             avatarUrl: user?.avatarUrl,
             level: user?.level ?? 1,
           ),

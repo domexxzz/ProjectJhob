@@ -677,7 +677,8 @@ class _EditGoalScreenState extends ConsumerState<EditGoalScreen> {
                         const Icon(Icons.arrow_forward_ios_rounded, color: Colors.white30, size: 14),
                       ],
                     ),
-                  SizedBox(height: personalized ? 48 : 24),
+                  ),
+                  const SizedBox(height: 24),
 
                   // ปุ่มลบ และ ยืนยันการแก้ไข / สร้างเป้าหมาย
                   widget.goalId != null

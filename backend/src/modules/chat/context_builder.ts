@@ -23,7 +23,7 @@ export async function buildContext(userId: string): Promise<CoachContext> {
       where: { userId, occurredAt: { gte: start, lt: end } },
       include: { category: true },
     }),
-    prisma.budget.findMany({ where: { userId, period: 'monthly' }, include: { category: true } }),
+    prisma.budget.findMany({ where: { userId }, include: { category: true } }),
     prisma.goal.findMany({ where: { userId } }),
   ]);
 

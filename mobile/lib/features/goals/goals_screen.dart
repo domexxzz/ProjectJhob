@@ -26,8 +26,8 @@ class GoalsScreen extends ConsumerWidget {
           // 1. Top Green Gradient Header Bar (ถอดจากภาพ goal.png และ dashboard)
           // 1. Top Green Gradient Header Bar (ดึงชื่อและ streak จากระบบ login จริง)[cite: 20]
           _GreenHeader(
-            name: user?.displayName ?? 'Fanta Inazuma',
-            streak: user?.streak ?? 20,
+            name: user?.displayName ?? '',
+            streak: user?.streak ?? 0,
             avatarUrl: user?.avatarUrl,
             level: user?.level ?? 1,
           ),
