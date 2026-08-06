@@ -2,8 +2,11 @@
 title App (Real Phone) - AI Finance Coach
 cd /d "%~dp0mobile"
 
-set "FLUTTER=C:\flutter\bin\flutter.bat"
-if not exist "%FLUTTER%" set "FLUTTER=C:\src\flutter\bin\flutter.bat"
+set "FLUTTER="
+for /f "delims=" %%i in ('where flutter 2^>nul') do set "FLUTTER=%%i"
+if not exist "%FLUTTER%" if exist "C:\Users\ta100\Downloads\flutter\bin\flutter.bat" set "FLUTTER=C:\Users\ta100\Downloads\flutter\bin\flutter.bat"
+if not exist "%FLUTTER%" if exist "C:\flutter\bin\flutter.bat" set "FLUTTER=C:\flutter\bin\flutter.bat"
+if not exist "%FLUTTER%" if exist "C:\src\flutter\bin\flutter.bat" set "FLUTTER=C:\src\flutter\bin\flutter.bat"
 if not exist "%FLUTTER%" set "FLUTTER=flutter"
 
 REM Verify Flutter is available
