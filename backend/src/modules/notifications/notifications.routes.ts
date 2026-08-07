@@ -4,6 +4,7 @@ import { asyncHandler, HttpError } from '../../lib/http';
 import { requireAuth } from '../../lib/auth';
 import { z } from 'zod';
 import { runBudgetTriggers } from './triggers';
+import { createNotification } from './create';
 import { runPredictionTriggers } from '../predictions/prediction_triggers';
 
 export const notificationsRouter = Router();
@@ -82,6 +83,30 @@ notificationsRouter.post(
   asyncHandler(async (req, res) => {
     const { token } = tokenSchema.parse(req.body);
     await prisma.user.update({ where: { id: req.userId! }, data: { deviceToken: token } });
+    res.json({ ok: true });
+  }),
+);
+
+// POST /api/v1/notifications/test — ยิงแจ้งเตือนทดสอบเข้าเครื่องตัวเอง (ใช้เช็กว่าตั้งค่าสำเร็จ)
+notificationsRouter.post(
+  '/test',
+  asyncHandler(async (req, res) => {
+    const user = await prisma.user.findUnique({
+      where: { id: req.userId! },
+      select: { deviceToken: true },
+    });
+    if (!user?.deviceToken) {
+      throw new HttpError(
+        400,
+        'เครื่องนี้ยังไม่ได้เปิดการแจ้งเตือน — กด "เปิดแจ้งเตือนบนเครื่องนี้" ก่อนครับ',
+      );
+    }
+    await createNotification(
+      req.userId!,
+      'system',
+      '🔔 ทดสอบแจ้งเตือน',
+      'ถ้าเห็นข้อความนี้ แปลว่าการแจ้งเตือนใช้งานได้แล้ว 🎉',
+    );
     res.json({ ok: true });
   }),
 );

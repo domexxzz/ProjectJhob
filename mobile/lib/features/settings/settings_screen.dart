@@ -1,3 +1,4 @@
+import 'package:dio/dio.dart' show DioException;
 import 'package:flutter/foundation.dart' show kIsWeb;
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
@@ -254,6 +255,33 @@ class SettingsScreen extends ConsumerWidget {
                           ));
                         },
                       ),
+                    _SettingsActionTile(
+                      icon: Icons.send_rounded,
+                      title: 'ทดสอบแจ้งเตือน',
+                      value: 'ส่งหาเครื่องนี้',
+                      onTap: () async {
+                        final messenger = ScaffoldMessenger.of(context);
+                        try {
+                          await ref
+                              .read(dioProvider)
+                              .post('/notifications/test');
+                          messenger.showSnackBar(const SnackBar(
+                            content: Text('ส่งแล้ว! รอสักครู่ดูที่แถบแจ้งเตือน 🔔'),
+                            backgroundColor: AppColors.primary,
+                          ));
+                        } catch (e) {
+                          final msg = e is DioException
+                              ? (e.response?.data is Map
+                                  ? '${(e.response!.data as Map)['error']}'
+                                  : 'ส่งไม่สำเร็จ ลองใหม่อีกครั้ง')
+                              : 'ส่งไม่สำเร็จ ลองใหม่อีกครั้ง';
+                          messenger.showSnackBar(SnackBar(
+                            content: Text(msg),
+                            backgroundColor: AppColors.expense,
+                          ));
+                        }
+                      },
+                    ),
                     _SettingsSwitchTile(
                       icon: Icons.notifications_active_outlined,
                       title: 'เปิดการแจ้งเตือน',
