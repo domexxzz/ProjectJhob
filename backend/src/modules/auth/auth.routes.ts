@@ -7,6 +7,7 @@ import { registerSchema, loginSchema } from '../../lib/validate';
 import { registerUser, loginUser } from './auth.service';
 import { verifyGoogleIdToken, verifyGoogleAccessToken, verifyFacebookToken, oauthLogin } from './oauth.service';
 import { prisma } from '../../lib/prisma';
+import { env } from '../../config/env';
 
 export const authRouter = Router();
 
@@ -74,6 +75,67 @@ authRouter.post(
     const { accessToken } = facebookSchema.parse(req.body);
     const profile = await verifyFacebookToken(accessToken);
     res.json(await oauthLogin(profile));
+  }),
+);
+
+// ── Facebook server-side OAuth (สำหรับเว็บ/PWA) ──────────────────────────────
+// iOS Safari (ITP) บล็อก connect.facebook.net → FB JS SDK โหลดไม่ได้ ("window.FB is undefined")
+// จึงต้อง redirect ไป facebook.com ตรง ๆ แทนการใช้ SDK ฝั่ง client
+const fbRedirectUri = () =>
+  process.env.FACEBOOK_REDIRECT_URI ??
+  `${(env.webAppUrl || '').replace(/\/$/, '')}/api/v1/auth/facebook/callback`;
+
+// GET /api/v1/auth/facebook/start — พาไปหน้า login ของ Facebook
+authRouter.get(
+  '/facebook/start',
+  asyncHandler(async (req, res) => {
+    if (!env.facebookAppId) throw new HttpError(503, 'backend ยังไม่ได้ตั้ง FACEBOOK_APP_ID');
+    // state: กัน CSRF + จำหน้าที่ผู้ใช้จะกลับไป (ส่งกลับมาใน callback)
+    const state = Buffer.from(
+      JSON.stringify({ n: Math.random().toString(36).slice(2), t: Date.now() }),
+    ).toString('base64url');
+    const url =
+      'https://www.facebook.com/v21.0/dialog/oauth' +
+      `?client_id=${encodeURIComponent(env.facebookAppId)}` +
+      `&redirect_uri=${encodeURIComponent(fbRedirectUri())}` +
+      `&state=${state}` +
+      '&scope=email,public_profile';
+    res.redirect(url);
+  }),
+);
+
+// GET /api/v1/auth/facebook/callback — Facebook ส่ง code กลับมา → แลก token → JWT → กลับเว็บ
+authRouter.get(
+  '/facebook/callback',
+  asyncHandler(async (req, res) => {
+    const web = (env.webAppUrl || '').replace(/\/$/, '');
+    const fail = (msg: string) =>
+      res.redirect(`${web}/#/login?fb_error=${encodeURIComponent(msg)}`);
+
+    const code = typeof req.query.code === 'string' ? req.query.code : '';
+    if (!code) return fail(typeof req.query.error_description === 'string' ? req.query.error_description : 'ยกเลิกการล็อกอิน Facebook');
+    if (!env.facebookAppId || !env.facebookAppSecret) return fail('backend ยังไม่ได้ตั้ง FACEBOOK_APP_ID/SECRET');
+
+    // แลก code → access token (ต้องใช้ app secret ฝั่ง server เท่านั้น)
+    const tokenUrl =
+      'https://graph.facebook.com/v21.0/oauth/access_token' +
+      `?client_id=${encodeURIComponent(env.facebookAppId)}` +
+      `&client_secret=${encodeURIComponent(env.facebookAppSecret)}` +
+      `&redirect_uri=${encodeURIComponent(fbRedirectUri())}` +
+      `&code=${encodeURIComponent(code)}`;
+    const tokenRes = await fetch(tokenUrl);
+    if (!tokenRes.ok) return fail('แลก token กับ Facebook ไม่สำเร็จ');
+    const tokenJson = (await tokenRes.json()) as { access_token?: string };
+    if (!tokenJson.access_token) return fail('Facebook ไม่ได้ส่ง access token กลับมา');
+
+    try {
+      const profile = await verifyFacebookToken(tokenJson.access_token);
+      const { token } = await oauthLogin(profile);
+      // ส่ง JWT กลับหน้าเว็บผ่าน hash fragment (ไม่ติด log ของ server/proxy)
+      res.redirect(`${web}/#/oauth?token=${encodeURIComponent(token)}`);
+    } catch (e) {
+      return fail(e instanceof HttpError ? e.message : 'ล็อกอิน Facebook ไม่สำเร็จ');
+    }
   }),
 );
 

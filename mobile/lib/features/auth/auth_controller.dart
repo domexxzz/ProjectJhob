@@ -1,7 +1,9 @@
 import 'package:dio/dio.dart';
+import 'package:flutter/foundation.dart' show kIsWeb;
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:google_sign_in/google_sign_in.dart';
 import 'package:flutter_facebook_auth/flutter_facebook_auth.dart';
+import 'package:url_launcher/url_launcher.dart';
 
 import '../../core/api/api_client.dart';
 import '../settings/settings_screen.dart';
@@ -77,6 +79,7 @@ class AuthController extends StateNotifier<AuthState> {
   TokenStore get _tokens => _ref.read(tokenStoreProvider);
 
   Future<void> _bootstrap() async {
+    await _consumeOAuthRedirect();
     final token = await _tokens.read();
     if (token == null) return;
     try {
@@ -89,6 +92,26 @@ class AuthController extends StateNotifier<AuthState> {
     } catch (_) {
       await _tokens.clear();
     }
+  }
+
+  /// เว็บ: รับ JWT ที่ backend ส่งกลับหลัง server-side OAuth (#/oauth?token=... )
+  /// หรือแสดง error ที่ส่งกลับมา (#/login?fb_error=...) แล้วล้าง URL ให้สะอาด
+  Future<void> _consumeOAuthRedirect() async {
+    if (!kIsWeb) return;
+    final frag = Uri.base.fragment; // เช่น "/oauth?token=xxx"
+    if (frag.isEmpty) return;
+    final qIndex = frag.indexOf('?');
+    if (qIndex < 0) return;
+    final params = Uri.splitQueryString(frag.substring(qIndex + 1));
+
+    final err = params['fb_error'];
+    if (err != null && err.isNotEmpty) {
+      state = state.copyWith(loading: false, error: err);
+      return;
+    }
+    final token = params['token'];
+    if (token == null || token.isEmpty) return;
+    await _tokens.write(token);
   }
 
   Future<bool> login(String email, String password) =>
@@ -181,7 +204,21 @@ class AuthController extends StateNotifier<AuthState> {
   }
 
   /// ล็อกอินด้วย Facebook → ส่ง accessToken ให้ backend verify
+  ///
+  /// เว็บ/PWA: ไม่ใช้ FB JS SDK เพราะ iOS Safari (ITP) บล็อก connect.facebook.net
+  /// ("window.FB is undefined") → เด้งไป server-side OAuth (/auth/facebook/start)
+  /// ซึ่งจะ redirect กลับมาที่ #/oauth?token=... แล้ว consumeOAuthToken() รับต่อ
   Future<bool> loginWithFacebook() async {
+    if (kIsWeb) {
+      state = state.copyWith(loading: true, clearError: true);
+      // kApiBaseUrl บนเว็บเป็น '' (same-origin) → ใช้ origin ปัจจุบัน
+      final origin = kApiBaseUrl.isNotEmpty ? kApiBaseUrl : Uri.base.origin;
+      await launchUrl(
+        Uri.parse('$origin/api/v1/auth/facebook/start'),
+        webOnlyWindowName: '_self', // เด้งทั้งแท็บ (ไม่โดน popup blocker บน iOS)
+      );
+      return false; // ออกจากหน้าไปแล้ว — จะกลับมาที่ #/oauth?token=...
+    }
     state = state.copyWith(loading: true, clearError: true);
     try {
       final result = await FacebookAuth.instance

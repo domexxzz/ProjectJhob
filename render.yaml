@@ -21,6 +21,14 @@ services:
       # ชี้ไป Python Prophet service (service phee-ngern-ai ด้านล่าง) — ถ้าชื่อ host ต่างให้แก้ใน dashboard
       - key: PREDICTION_API_URL
         value: https://phee-ngern-ai.onrender.com/predict
+      # โดเมนเว็บ/PWA (backend เสิร์ฟ same-origin) — ใช้ทำ redirect กลับหลัง OAuth
+      - key: WEB_APP_URL
+        value: https://phee-ngern.onrender.com
+      # Facebook server-side OAuth (iOS Safari บล็อก FB JS SDK จึงต้อง redirect flow)
+      - key: FACEBOOK_APP_ID
+        value: "1737272337424131"
+      - key: FACEBOOK_APP_SECRET   # ตั้งใน dashboard (ความลับ — ห้ามเก็บใน repo)
+        sync: false
       # ── secret: ตั้งค่าใน Render dashboard (ไม่เก็บใน repo) ──
       - key: DATABASE_URL          # จาก Neon Postgres (connection string)
         sync: false
