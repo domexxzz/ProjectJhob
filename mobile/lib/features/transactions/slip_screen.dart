@@ -709,17 +709,9 @@ class _SlipScreenState extends ConsumerState<SlipScreen> {
       backgroundColor: AppColors.bg,
       appBar: AppBar(
         centerTitle: true,
-        leading: Padding(
-          padding: const EdgeInsets.only(left: 12),
-          child: GestureDetector(
-            onTap: () => context.pop(),
-            child: Container(
-              decoration: const BoxDecoration(
-                  color: AppColors.primary, shape: BoxShape.circle),
-              child:
-                  const Icon(Icons.arrow_back, color: Colors.white, size: 20),
-            ),
-          ),
+        leading: IconButton(
+          icon: const Icon(Icons.arrow_back, color: Colors.white, size: 24),
+          onPressed: () => context.pop(),
         ),
         title: const Text('เลือกสลิป',
             style: TextStyle(fontWeight: FontWeight.bold, fontSize: 20)),

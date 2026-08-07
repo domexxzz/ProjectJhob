@@ -647,14 +647,16 @@ class _TypeSwitch extends StatelessWidget {
       child: Row(
         children: [
           _TypeOption(
-            label: 'รายจ่าย',
-            active: !showIncome,
-            onTap: () => onChanged(false),
-          ),
-          _TypeOption(
             label: 'รายรับ',
             active: showIncome,
+            activeColor: AppColors.income,
             onTap: () => onChanged(true),
+          ),
+          _TypeOption(
+            label: 'รายจ่าย',
+            active: !showIncome,
+            activeColor: AppColors.expense,
+            onTap: () => onChanged(false),
           ),
         ],
       ),
@@ -666,11 +668,13 @@ class _TypeOption extends StatelessWidget {
   const _TypeOption({
     required this.label,
     required this.active,
+    required this.activeColor,
     required this.onTap,
   });
 
   final String label;
   final bool active;
+  final Color activeColor;
   final VoidCallback onTap;
 
   @override
@@ -681,13 +685,13 @@ class _TypeOption extends StatelessWidget {
       child: Container(
         padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 6),
         decoration: BoxDecoration(
-          color: active ? AppColors.primary : Colors.transparent,
+          color: active ? activeColor : Colors.transparent,
           borderRadius: BorderRadius.circular(7),
         ),
         child: Text(
           label,
           style: TextStyle(
-            color: active ? Colors.black : Colors.white54,
+            color: active ? Colors.white : Colors.white54,
             fontSize: 10,
             fontWeight: FontWeight.w700,
           ),

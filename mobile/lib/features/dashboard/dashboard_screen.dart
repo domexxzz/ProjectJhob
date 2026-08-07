@@ -916,9 +916,9 @@ class _QuickActionsGrid extends StatelessWidget {
         onTap: () => context.push('/goals')
       ),
       (
-        icon: Icons.edit_note_rounded,
-        label: 'บันทึกสลิป',
-        onTap: () => context.push('/slip?mode=manual')
+        icon: Icons.card_membership_rounded,
+        label: 'ค่าสมาชิก',
+        onTap: () => context.push('/subscriptions')
       ),
     ];
 

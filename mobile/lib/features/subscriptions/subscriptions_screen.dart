@@ -40,7 +40,7 @@ class SubscriptionsScreen extends ConsumerWidget {
           },
         ),
         title:
-            const Text('Subscription', style: TextStyle(color: Colors.white)),
+            const Text('ค่าสมาชิก', style: TextStyle(color: Colors.white)),
         actions: [
           IconButton(
             tooltip: 'นำเข้าจาก Gmail',
