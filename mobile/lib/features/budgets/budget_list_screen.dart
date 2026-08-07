@@ -35,8 +35,7 @@ class BudgetListScreen extends ConsumerWidget {
     final user = ref.watch(authControllerProvider).user;
 
     return Scaffold(
-      backgroundColor: const Color(
-          0xFF121212), // ธีม Premium Dark UI แบบเดียวกับเป้าหมายและแดชบอร์ด
+      backgroundColor: const Color(0xFF0A0F0C),
       body: Column(
         children: [
           // 1. Top Green Gradient Header Bar (ถอดดีไซน์ไล่ระดับสีแบบเดียวกับ Goals Screen เป๊ะๆ)

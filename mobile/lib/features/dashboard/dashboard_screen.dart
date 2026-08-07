@@ -92,7 +92,7 @@ class _DashboardScreenState extends ConsumerState<DashboardScreen> {
     }
 
     return Scaffold(
-      backgroundColor: const Color(0xFF0D0F0E),
+      backgroundColor: const Color(0xFF0A0F0C),
       body: Column(
         children: [
           // ── Header (Gradient Top Bar จากภาพ Home.png) ─────────────────────
@@ -288,11 +288,7 @@ class _BalanceCard extends StatelessWidget {
     return Container(
       padding: const EdgeInsets.all(20),
       decoration: BoxDecoration(
-        gradient: const LinearGradient(
-          colors: [Color(0xFF071B13), Color(0xFF151817)],
-          begin: Alignment.topCenter,
-          end: Alignment.bottomCenter,
-        ),
+        color: const Color(0xFF10201A),
         borderRadius: BorderRadius.circular(20),
         border: Border.all(color: Colors.white.withValues(alpha: 0.06)),
       ),
@@ -301,7 +297,11 @@ class _BalanceCard extends StatelessWidget {
         children: [
           const Text(
             'ยอดคงเหลือ',
-            style: TextStyle(color: Colors.white60, fontSize: 13),
+            style: TextStyle(
+              color: Color(0xFF9CA3AF),
+              fontSize: 12,
+              fontWeight: FontWeight.w400,
+            ),
           ),
           const SizedBox(height: 8),
           Row(
@@ -316,7 +316,7 @@ class _BalanceCard extends StatelessWidget {
                     maxLines: 1,
                     style: const TextStyle(
                       color: Colors.white,
-                      fontSize: 30,
+                      fontSize: 38,
                       fontWeight: FontWeight.bold,
                     ),
                   ),
@@ -328,7 +328,7 @@ class _BalanceCard extends StatelessWidget {
                 children: [
                   _MiniStatRow(
                       label: 'รายรับ', value: income, color: AppColors.income),
-                  const SizedBox(height: 4),
+                  const SizedBox(height: 10),
                   _MiniStatRow(
                       label: 'รายจ่าย',
                       value: expense,
@@ -551,7 +551,7 @@ class _GoalsCardState extends ConsumerState<_GoalsCard> {
                                   fontSize: 13,
                                   fontWeight: FontWeight.w500),
                             ),
-                            const SizedBox(width: 8),
+                            const SizedBox(width: 12),
                             // Badge แสดงประเภทระยะเวลาเป้าหมาย (แก้ไขเรียกผ่านตัวระบุตำแหน่งดัชนี ดึงค่าถูกต้องแน่นอน)
                             Container(
                               padding: const EdgeInsets.symmetric(
@@ -613,11 +613,25 @@ class _GoalsCardState extends ConsumerState<_GoalsCard> {
                     const SizedBox(height: 10),
                     ClipRRect(
                       borderRadius: BorderRadius.circular(10),
-                      child: LinearProgressIndicator(
-                        value: g.progressPercentage,
-                        minHeight: 12,
-                        backgroundColor: Colors.white.withOpacity(0.18),
-                        valueColor: AlwaysStoppedAnimation<Color>(accentColor),
+                      child: Stack(
+                        alignment: Alignment.center,
+                        children: [
+                          LinearProgressIndicator(
+                            value: g.progressPercentage.clamp(0.0, 1.0),
+                            minHeight: 16,
+                            backgroundColor: Colors.white.withOpacity(0.18),
+                            valueColor:
+                                AlwaysStoppedAnimation<Color>(accentColor),
+                          ),
+                          Text(
+                            '${(g.progressPercentage * 100).round()}%',
+                            style: const TextStyle(
+                              color: Colors.white,
+                              fontSize: 10,
+                              fontWeight: FontWeight.bold,
+                            ),
+                          ),
+                        ],
                       ),
                     ),
                     const SizedBox(height: 8),
@@ -688,11 +702,7 @@ class _BudgetsCard extends ConsumerWidget {
         child: Container(
           padding: const EdgeInsets.all(18),
           decoration: BoxDecoration(
-            gradient: const LinearGradient(
-              colors: [Color(0xFF071B13), Color(0xFF151817)],
-              begin: Alignment.topCenter,
-              end: Alignment.bottomCenter,
-            ),
+            color: const Color(0xFF10201A),
             borderRadius: BorderRadius.circular(20),
             border: Border.all(color: Colors.white.withValues(alpha: 0.06)),
             boxShadow: [
@@ -722,7 +732,7 @@ class _BudgetsCard extends ConsumerWidget {
               const SizedBox(height: 16),
               budgetsAsync.when(
                 loading: () => const Center(
-                    child: CircularProgressIndicator(color: Color(0xFF3CAE63))),
+                    child: CircularProgressIndicator(color: Color(0xFF22C55E))),
                 error: (e, _) => Text('โหลดงบไม่ได้: $e',
                     style: const TextStyle(color: Colors.red)),
                 data: (budgets) {
@@ -732,14 +742,55 @@ class _BudgetsCard extends ConsumerWidget {
                       .toList();
                   
                   if (activeStatuses.isEmpty) {
-                    return const Padding(
-                      padding: EdgeInsets.symmetric(vertical: 12),
-                      child: Center(
-                        child: Text(
-                          'ไม่มีงบประมาณที่กำลังเปิดใช้งาน',
-                          style: TextStyle(
-                              color: AppColors.textMuted, fontSize: 13),
+                    return Container(
+                      width: double.infinity,
+                      margin: const EdgeInsets.symmetric(vertical: 4),
+                      padding: const EdgeInsets.all(20),
+                      decoration: BoxDecoration(
+                        color: const Color(0xFF10201A),
+                        borderRadius: BorderRadius.circular(16),
+                        border: Border.all(
+                          color: const Color(0xFF9CA3AF).withOpacity(0.3),
+                          width: 1.5,
                         ),
+                      ),
+                      child: Column(
+                        children: [
+                          Icon(
+                            Icons.account_balance_wallet_outlined,
+                            color: const Color(0xFF9CA3AF).withOpacity(0.6),
+                            size: 36,
+                          ),
+                          const SizedBox(height: 8),
+                          const Text(
+                            'ไม่มีงบประมาณที่กำลังเปิดใช้งาน',
+                            style: TextStyle(
+                              color: Color(0xFF9CA3AF),
+                              fontSize: 13,
+                              fontWeight: FontWeight.w500,
+                            ),
+                          ),
+                          const SizedBox(height: 12),
+                          ElevatedButton.icon(
+                            onPressed: () => context.push('/budgets'),
+                            style: ElevatedButton.styleFrom(
+                              backgroundColor: const Color(0xFF22C55E),
+                              foregroundColor: Colors.white,
+                              shape: RoundedRectangleBorder(
+                                borderRadius: BorderRadius.circular(12),
+                              ),
+                              padding: const EdgeInsets.symmetric(
+                                  horizontal: 16, vertical: 8),
+                              minimumSize: Size.zero,
+                            ),
+                            icon: const Icon(Icons.add, size: 18),
+                            label: const Text(
+                              '+ ตั้งงบประมาณ',
+                              style: TextStyle(
+                                  fontSize: 13, fontWeight: FontWeight.bold),
+                            ),
+                          ),
+                        ],
                       ),
                     );
                   }
@@ -861,14 +912,10 @@ class _RecentTxnCards extends StatelessWidget {
             width: 135,
             padding: const EdgeInsets.all(14),
             decoration: BoxDecoration(
-              gradient: const LinearGradient(
-                colors: [Color(0xFF041E14), Color(0xFF0A2B1D)],
-                begin: Alignment.topLeft,
-                end: Alignment.bottomRight,
-              ),
+              color: const Color(0xFF10201A),
               borderRadius: BorderRadius.circular(20),
               border:
-                  Border.all(color: const Color(0xFF3CAE63).withOpacity(0.3)),
+                  Border.all(color: const Color(0xFF22C55E).withOpacity(0.2)),
             ),
             child: Column(
               crossAxisAlignment: CrossAxisAlignment.start,
@@ -947,37 +994,51 @@ class _QuickActionsGrid extends StatelessWidget {
     ];
 
     return Container(
-      padding: const EdgeInsets.all(18),
+      padding: const EdgeInsets.symmetric(vertical: 14, horizontal: 8),
       decoration: BoxDecoration(
-        color: const Color(0xFF151817),
+        color: const Color(0xFF10201A),
         borderRadius: BorderRadius.circular(20),
-        border: Border.all(color: Colors.white.withValues(alpha: 0.06)),
+        border: Border.all(color: Colors.white.withOpacity(0.06)),
       ),
       child: Row(
-        mainAxisAlignment: MainAxisAlignment.spaceAround,
-        children: items.map((it) {
-          return GestureDetector(
-            onTap: it.onTap,
-            child: Column(
+        children: items.asMap().entries.map((entry) {
+          final idx = entry.key;
+          final it = entry.value;
+          final isLast = idx == items.length - 1;
+          return Expanded(
+            child: Row(
               children: [
-                Container(
-                  width: 60,
-                  height: 60,
-                  decoration: BoxDecoration(
-                    color: const Color(0xFF1F2823),
-                    borderRadius: BorderRadius.circular(16),
+                Expanded(
+                  child: InkWell(
+                    onTap: it.onTap,
+                    borderRadius: BorderRadius.circular(14),
+                    child: Padding(
+                      padding: const EdgeInsets.symmetric(vertical: 4),
+                      child: Column(
+                        mainAxisSize: MainAxisSize.min,
+                        children: [
+                          Icon(it.icon, color: const Color(0xFF22C55E), size: 24),
+                          const SizedBox(height: 6),
+                          Text(
+                            it.label,
+                            style: const TextStyle(
+                              color: Colors.white,
+                              fontSize: 11,
+                              fontWeight: FontWeight.w500,
+                            ),
+                            textAlign: TextAlign.center,
+                          ),
+                        ],
+                      ),
+                    ),
                   ),
-                  child: Icon(it.icon, color: AppColors.primary, size: 28),
                 ),
-                const SizedBox(height: 8),
-                Text(
-                  it.label,
-                  style: const TextStyle(
-                      color: Colors.white,
-                      fontSize: 12,
-                      fontWeight: FontWeight.w500),
-                  textAlign: TextAlign.center,
-                ),
+                if (!isLast)
+                  Container(
+                    width: 1,
+                    height: 32,
+                    color: const Color(0xFF9CA3AF).withOpacity(0.15),
+                  ),
               ],
             ),
           );

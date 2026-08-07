@@ -40,7 +40,7 @@ class _FinancialDashboardScreenState
     final dashboard = ref.watch(dashboardProvider);
 
     return Scaffold(
-      backgroundColor: const Color(0xFF0D0F0E),
+      backgroundColor: const Color(0xFF0A0F0C),
       body: Column(
         children: [
           _GreenHeader(
@@ -232,7 +232,7 @@ class _RangeSelector extends StatelessWidget {
       height: 38,
       padding: const EdgeInsets.all(3),
       decoration: BoxDecoration(
-        color: const Color(0xFF242624),
+        color: const Color(0xFF10201A),
         borderRadius: BorderRadius.circular(10),
       ),
       child: Row(
@@ -281,7 +281,7 @@ class _TrendCard extends StatelessWidget {
     return Container(
       padding: const EdgeInsets.fromLTRB(14, 16, 14, 12),
       decoration: BoxDecoration(
-        color: const Color(0xFF151817),
+        color: const Color(0xFF10201A),
         borderRadius: BorderRadius.circular(18),
         border: Border.all(color: Colors.white.withValues(alpha: 0.06)),
       ),
@@ -396,7 +396,14 @@ class _TrendCard extends StatelessWidget {
       dotData: FlDotData(show: values.length <= 7),
       belowBarData: BarAreaData(
         show: true,
-        color: color.withValues(alpha: 0.08),
+        gradient: LinearGradient(
+          colors: [
+            color.withValues(alpha: 0.35),
+            color.withValues(alpha: 0.0),
+          ],
+          begin: Alignment.topCenter,
+          end: Alignment.bottomCenter,
+        ),
       ),
     );
   }
@@ -555,7 +562,7 @@ class _SummaryCard extends StatelessWidget {
     return Container(
       padding: const EdgeInsets.all(14),
       decoration: BoxDecoration(
-        color: const Color(0xFF202220),
+        color: const Color(0xFF10201A),
         borderRadius: BorderRadius.circular(18),
       ),
       child: Row(
@@ -634,7 +641,7 @@ class _TypeSwitch extends StatelessWidget {
     return Container(
       padding: const EdgeInsets.all(2),
       decoration: BoxDecoration(
-        color: const Color(0xFF242624),
+        color: const Color(0xFF10201A),
         borderRadius: BorderRadius.circular(9),
       ),
       child: Row(
@@ -725,7 +732,7 @@ class _CategoryBreakdown extends StatelessWidget {
         height: 126,
         alignment: Alignment.center,
         decoration: BoxDecoration(
-          color: const Color(0xFF151817),
+          color: const Color(0xFF10201A),
           borderRadius: BorderRadius.circular(18),
         ),
         child: Text(
@@ -735,12 +742,89 @@ class _CategoryBreakdown extends StatelessWidget {
       );
     }
 
+    if (totals.length == 1) {
+      final item = totals.first;
+      return Container(
+        padding: const EdgeInsets.all(18),
+        decoration: BoxDecoration(
+          color: const Color(0xFF10201A),
+          borderRadius: BorderRadius.circular(18),
+          border: Border.all(color: Colors.white.withValues(alpha: 0.06)),
+        ),
+        child: Column(
+          children: [
+            SizedBox(
+              height: 130,
+              child: Stack(
+                alignment: Alignment.center,
+                children: [
+                  PieChart(
+                    PieChartData(
+                      startDegreeOffset: 180,
+                      centerSpaceRadius: 44,
+                      sectionsSpace: 0,
+                      sections: [
+                        PieChartSectionData(
+                          color: item.color,
+                          value: 100,
+                          radius: 18,
+                          showTitle: false,
+                        ),
+                      ],
+                    ),
+                  ),
+                  Column(
+                    mainAxisSize: MainAxisSize.min,
+                    children: [
+                      Text(item.icon, style: const TextStyle(fontSize: 22)),
+                      const SizedBox(height: 2),
+                      Text(
+                        '100%',
+                        style: TextStyle(
+                          color: item.color,
+                          fontSize: 16,
+                          fontWeight: FontWeight.bold,
+                        ),
+                      ),
+                    ],
+                  ),
+                ],
+              ),
+            ),
+            const SizedBox(height: 12),
+            Row(
+              mainAxisAlignment: MainAxisAlignment.center,
+              children: [
+                Text(
+                  item.name,
+                  style: const TextStyle(
+                    color: Colors.white,
+                    fontSize: 14,
+                    fontWeight: FontWeight.w600,
+                  ),
+                ),
+                const SizedBox(width: 10),
+                Text(
+                  Money.formatBaht(item.amount),
+                  style: TextStyle(
+                    color: item.color,
+                    fontSize: 14,
+                    fontWeight: FontWeight.bold,
+                  ),
+                ),
+              ],
+            ),
+          ],
+        ),
+      );
+    }
+
     return Container(
       padding: const EdgeInsets.all(14),
       decoration: BoxDecoration(
-        color: const Color(0xFF0A2A1B),
+        color: const Color(0xFF10201A),
         borderRadius: BorderRadius.circular(18),
-        border: Border.all(color: AppColors.primary.withValues(alpha: 0.3)),
+        border: Border.all(color: Colors.white.withValues(alpha: 0.06)),
       ),
       child: Column(
         children: [

@@ -24,9 +24,9 @@ class SubscriptionsScreen extends ConsumerWidget {
     final async = ref.watch(subscriptionsProvider);
 
     return Scaffold(
-      backgroundColor: const Color(0xFF121212),
+      backgroundColor: const Color(0xFF0A0F0C),
       appBar: AppBar(
-        backgroundColor: const Color(0xFF121212),
+        backgroundColor: const Color(0xFF0A0F0C),
         elevation: 0,
         centerTitle: true,
         leading: IconButton(

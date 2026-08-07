@@ -21,7 +21,7 @@ class AppBottomNavigationBar extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     return BottomAppBar(
-      color: const Color(0xFF1A1A1A),
+      color: const Color(0xFF10201A),
       elevation: 10,
       notchMargin: 8,
       shape: const AutomaticNotchedShape(
@@ -105,7 +105,7 @@ class _NavItem extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
-    final color = active ? const Color(0xFF4CD97B) : Colors.white60;
+    final color = active ? const Color(0xFF22C55E) : const Color(0xFF9CA3AF);
     return InkWell(
       onTap: onTap,
       borderRadius: BorderRadius.circular(16),
@@ -152,8 +152,8 @@ class AppFloatingActionButton extends ConsumerWidget {
             await ref.read(dashboardProvider.future);
           } catch (_) {}
         },
-        backgroundColor: const Color(0xFF3CAE63),
-        foregroundColor: Colors.black,
+        backgroundColor: const Color(0xFF22C55E),
+        foregroundColor: Colors.white,
         shape: const CircleBorder(),
         elevation: 4,
         child: const Icon(Icons.add, size: 32),

@@ -19,7 +19,7 @@ class MenuScreen extends ConsumerWidget {
     final user = ref.watch(authControllerProvider).user;
 
     return Scaffold(
-      backgroundColor: const Color(0xFF121212),
+      backgroundColor: const Color(0xFF0A0F0C),
       body: Column(
         children: [
           _MenuHeader(
