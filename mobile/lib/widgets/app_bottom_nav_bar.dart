@@ -10,9 +10,13 @@ class AppBottomNavigationBar extends StatelessWidget {
   const AppBottomNavigationBar({
     super.key,
     required this.currentTab,
+    this.chatTabKey,
   });
 
   final AppTab currentTab;
+
+  /// ใช้ไฮไลต์แท็บ "พี่เงิน" ตอนทัวร์แนะนำ (ส่งมาเฉพาะหน้าหลัก กัน GlobalKey ซ้ำ)
+  final GlobalKey? chatTabKey;
 
   @override
   Widget build(BuildContext context) {
@@ -55,6 +59,7 @@ class AppBottomNavigationBar extends StatelessWidget {
           ),
           const SizedBox(width: 48),
           _NavItem(
+            key: chatTabKey,
             icon: currentTab == AppTab.chat
                 ? Icons.chat_bubble_rounded
                 : Icons.chat_bubble_outline_rounded,
@@ -86,6 +91,7 @@ class AppBottomNavigationBar extends StatelessWidget {
 
 class _NavItem extends StatelessWidget {
   const _NavItem({
+    super.key,
     required this.icon,
     required this.label,
     required this.active,
@@ -126,11 +132,15 @@ class _NavItem extends StatelessWidget {
 }
 
 class AppFloatingActionButton extends ConsumerWidget {
-  const AppFloatingActionButton({super.key});
+  const AppFloatingActionButton({super.key, this.spotlightKey});
+
+  /// ใช้ไฮไลต์ปุ่ม + ตอนทัวร์แนะนำ (ส่งมาเฉพาะหน้าหลัก กัน GlobalKey ซ้ำ)
+  final GlobalKey? spotlightKey;
 
   @override
   Widget build(BuildContext context, WidgetRef ref) {
     return Container(
+      key: spotlightKey,
       height: 62,
       width: 62,
       margin: const EdgeInsets.only(top: 10),

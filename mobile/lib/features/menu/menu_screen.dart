@@ -5,6 +5,7 @@ import 'package:go_router/go_router.dart';
 import '../../app/theme.dart';
 import '../auth/auth_controller.dart';
 import '../notifications/notif_bell.dart';
+import '../onboarding/tour_provider.dart';
 import '../profile/profile_avatar.dart';
 import '../../widgets/app_bottom_nav_bar.dart';
 
@@ -73,6 +74,25 @@ class MenuScreen extends ConsumerWidget {
                           onTap: () => context.push('/subscriptions'),
                         ),
                       ),
+                    ],
+                  ),
+                  const SizedBox(height: 14),
+                  Row(
+                    children: [
+                      Expanded(
+                        child: _MenuCard(
+                          icon: Icons.help_outline_rounded,
+                          title: 'วิธีใช้งาน',
+                          subtitle: 'ดูคำแนะนำการใช้แอป\nอีกครั้ง',
+                          onTap: () async {
+                            // รีเซ็ตธง → กลับหน้าหลักแล้วทัวร์จะเด้งเอง
+                            await ref.read(tourDoneProvider.notifier).reset();
+                            if (context.mounted) context.go('/');
+                          },
+                        ),
+                      ),
+                      const SizedBox(width: 14),
+                      const Expanded(child: SizedBox()),
                     ],
                   ),
                 ],
