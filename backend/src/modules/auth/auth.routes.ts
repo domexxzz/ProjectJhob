@@ -124,8 +124,20 @@ authRouter.get(
       `&redirect_uri=${encodeURIComponent(fbRedirectUri())}` +
       `&code=${encodeURIComponent(code)}`;
     const tokenRes = await fetch(tokenUrl);
-    if (!tokenRes.ok) return fail('แลก token กับ Facebook ไม่สำเร็จ');
-    const tokenJson = (await tokenRes.json()) as { access_token?: string };
+    const tokenBody = await tokenRes.text();
+    if (!tokenRes.ok) {
+      // โชว์สาเหตุจริงจาก Facebook (เช่น secret ผิด / redirect_uri ไม่ตรง) แทนข้อความกว้าง ๆ
+      let reason = tokenBody.slice(0, 200);
+      try {
+        const e = JSON.parse(tokenBody) as { error?: { message?: string } };
+        if (e.error?.message) reason = e.error.message;
+      } catch {
+        /* ไม่ใช่ JSON → ใช้ text ดิบ */
+      }
+      console.error('[fb-oauth] token exchange failed', tokenRes.status, tokenBody.slice(0, 400));
+      return fail(`FB: ${reason}`);
+    }
+    const tokenJson = JSON.parse(tokenBody) as { access_token?: string };
     if (!tokenJson.access_token) return fail('Facebook ไม่ได้ส่ง access token กลับมา');
 
     try {
