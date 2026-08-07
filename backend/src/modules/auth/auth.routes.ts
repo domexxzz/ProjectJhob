@@ -8,6 +8,7 @@ import { registerUser, loginUser } from './auth.service';
 import { verifyGoogleIdToken, verifyGoogleAccessToken, verifyFacebookToken, oauthLogin } from './oauth.service';
 import { prisma } from '../../lib/prisma';
 import { env } from '../../config/env';
+import { cache } from '../../lib/cache';
 
 export const authRouter = Router();
 
@@ -116,6 +117,15 @@ authRouter.get(
     if (!code) return fail(typeof req.query.error_description === 'string' ? req.query.error_description : 'ยกเลิกการล็อกอิน Facebook');
     if (!env.facebookAppId || !env.facebookAppSecret) return fail('backend ยังไม่ได้ตั้ง FACEBOOK_APP_ID/SECRET');
 
+    // iOS Safari prefetch ลิงก์ล่วงหน้า → callback ถูกยิง 2 ครั้งด้วย code เดียวกัน
+    // ครั้งแรกกิน code (สำเร็จแต่ผู้ใช้ไม่เห็น) ครั้งที่สอง FB ตอบ "authorization code has been used"
+    // จึง cache ผล code→JWT ไว้สั้น ๆ แล้วคืนตัวเดิมถ้า code ซ้ำ
+    const codeKey = `fb_code:${code.slice(0, 64)}`;
+    const cachedToken = await cache.get<string>(codeKey);
+    if (cachedToken) {
+      return res.redirect(`${web}/#/oauth?token=${encodeURIComponent(cachedToken)}`);
+    }
+
     // แลก code → access token (ต้องใช้ app secret ฝั่ง server เท่านั้น)
     const tokenUrl =
       'https://graph.facebook.com/v21.0/oauth/access_token' +
@@ -135,6 +145,10 @@ authRouter.get(
         /* ไม่ใช่ JSON → ใช้ text ดิบ */
       }
       console.error('[fb-oauth] token exchange failed', tokenRes.status, tokenBody.slice(0, 400));
+      // code ถูกใช้ไปแล้วแต่ไม่มีใน cache (เช่น cache หมดอายุ) → บอกให้กดใหม่ ไม่ใช่ error ดิบ
+      if (/has been used|expired/i.test(reason)) {
+        return fail('ลิงก์ล็อกอินหมดอายุ กรุณากดเข้าสู่ระบบด้วย Facebook อีกครั้ง');
+      }
       return fail(`FB: ${reason}`);
     }
     const tokenJson = JSON.parse(tokenBody) as { access_token?: string };
@@ -143,6 +157,8 @@ authRouter.get(
     try {
       const profile = await verifyFacebookToken(tokenJson.access_token);
       const { token } = await oauthLogin(profile);
+      // เก็บไว้ 3 นาที เผื่อ callback ถูกยิงซ้ำด้วย code เดิม (Safari prefetch)
+      await cache.set(codeKey, token, 180);
       // ส่ง JWT กลับหน้าเว็บผ่าน hash fragment (ไม่ติด log ของ server/proxy)
       res.redirect(`${web}/#/oauth?token=${encodeURIComponent(token)}`);
     } catch (e) {
