@@ -121,10 +121,23 @@ authRouter.get(
     // ครั้งแรกกิน code (สำเร็จแต่ผู้ใช้ไม่เห็น) ครั้งที่สอง FB ตอบ "authorization code has been used"
     // จึง cache ผล code→JWT ไว้สั้น ๆ แล้วคืนตัวเดิมถ้า code ซ้ำ
     const codeKey = `fb_code:${code.slice(0, 64)}`;
+    const lockKey = `fb_lock:${code.slice(0, 64)}`;
+    const ok = (t: string) => res.redirect(`${web}/#/oauth?token=${encodeURIComponent(t)}`);
+
     const cachedToken = await cache.get<string>(codeKey);
-    if (cachedToken) {
-      return res.redirect(`${web}/#/oauth?token=${encodeURIComponent(cachedToken)}`);
+    if (cachedToken) return ok(cachedToken);
+
+    // ถ้าอีก request กำลังแลก code เดียวกันอยู่ (prefetch vs การกดจริง มาพร้อมกัน)
+    // → รอผลของตัวที่ทำอยู่ แทนที่จะยิงซ้ำแล้วโดน "authorization code has been used"
+    if (await cache.get<string>(lockKey)) {
+      for (let i = 0; i < 32; i++) {
+        await new Promise((r) => setTimeout(r, 250)); // รอสูงสุด ~8 วินาที
+        const t = await cache.get<string>(codeKey);
+        if (t) return ok(t);
+      }
+      return fail('ล็อกอินใช้เวลานานเกินไป กรุณาลองอีกครั้ง');
     }
+    await cache.set(lockKey, '1', 60);
 
     // แลก code → access token (ต้องใช้ app secret ฝั่ง server เท่านั้น)
     const tokenUrl =
@@ -144,11 +157,18 @@ authRouter.get(
       } catch {
         /* ไม่ใช่ JSON → ใช้ text ดิบ */
       }
-      console.error('[fb-oauth] token exchange failed', tokenRes.status, tokenBody.slice(0, 400));
-      // code ถูกใช้ไปแล้วแต่ไม่มีใน cache (เช่น cache หมดอายุ) → บอกให้กดใหม่ ไม่ใช่ error ดิบ
+      // "code has been used" = request ซ้ำจาก prefetch ที่ชนกันพอดี — ไม่ใช่ความผิดพลาดจริง
+      // ลองรอผลจาก request ที่แลกสำเร็จอีกสักครู่ก่อนค่อยยอมแพ้
       if (/has been used|expired/i.test(reason)) {
+        console.warn('[fb-oauth] duplicate callback (prefetch) — รอผลจาก request แรก');
+        for (let i = 0; i < 24; i++) {
+          await new Promise((r) => setTimeout(r, 250)); // รอสูงสุด ~6 วินาที
+          const t = await cache.get<string>(codeKey);
+          if (t) return ok(t);
+        }
         return fail('ลิงก์ล็อกอินหมดอายุ กรุณากดเข้าสู่ระบบด้วย Facebook อีกครั้ง');
       }
+      console.error('[fb-oauth] token exchange failed', tokenRes.status, tokenBody.slice(0, 400));
       return fail(`FB: ${reason}`);
     }
     const tokenJson = JSON.parse(tokenBody) as { access_token?: string };
@@ -160,7 +180,7 @@ authRouter.get(
       // เก็บไว้ 3 นาที เผื่อ callback ถูกยิงซ้ำด้วย code เดิม (Safari prefetch)
       await cache.set(codeKey, token, 180);
       // ส่ง JWT กลับหน้าเว็บผ่าน hash fragment (ไม่ติด log ของ server/proxy)
-      res.redirect(`${web}/#/oauth?token=${encodeURIComponent(token)}`);
+      ok(token);
     } catch (e) {
       return fail(e instanceof HttpError ? e.message : 'ล็อกอิน Facebook ไม่สำเร็จ');
     }
