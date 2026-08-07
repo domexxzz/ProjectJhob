@@ -1,17 +1,19 @@
 import 'package:flutter/material.dart';
 
 class AppColors {
-  static const primary = Color(0xFF00C850); // Emerald green
-  static const primaryDark = Color(0xFF0D6E37); // Darker green
-  static const accent = Color(0xFF00C850);
-  static const income = Color(0xFF00C850);
-  static const expense = Color(0xFFFF4D4D);
-  static const warning = Color(0xFFFFA500);
-  static const bg = Color(0xFF0D1117); // Dark background
-  static const surface = Color(0xFF16202E); // Dark surface card
+  static const primary = Color(0xFF22C55E); // --green-primary
+  static const primaryDark = Color(0xFF15803D);
+  static const greenData = Color(0xFF4ADE80); // --green-data
+  static const accent = Color(0xFF22C55E);
+  static const income = Color(0xFF22C55E);
+  static const expense = Color(0xFFEF4444); // --danger
+  static const warning = Color(0xFFF59E0B);
+  static const bg = Color(0xFF0A0F0C); // --bg-base
+  static const surface = Color(0xFF10201A); // --bg-card
   static const textDark = Color(0xFFFFFFFF);
-  static const textMuted = Color(0xFF8A9BB0);
-  static const chipBg = Color(0xFF1F2937);
+  static const textSecondary = Color(0xFF9CA3AF); // --text-secondary
+  static const textMuted = Color(0xFF9CA3AF);
+  static const chipBg = Color(0xFF10201A);
 }
 
 /// เงานุ่มสำหรับการ์ด — ให้ดู "ลอย" ไม่แบน
