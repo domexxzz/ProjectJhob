@@ -4,7 +4,7 @@ import { asyncHandler, HttpError } from '../../lib/http';
 import { requireAuth } from '../../lib/auth';
 import { z } from 'zod';
 import { runBudgetTriggers } from './triggers';
-import { createNotification } from './create';
+import { sendPush } from './fcm';
 import { runPredictionTriggers } from '../predictions/prediction_triggers';
 
 export const notificationsRouter = Router();
@@ -101,13 +101,25 @@ notificationsRouter.post(
         'เครื่องนี้ยังไม่ได้เปิดการแจ้งเตือน — กด "เปิดแจ้งเตือนบนเครื่องนี้" ก่อนครับ',
       );
     }
-    await createNotification(
+
+    // ส่งตรง เพื่อรู้ผลจริง (createNotification กลืน error ไว้ทำให้ดีบักยาก)
+    const result = await sendPush(
       req.userId!,
-      'system',
       '🔔 ทดสอบแจ้งเตือน',
       'ถ้าเห็นข้อความนี้ แปลว่าการแจ้งเตือนใช้งานได้แล้ว 🎉',
     );
-    res.json({ ok: true });
+
+    if (!result.ok) {
+      const why: Record<string, string> = {
+        fcm_not_configured:
+          'เซิร์ฟเวอร์ยังไม่ได้ตั้งค่า FCM (ต้องใส่ FIREBASE_SERVICE_ACCOUNT)',
+        no_device_token: 'เครื่องนี้ยังไม่ได้ลงทะเบียนรับแจ้งเตือน',
+        send_failed: `ส่งไม่สำเร็จ: ${result.detail ?? 'ไม่ทราบสาเหตุ'}`,
+      };
+      throw new HttpError(503, why[result.reason ?? 'send_failed'] ?? 'ส่งไม่สำเร็จ');
+    }
+
+    res.json({ ok: true, sent: true });
   }),
 );
 

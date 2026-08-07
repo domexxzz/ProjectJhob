@@ -37,11 +37,25 @@ async function ensureFcm(): Promise<boolean> {
   return fcmReady;
 }
 
+export interface PushResult {
+  ok: boolean;
+  /** เหตุผลเวลาไม่สำเร็จ — ใช้บอกผู้ใช้/ดีบักได้ว่าติดตรงไหน */
+  reason?: 'fcm_not_configured' | 'no_device_token' | 'send_failed';
+  detail?: string;
+}
+
+/** เช็กว่า backend ตั้งค่า FCM (FIREBASE_SERVICE_ACCOUNT) ไว้แล้วหรือยัง */
+export async function isFcmConfigured(): Promise<boolean> {
+  return ensureFcm();
+}
+
 /** ส่ง push ไป device ของ user (ถ้าตั้งค่า FCM ไว้) — ไม่พังถ้ายังไม่ได้ตั้ง */
-export async function sendPush(userId: string, title: string, body: string): Promise<void> {
-  if (!(await ensureFcm())) return;
+export async function sendPush(userId: string, title: string, body: string): Promise<PushResult> {
+  if (!(await ensureFcm())) {
+    return { ok: false, reason: 'fcm_not_configured' };
+  }
   const user = await prisma.user.findUnique({ where: { id: userId }, select: { deviceToken: true } });
-  if (!user?.deviceToken) return;
+  if (!user?.deviceToken) return { ok: false, reason: 'no_device_token' };
   try {
     await messaging.send({
       token: user.deviceToken,
@@ -54,7 +68,10 @@ export async function sendPush(userId: string, title: string, body: string): Pro
         fcmOptions: { link: env.webAppUrl || '/' },
       },
     });
+    return { ok: true };
   } catch (e) {
-    console.error('[fcm] ส่ง push ล้มเหลว:', (e as Error).message);
+    const detail = (e as Error).message;
+    console.error('[fcm] ส่ง push ล้มเหลว:', detail);
+    return { ok: false, reason: 'send_failed', detail };
   }
 }
