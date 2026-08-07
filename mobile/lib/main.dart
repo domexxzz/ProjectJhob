@@ -1,10 +1,12 @@
 import 'package:firebase_core/firebase_core.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
+import 'package:go_router/go_router.dart';
 import 'package:hive_flutter/hive_flutter.dart';
 import 'package:intl/date_symbol_data_local.dart';
 
 import 'app/router.dart';
+import 'features/onboarding/page_guide.dart';
 import 'app/theme.dart';
 import 'core/api/api_client.dart';
 import 'features/auth/auth_controller.dart';
@@ -60,12 +62,44 @@ Future<void> main() async {
   runApp(const ProviderScope(child: FinanceCoachApp()));
 }
 
-class FinanceCoachApp extends ConsumerWidget {
+class FinanceCoachApp extends ConsumerStatefulWidget {
   const FinanceCoachApp({super.key});
 
   @override
-  Widget build(BuildContext context, WidgetRef ref) {
+  ConsumerState<FinanceCoachApp> createState() => _FinanceCoachAppState();
+}
+
+class _FinanceCoachAppState extends ConsumerState<FinanceCoachApp> {
+  GoRouter? _router;
+  String? _lastLocation;
+
+  /// ดักทุกครั้งที่เปลี่ยนหน้า → เด้งคู่มือของหน้านั้น (ครั้งแรกครั้งเดียว)
+  /// ทำที่นี่ที่เดียวจึงครอบคลุมทุกหน้าโดยไม่ต้องแก้ทีละไฟล์
+  void _onRouteChanged() {
+    final router = _router;
+    if (router == null) return;
+    final loc = router.routerDelegate.currentConfiguration.uri.path;
+    if (loc == _lastLocation) return;
+    _lastLocation = loc;
+    final ctx = router.routerDelegate.navigatorKey.currentContext;
+    if (ctx == null) return;
+    maybeShowPageGuide(ctx, loc);
+  }
+
+  @override
+  void dispose() {
+    _router?.routerDelegate.removeListener(_onRouteChanged);
+    super.dispose();
+  }
+
+  @override
+  Widget build(BuildContext context) {
     final router = ref.watch(routerProvider);
+    if (!identical(router, _router)) {
+      _router?.routerDelegate.removeListener(_onRouteChanged);
+      _router = router;
+      router.routerDelegate.addListener(_onRouteChanged);
+    }
     final settings = ref.watch(appSettingsProvider);
     Money.configure(settings.currency, thbToUsdRate: settings.usdRate);
 

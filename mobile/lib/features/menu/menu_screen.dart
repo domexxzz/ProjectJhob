@@ -5,6 +5,7 @@ import 'package:go_router/go_router.dart';
 import '../../app/theme.dart';
 import '../auth/auth_controller.dart';
 import '../notifications/notif_bell.dart';
+import '../onboarding/page_guide.dart';
 import '../onboarding/tour_provider.dart';
 import '../profile/profile_avatar.dart';
 import '../../widgets/app_bottom_nav_bar.dart';
@@ -85,7 +86,8 @@ class MenuScreen extends ConsumerWidget {
                           title: 'วิธีใช้งาน',
                           subtitle: 'ดูคำแนะนำการใช้แอป\nอีกครั้ง',
                           onTap: () async {
-                            // รีเซ็ตธง → กลับหน้าหลักแล้วทัวร์จะเด้งเอง
+                            // รีเซ็ตทั้งทัวร์หน้าหลัก + คู่มือทุกหน้า
+                            await resetAllPageGuides();
                             await ref.read(tourDoneProvider.notifier).reset();
                             if (context.mounted) context.go('/');
                           },
