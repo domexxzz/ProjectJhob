@@ -174,13 +174,17 @@ Render ตั้ง **Auto-Deploy = On Commit** → **push เข้า `deploy/
 > ⚠️ **push เข้า `main` งานจะไม่ขึ้น production!** เพราะ Render ดูที่ `deploy/cloud` เท่านั้น
 > แตก branch จาก `deploy/cloud` และเปิด PR กลับเข้า `deploy/cloud` เสมอ
 
-### 🖼️ แก้โค้ด Flutter แล้วต้อง rebuild web ด้วย (คนลืมบ่อยมาก)
-เว็บ/PWA ถูกเสิร์ฟจาก **`backend/public`** ซึ่งเป็น **ไฟล์ build ที่ commit ไว้ในกิต**
-แก้ไฟล์ใน `mobile/lib/` แล้ว push เฉย ๆ **หน้าเว็บจะไม่เปลี่ยน** ต้องทำเพิ่ม:
+### 🤖 rebuild web เป็นอัตโนมัติแล้ว (ไม่ต้องทำเอง)
+เว็บ/PWA ถูกเสิร์ฟจาก **`backend/public`** ซึ่งเป็นไฟล์ build ที่ commit ไว้ในกิต
+เมื่อก่อนถ้าแก้ `mobile/lib/` แล้ว push เฉย ๆ หน้าเว็บจะไม่เปลี่ยน — **ตอนนี้มี GitHub Actions
+(`.github/workflows/build-web.yml`) build ให้อัตโนมัติ** ทุกครั้งที่ `mobile/**` ถูก push
+เข้า `deploy/cloud` แล้ว commit `backend/public` กลับให้เอง
+
+**สิ่งที่ต้องทำ:** แค่ push โค้ดตามปกติ → รอ ~3-5 นาที (ดูสถานะที่แท็บ **Actions** บน GitHub)
+
+ถ้าอยาก build เองก่อนก็ยังทำได้:
 ```bash
-cd mobile
-flutter build web --release
-cd ..
+cd mobile && flutter build web --release && cd ..
 rm -rf backend/public && cp -r mobile/build/web backend/public
 git add backend/public && git commit -m "chore: rebuild web"
 ```

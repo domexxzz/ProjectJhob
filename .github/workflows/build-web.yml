@@ -1,0 +1,83 @@
+name: Build web → backend/public
+
+# แก้กับดักถาวร: เว็บ/PWA ถูกเสิร์ฟจาก backend/public ซึ่งเป็น "ไฟล์ build ที่ commit ไว้"
+# ใครแก้โค้ดใน mobile/ แล้ว push เฉย ๆ หน้าเว็บจะไม่เปลี่ยน
+# → workflow นี้ build web ให้อัตโนมัติแล้ว commit backend/public กลับเข้า deploy/cloud
+on:
+  push:
+    branches: [deploy/cloud]
+    paths:
+      - 'mobile/**'
+      - '.github/workflows/build-web.yml'
+  workflow_dispatch: # กดรันเองได้จากแท็บ Actions
+
+concurrency:
+  group: build-web-${{ github.ref }}
+  cancel-in-progress: true
+
+permissions:
+  contents: write
+
+jobs:
+  build-web:
+    name: Build Flutter web and commit
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout deploy/cloud
+        uses: actions/checkout@v4
+        with:
+          ref: deploy/cloud
+
+      - name: Set up Flutter
+        uses: subosito/flutter-action@v2
+        with:
+          channel: stable
+          flutter-version: '3.44.x'
+          cache: true
+
+      - name: Get packages
+        working-directory: mobile
+        run: flutter pub get
+
+      # เว็บเรียก API แบบ same-origin (kApiBaseUrl = '') จึงไม่ต้องใส่ --dart-define
+      - name: Build web
+        working-directory: mobile
+        run: flutter build web --release
+
+      - name: Copy build → backend/public
+        run: |
+          rm -rf backend/public
+          cp -r mobile/build/web backend/public
+
+      - name: Commit if changed
+        id: commit
+        run: |
+          git config user.name  "github-actions[bot]"
+          git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
+          git add backend/public
+          if git diff --cached --quiet; then
+            echo "ไม่มีอะไรเปลี่ยน — ข้าม"
+            echo "pushed=false" >> "$GITHUB_OUTPUT"
+            exit 0
+          fi
+          # [skip ci] + commit ด้วย GITHUB_TOKEN → ไม่ trigger workflow ซ้ำ (กันลูป)
+          git commit -m "chore(ci): rebuild web → backend/public [skip ci]"
+          git push origin HEAD:deploy/cloud || {
+            echo "push ชนกับคนอื่น — ดึงมา rebase แล้วลองใหม่"
+            git pull --rebase origin deploy/cloud
+            git push origin HEAD:deploy/cloud
+          }
+          echo "pushed=true" >> "$GITHUB_OUTPUT"
+
+      # ทางเลือก: ถ้าตั้ง secret RENDER_DEPLOY_HOOK ไว้ จะสั่ง deploy ให้เลย
+      # (Render → phee-ngern → Settings → Deploy Hook → คัดลอก URL มาใส่เป็น secret)
+      - name: Trigger Render deploy (ถ้ามี secret)
+        if: steps.commit.outputs.pushed == 'true'
+        env:
+          HOOK: ${{ secrets.RENDER_DEPLOY_HOOK }}
+        run: |
+          if [ -n "$HOOK" ]; then
+            curl -fsS "$HOOK" > /dev/null && echo "สั่ง deploy Render แล้ว"
+          else
+            echo "ยังไม่ได้ตั้ง secret RENDER_DEPLOY_HOOK — ข้ามขั้นตอน deploy"
+          fi
