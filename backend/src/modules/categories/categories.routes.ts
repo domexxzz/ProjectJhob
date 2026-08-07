@@ -13,3 +13,33 @@ categoriesRouter.get(
     res.json({ categories });
   }),
 );
+
+categoriesRouter.post(
+  '/',
+  asyncHandler(async (req, res) => {
+    const { nameTh, icon, color, type } = req.body;
+    if (!nameTh || typeof nameTh !== 'string' || !nameTh.trim()) {
+      res.status(400).json({ error: 'กรุณาระบุชื่อหมวดหมู่' });
+      return;
+    }
+
+    const trimmedNameTh = nameTh.trim();
+    const categoryName = `custom_${Date.now()}_${Math.random().toString(36).substring(2, 7)}`;
+    const categoryType = type === 'income' ? 'income' : 'expense';
+    const categoryIcon = icon && typeof icon === 'string' ? icon.trim() : '📁';
+    const categoryColor = color && typeof color === 'string' ? color.trim() : '#4CD97B';
+
+    const category = await prisma.category.create({
+      data: {
+        name: categoryName,
+        nameTh: trimmedNameTh,
+        icon: categoryIcon,
+        color: categoryColor,
+        type: categoryType,
+        isDefault: false,
+      },
+    });
+
+    res.status(201).json({ category });
+  }),
+);

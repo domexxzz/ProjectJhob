@@ -221,6 +221,22 @@ class TransactionsRepository {
     }
   }
 
+  Future<Category> createCategory({
+    required String nameTh,
+    String icon = '📁',
+    String color = '#4CD97B',
+    String type = 'expense',
+  }) async {
+    final res = await _dio.post('/categories', data: {
+      'nameTh': nameTh,
+      'icon': icon,
+      'color': color,
+      'type': type,
+    });
+    final data = res.data as Map<String, dynamic>;
+    return Category.fromJson(data['category'] as Map<String, dynamic>);
+  }
+
   Future<AnalyzedSlip> analyzeText(String text) async {
     final res =
         await _dio.post('/transactions/analyze-text', data: {'text': text});
