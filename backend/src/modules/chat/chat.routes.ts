@@ -14,7 +14,7 @@ import {
 } from './export_intent';
 import { checkFinanceScope, OUT_OF_SCOPE_REPLY } from './finance_scope';
 import { detectQuickLog, quickCreate } from './tools';
-import { extractReceiptItems, logReceiptItems, analyzeContract } from './receipt';
+import { extractReceiptItems, logReceiptItems, analyzeContract, logTransferSlip } from './receipt';
 
 export const chatRouter = Router();
 chatRouter.use(requireAuth);
@@ -23,6 +23,7 @@ chatRouter.use(requireAuth);
 const sendSchema = z.object({
   message: z.string().min(1).max(8000),
   imageBase64: z.string().optional(), // ➕ รองรับการส่งรูปแบบ Base64
+  slipType: z.enum(['income', 'expense']).optional(), // ผู้ใช้เลือกตอนแนบสลิป: รายรับ/รายจ่าย
   includeFinancialContext: z.boolean().default(true),
   personalizedRecommendations: z.boolean().default(true),
   storeConversationHistory: z.boolean().default(true),
@@ -50,6 +51,7 @@ chatRouter.post(
     const {
       message,
       imageBase64,
+      slipType,
       includeFinancialContext,
       personalizedRecommendations,
       storeConversationHistory,
@@ -172,6 +174,25 @@ chatRouter.post(
           res.status(201).json({ message: saved, source: 'receipt-scan', cards });
           return;
         }
+      }
+    }
+
+    // ── สลิปโอนเงิน/จ่ายบิล "ยอดเดียว" (ไม่ใช่ใบเสร็จหลายรายการ) → จด 1 รายการจากยอดในสลิป ──
+    // ใช้ parser เดียวกับ /parse-slip (deterministic) การ์ดขึ้นชัวร์ ไม่พึ่ง LLM เรียก tool
+    if (includeFinancialContext && ocrText) {
+      const card = await logTransferSlip(userId, ocrText, message, slipType);
+      if (card) {
+        const kind = card.type === 'income' ? 'รายรับ' : 'รายจ่าย';
+        const reply =
+          `จดจากสลิปให้แล้วครับ ✅ ${kind}: ${card.note} ${card.amountBaht.toLocaleString('en-US')} บาท (หมวด${card.category})\n\n` +
+          'ถ้าผิดกดแก้หรือลบที่การ์ดด้านล่างได้เลยครับ 😊';
+        const saved = await saveMessage(
+          'assistant',
+          reply,
+          JSON.stringify({ source: 'slip-log', cards: [card] }),
+        );
+        res.status(201).json({ message: saved, source: 'slip-log', cards: [card] });
+        return;
       }
     }
 

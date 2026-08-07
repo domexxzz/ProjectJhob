@@ -23,6 +23,17 @@ app.add_middleware(
     allow_headers=["*"],
 )
 
+
+@app.get("/health")
+def health() -> dict:
+    """Health check for Render (healthCheckPath) และให้ backend ตรวจว่า service พร้อม."""
+    return {"status": "ok", "service": "ai-predictions"}
+
+
+@app.get("/")
+def root() -> dict:
+    return {"service": "AI Financial Forecasting Service", "predict": "POST /predict"}
+
 class TransactionItem(BaseModel):
     id: Optional[str] = None
     date: str  # YYYY-MM-DD
@@ -336,5 +347,7 @@ def predict_transactions(request: PredictionRequest):
 
 
 if __name__ == "__main__":
-    logger.info("Starting FastAPI local prediction server...")
-    uvicorn.run(app, host="127.0.0.1", port=8000)
+    import os
+    port = int(os.environ.get("PORT", "8000"))
+    logger.info(f"Starting FastAPI prediction server on 0.0.0.0:{port} ...")
+    uvicorn.run(app, host="0.0.0.0", port=port)

@@ -10,7 +10,8 @@ export async function getPredictions(req: Request, res: Response): Promise<void>
     return;
   }
 
-  const result = await fetchPrediction(userId);
+  // ผู้ใช้กดดูพยากรณ์เอง — รอ cold start ของ FastAPI บน cloud ได้ (timeout ยาว 60s)
+  const result = await fetchPrediction(userId, 60000);
   if (!result) {
     res.status(502).json({ error: 'AI Prediction service ไม่พร้อมใช้งาน (ตรวจว่ารัน FastAPI :8000 อยู่)' });
     return;

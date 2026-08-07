@@ -11,22 +11,85 @@ import '../notifications/notif_bell.dart';
 import '../goals/goals_provider.dart';
 import '../settings/settings_screen.dart';
 import '../profile/profile_avatar.dart';
+import '../onboarding/coach_tour.dart';
+import '../onboarding/tour_provider.dart';
 import '../../widgets/app_bottom_nav_bar.dart';
 
 // ─────────────────────────────────────────────────────────────────────────────
 // Dashboard Screen (Main) - Premium Dark UI Redesign
 // ─────────────────────────────────────────────────────────────────────────────
-class DashboardScreen extends ConsumerWidget {
+class DashboardScreen extends ConsumerStatefulWidget {
   const DashboardScreen({super.key});
 
   @override
-  Widget build(BuildContext context, WidgetRef ref) {
+  ConsumerState<DashboardScreen> createState() => _DashboardScreenState();
+}
+
+class _DashboardScreenState extends ConsumerState<DashboardScreen> {
+  // ── key สำหรับทัวร์แนะนำการใช้งาน (ชี้ไปที่ปุ่มจริงบนหน้าจอ) ──
+  final _balanceKey = GlobalKey();
+  final _budgetsKey = GlobalKey();
+  final _quickKey = GlobalKey();
+  final _fabKey = GlobalKey();
+  final _chatTabKey = GlobalKey();
+  bool _tourStarted = false;
+
+  /// เปิดทัวร์ครั้งแรกที่เข้าหน้าหลัก (หลังข้อมูลโหลดเสร็จ ปุ่มถึงจะมีตำแหน่งจริง)
+  Future<void> _startTour() async {
+    await showCoachTour(context, [
+      CoachStep(
+        targetKey: _balanceKey,
+        icon: Icons.account_balance_wallet_rounded,
+        title: 'ยอดเงินของคุณ',
+        body: 'ดูเงินคงเหลือ พร้อมรายรับ-รายจ่ายของเดือนนี้ได้ที่นี่',
+      ),
+      CoachStep(
+        targetKey: _fabKey,
+        circle: true,
+        icon: Icons.add_circle_outline_rounded,
+        title: 'ปุ่มบันทึกเงิน',
+        body: 'แตะปุ่ม + เพื่อถ่าย/เลือกรูปสลิป ให้ระบบอ่านยอดให้อัตโนมัติ หรือกรอกเองก็ได้',
+      ),
+      CoachStep(
+        targetKey: _chatTabKey,
+        icon: Icons.chat_bubble_rounded,
+        title: 'คุยกับพี่เงิน',
+        body: 'ถามเรื่องเงินได้ทุกอย่าง หรือพิมพ์สั้น ๆ เช่น "กาแฟ 50" เดี๋ยวพี่เงินจดให้',
+      ),
+      CoachStep(
+        targetKey: _budgetsKey,
+        icon: Icons.pie_chart_rounded,
+        title: 'ตั้งงบรายเดือน',
+        body: 'แตะการ์ดนี้เพื่อกำหนดงบแต่ละหมวด แล้วระบบจะเตือนเมื่อใกล้เกิน',
+      ),
+      CoachStep(
+        targetKey: _quickKey,
+        icon: Icons.bolt_rounded,
+        title: 'ทางลัด',
+        body: 'สแกนสลิป · ปรึกษาพี่เงิน · ตั้งเป้าหมาย — เข้าถึงได้เร็วจากตรงนี้',
+      ),
+    ]);
+    if (mounted) ref.read(tourDoneProvider.notifier).markDone();
+  }
+
+  @override
+  Widget build(BuildContext context) {
     final moneySettings = ref.watch(
       appSettingsProvider.select((s) => (s.currency, s.usdRate)),
     );
     Money.configure(moneySettings.$1, thbToUsdRate: moneySettings.$2);
     final user = ref.watch(authControllerProvider).user;
     final dashboard = ref.watch(dashboardProvider);
+
+    // เข้าครั้งแรก + ข้อมูลพร้อม → เปิดทัวร์อัตโนมัติ (ครั้งเดียว)
+    if (!_tourStarted &&
+        dashboard.hasValue &&
+        ref.watch(tourDoneProvider) == false) {
+      _tourStarted = true;
+      WidgetsBinding.instance.addPostFrameCallback((_) {
+        if (mounted) _startTour();
+      });
+    }
 
     return Scaffold(
       backgroundColor: const Color(0xFF0D0F0E),
@@ -66,10 +129,13 @@ class DashboardScreen extends ConsumerWidget {
                       return Column(
                         crossAxisAlignment: CrossAxisAlignment.start,
                         children: [
-                          _BalanceCard(
-                            balance: d.summary.balance,
-                            income: d.summary.income,
-                            expense: d.summary.expense,
+                          KeyedSubtree(
+                            key: _balanceKey,
+                            child: _BalanceCard(
+                              balance: d.summary.balance,
+                              income: d.summary.income,
+                              expense: d.summary.expense,
+                            ),
                           ),
                           const SizedBox(height: 16),
 
@@ -78,7 +144,8 @@ class DashboardScreen extends ConsumerWidget {
                           const SizedBox(height: 16),
 
                           // 3. Budgets Card (Top -> Bottom Gradient)
-                          const _BudgetsCard(),
+                          KeyedSubtree(
+                              key: _budgetsKey, child: const _BudgetsCard()),
                           const SizedBox(height: 16),
 
                           // 4. Recent Transactions (Horizontal scroll)
@@ -88,7 +155,8 @@ class DashboardScreen extends ConsumerWidget {
                           ],
 
                           // 5. Quick Actions Grid
-                          const _QuickActionsGrid(),
+                          KeyedSubtree(
+                              key: _quickKey, child: const _QuickActionsGrid()),
                         ],
                       );
                     },
@@ -99,9 +167,12 @@ class DashboardScreen extends ConsumerWidget {
           ),
         ],
       ),
-      floatingActionButton: const AppFloatingActionButton(),
+      floatingActionButton: AppFloatingActionButton(spotlightKey: _fabKey),
       floatingActionButtonLocation: kFixedCenterDockedFabLocation,
-      bottomNavigationBar: const AppBottomNavigationBar(currentTab: AppTab.home),
+      bottomNavigationBar: AppBottomNavigationBar(
+        currentTab: AppTab.home,
+        chatTabKey: _chatTabKey,
+      ),
     );
   }
 }

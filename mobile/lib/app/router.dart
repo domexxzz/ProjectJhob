@@ -29,6 +29,7 @@ import '../features/predictions/predictions_screen.dart';
 import '../features/goals/set_deadline_screen.dart';
 import '../features/privacy/privacy_screen.dart';
 import '../features/settings/settings_screen.dart';
+import '../features/auth/oauth_redirect_screen.dart';
 
 /// Set เป็น true หลังจากผ่าน Welcome3 แล้วกด "เริ่มต้นใช้งาน"
 /// ใช้ควบคุม redirect ไม่ให้ข้าม Login page เมื่อมี token เดิมค้างอยู่
@@ -47,6 +48,10 @@ final routerProvider = Provider<GoRouter>((ref) {
       final onOnboarding =
           loc == '/welcome1' || loc == '/welcome2' || loc == '/welcome3';
       if (onOnboarding) return null;
+
+      // หน้ารับ token จาก server-side OAuth (Facebook) — ปล่อยผ่าน
+      // ตอนเพิ่งกลับมา auth ยังโหลดไม่เสร็จ ถ้า guard เตะไป /login จะเข้าแอปไม่ได้
+      if (loc == '/oauth') return null;
 
       // 💡 เพิ่มการตรวจจับหน้าลืมรหัสผ่าน เพื่อไม่ให้ระบบเตะกลับไปหน้า Login ขณะที่ user ทำการกู้คืนรหัส
       final onAuthPage =
@@ -69,6 +74,14 @@ final routerProvider = Provider<GoRouter>((ref) {
 
       // ── Auth ─────────────────────────────────────────────────────────────
       GoRoute(path: '/login', builder: (_, __) => const LoginScreen()),
+      // กลับจาก Facebook server-side OAuth: /oauth?token=<JWT> (หรือ ?fb_error=...)
+      GoRoute(
+        path: '/oauth',
+        builder: (_, state) => OAuthRedirectScreen(
+          token: state.uri.queryParameters['token'],
+          error: state.uri.queryParameters['fb_error'],
+        ),
+      ),
       GoRoute(path: '/register', builder: (_, __) => const RegisterScreen()),
       // ➕ เพิ่มเส้นทางสำหรับหน้าลืมรหัสผ่าน (3 สเต็ปในหน้าเดียวที่เราทำไว้)
       GoRoute(

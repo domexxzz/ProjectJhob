@@ -18,6 +18,7 @@ class ChatRepository {
   Future<ChatMessage> send(
     String message, {
     String? imageBase64,
+    String? slipType, // 'income' | 'expense' — ผู้ใช้เลือกตอนแนบสลิป
     bool includeFinancialContext = true,
     bool personalizedRecommendations = true,
     bool storeConversationHistory = true,
@@ -28,6 +29,7 @@ class ChatRepository {
       data: {
         'message': message,
         if (imageBase64 != null) 'imageBase64': imageBase64,
+        if (slipType != null) 'slipType': slipType,
         'includeFinancialContext': includeFinancialContext,
         'personalizedRecommendations': personalizedRecommendations,
         'storeConversationHistory': storeConversationHistory,

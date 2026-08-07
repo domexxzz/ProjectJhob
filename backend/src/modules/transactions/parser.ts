@@ -6,16 +6,39 @@ const THAI_MONTHS: Record<string, number> = {
 };
 
 export function parseAmount(text: string): number | null {
-  const m = text.match(/จำนวน(?:เงิน)?\s*(?::|：)?\s*([\d,]+\.\d{2})/);
-  if (m) {
-    return Math.round(parseFloat(m[1].replace(/,/g, "")) * 100);
+  const toSatang = (s: string) => Math.round(parseFloat(s.replace(/,/g, "")) * 100);
+  // คำที่อยู่ "ก่อน" ตัวเลข แล้วไม่ใช่ยอดที่จ่ายจริง → ข้าม (ค่าธรรมเนียม, สิทธิร่วมจ่ายรัฐ, ส่วนลด, ยอดคงเหลือ)
+  const EXCLUDE = /(ค่าธรรมเนียม|ธรรมเนียม|ค่าบริการ|สิทธิ|ส่วนลด|discount|ยอดคงเหลือ|คงเหลือ|fee|balance)/i;
+  const skip = (idx: number) => EXCLUDE.test(text.slice(Math.max(0, idx - 28), idx));
+
+  // ตัวคั่นระหว่างป้ายกับตัวเลข — ยอมข้าม markdown/ตาราง (Typhoon OCR คืนเป็น "**ป้าย** | 24 บาท")
+  const SEP = "[\\s*|:：]*";
+
+  // 1) "ยอดที่ชำระจริง" — สำคัญสุด: สลิป co-pay (เป๋าตัง/คนละครึ่ง) ค่าสินค้า 60 − สิทธิ 36 = ชำระ 24 → เอา 24
+  const paid = text.match(
+    new RegExp(
+      `(?:จำนวนเงินที่ชำระ|ยอดที่ต้องชำระ|ยอดที่ชำระ|ยอดชำระ|รวมชำระ|จำนวนที่ชำระ|ชำระเงิน|ยอดสุทธิ)${SEP}([\\d,]+(?:\\.\\d{1,2})?)`,
+    ),
+  );
+  if (paid) return toSatang(paid[1]);
+
+  // 2) ป้าย "จำนวนเงิน" ทั่วไป (จำนวนเต็มหรือทศนิยม)
+  const labeled = text.match(new RegExp(`จำนวน(?:เงิน)?${SEP}([\\d,]+(?:\\.\\d{1,2})?)`));
+  if (labeled) return toSatang(labeled[1]);
+
+  // 3) "N บาท" / "N.NN บาท" (มีหน่วยต่อท้าย รองรับจำนวนเต็ม) — ตัด ค่าธรรมเนียม/สิทธิ/ส่วนลด แล้วเอามากสุด
+  const withUnit: number[] = [];
+  for (const m of text.matchAll(/([\d,]+(?:\.\d{1,2})?)\s*(?:บาท|฿)/g)) {
+    if (!skip(m.index ?? 0)) withUnit.push(toSatang(m[1]));
   }
-  const amts: number[] = [];
-  const matches = text.matchAll(/([\d,]+\.\d{2})\s*บาท/g);
-  for (const match of matches) {
-    amts.push(Math.round(parseFloat(match[1].replace(/,/g, "")) * 100));
+  if (withUnit.length > 0) return Math.max(...withUnit);
+
+  // 4) สำรองสุดท้าย: จำนวนรูปแบบ N.NN (ทศนิยม) ที่ไม่ใช่ค่าธรรมเนียม — สลิปโอน ttb ที่โชว์ยอดลอย ๆ ไม่มี "บาท"
+  const candidates: number[] = [];
+  for (const m of text.matchAll(/([\d,]+\.\d{2})/g)) {
+    if (!skip(m.index ?? 0)) candidates.push(toSatang(m[1]));
   }
-  return amts.length > 0 ? Math.max(...amts) : null;
+  return candidates.length > 0 ? Math.max(...candidates) : null;
 }
 
 export function parseDate(text: string): Date | null {
@@ -92,6 +115,14 @@ export function parseMerchant(text: string): string | null {
       const name = cleanName(m[1]);
       if (name) return name;
     }
+  }
+  // สลิปจ่ายบิล (ttb/ธนาคาร): ชื่อผู้รับบิลมักอยู่หน้าเลข biller/ผู้เสียภาษีในวงเล็บ
+  // เช่น "Banyabaramee (010753600031508)" / "TikTokShop Seller (010555609115221)"
+  // ⚠️ Typhoon OCR คืนคำคั่นด้วย ", " บรรทัดเดียว → ห้ามคว้าข้ามคอมมา/บรรทัด ไม่งั้นไปโดนชื่อผู้โอน
+  const biller = text.match(/([^\n,()]{2,40}?)\s*[,\n]?\s*\(\s*\d{10,17}\s*\)/);
+  if (biller) {
+    const name = cleanName(biller[1]);
+    if (name) return name;
   }
   return null;
 }

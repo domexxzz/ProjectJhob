@@ -7,6 +7,8 @@ import { registerSchema, loginSchema } from '../../lib/validate';
 import { registerUser, loginUser } from './auth.service';
 import { verifyGoogleIdToken, verifyGoogleAccessToken, verifyFacebookToken, oauthLogin } from './oauth.service';
 import { prisma } from '../../lib/prisma';
+import { env } from '../../config/env';
+import { cache } from '../../lib/cache';
 
 export const authRouter = Router();
 
@@ -74,6 +76,114 @@ authRouter.post(
     const { accessToken } = facebookSchema.parse(req.body);
     const profile = await verifyFacebookToken(accessToken);
     res.json(await oauthLogin(profile));
+  }),
+);
+
+// ── Facebook server-side OAuth (สำหรับเว็บ/PWA) ──────────────────────────────
+// iOS Safari (ITP) บล็อก connect.facebook.net → FB JS SDK โหลดไม่ได้ ("window.FB is undefined")
+// จึงต้อง redirect ไป facebook.com ตรง ๆ แทนการใช้ SDK ฝั่ง client
+const fbRedirectUri = () =>
+  process.env.FACEBOOK_REDIRECT_URI ??
+  `${(env.webAppUrl || '').replace(/\/$/, '')}/api/v1/auth/facebook/callback`;
+
+// GET /api/v1/auth/facebook/start — พาไปหน้า login ของ Facebook
+authRouter.get(
+  '/facebook/start',
+  asyncHandler(async (req, res) => {
+    if (!env.facebookAppId) throw new HttpError(503, 'backend ยังไม่ได้ตั้ง FACEBOOK_APP_ID');
+    // state: กัน CSRF + จำหน้าที่ผู้ใช้จะกลับไป (ส่งกลับมาใน callback)
+    const state = Buffer.from(
+      JSON.stringify({ n: Math.random().toString(36).slice(2), t: Date.now() }),
+    ).toString('base64url');
+    const url =
+      'https://www.facebook.com/v21.0/dialog/oauth' +
+      `?client_id=${encodeURIComponent(env.facebookAppId)}` +
+      `&redirect_uri=${encodeURIComponent(fbRedirectUri())}` +
+      `&state=${state}` +
+      '&scope=email,public_profile';
+    res.redirect(url);
+  }),
+);
+
+// GET /api/v1/auth/facebook/callback — Facebook ส่ง code กลับมา → แลก token → JWT → กลับเว็บ
+authRouter.get(
+  '/facebook/callback',
+  asyncHandler(async (req, res) => {
+    const web = (env.webAppUrl || '').replace(/\/$/, '');
+    const fail = (msg: string) =>
+      res.redirect(`${web}/#/login?fb_error=${encodeURIComponent(msg)}`);
+
+    const code = typeof req.query.code === 'string' ? req.query.code : '';
+    if (!code) return fail(typeof req.query.error_description === 'string' ? req.query.error_description : 'ยกเลิกการล็อกอิน Facebook');
+    if (!env.facebookAppId || !env.facebookAppSecret) return fail('backend ยังไม่ได้ตั้ง FACEBOOK_APP_ID/SECRET');
+
+    // iOS Safari prefetch ลิงก์ล่วงหน้า → callback ถูกยิง 2 ครั้งด้วย code เดียวกัน
+    // ครั้งแรกกิน code (สำเร็จแต่ผู้ใช้ไม่เห็น) ครั้งที่สอง FB ตอบ "authorization code has been used"
+    // จึง cache ผล code→JWT ไว้สั้น ๆ แล้วคืนตัวเดิมถ้า code ซ้ำ
+    const codeKey = `fb_code:${code.slice(0, 64)}`;
+    const lockKey = `fb_lock:${code.slice(0, 64)}`;
+    const ok = (t: string) => res.redirect(`${web}/#/oauth?token=${encodeURIComponent(t)}`);
+
+    const cachedToken = await cache.get<string>(codeKey);
+    if (cachedToken) return ok(cachedToken);
+
+    // ถ้าอีก request กำลังแลก code เดียวกันอยู่ (prefetch vs การกดจริง มาพร้อมกัน)
+    // → รอผลของตัวที่ทำอยู่ แทนที่จะยิงซ้ำแล้วโดน "authorization code has been used"
+    if (await cache.get<string>(lockKey)) {
+      for (let i = 0; i < 32; i++) {
+        await new Promise((r) => setTimeout(r, 250)); // รอสูงสุด ~8 วินาที
+        const t = await cache.get<string>(codeKey);
+        if (t) return ok(t);
+      }
+      return fail('ล็อกอินใช้เวลานานเกินไป กรุณาลองอีกครั้ง');
+    }
+    await cache.set(lockKey, '1', 60);
+
+    // แลก code → access token (ต้องใช้ app secret ฝั่ง server เท่านั้น)
+    const tokenUrl =
+      'https://graph.facebook.com/v21.0/oauth/access_token' +
+      `?client_id=${encodeURIComponent(env.facebookAppId)}` +
+      `&client_secret=${encodeURIComponent(env.facebookAppSecret)}` +
+      `&redirect_uri=${encodeURIComponent(fbRedirectUri())}` +
+      `&code=${encodeURIComponent(code)}`;
+    const tokenRes = await fetch(tokenUrl);
+    const tokenBody = await tokenRes.text();
+    if (!tokenRes.ok) {
+      // โชว์สาเหตุจริงจาก Facebook (เช่น secret ผิด / redirect_uri ไม่ตรง) แทนข้อความกว้าง ๆ
+      let reason = tokenBody.slice(0, 200);
+      try {
+        const e = JSON.parse(tokenBody) as { error?: { message?: string } };
+        if (e.error?.message) reason = e.error.message;
+      } catch {
+        /* ไม่ใช่ JSON → ใช้ text ดิบ */
+      }
+      // "code has been used" = request ซ้ำจาก prefetch ที่ชนกันพอดี — ไม่ใช่ความผิดพลาดจริง
+      // ลองรอผลจาก request ที่แลกสำเร็จอีกสักครู่ก่อนค่อยยอมแพ้
+      if (/has been used|expired/i.test(reason)) {
+        console.warn('[fb-oauth] duplicate callback (prefetch) — รอผลจาก request แรก');
+        for (let i = 0; i < 24; i++) {
+          await new Promise((r) => setTimeout(r, 250)); // รอสูงสุด ~6 วินาที
+          const t = await cache.get<string>(codeKey);
+          if (t) return ok(t);
+        }
+        return fail('ลิงก์ล็อกอินหมดอายุ กรุณากดเข้าสู่ระบบด้วย Facebook อีกครั้ง');
+      }
+      console.error('[fb-oauth] token exchange failed', tokenRes.status, tokenBody.slice(0, 400));
+      return fail(`FB: ${reason}`);
+    }
+    const tokenJson = JSON.parse(tokenBody) as { access_token?: string };
+    if (!tokenJson.access_token) return fail('Facebook ไม่ได้ส่ง access token กลับมา');
+
+    try {
+      const profile = await verifyFacebookToken(tokenJson.access_token);
+      const { token } = await oauthLogin(profile);
+      // เก็บไว้ 3 นาที เผื่อ callback ถูกยิงซ้ำด้วย code เดิม (Safari prefetch)
+      await cache.set(codeKey, token, 180);
+      // ส่ง JWT กลับหน้าเว็บผ่าน hash fragment (ไม่ติด log ของ server/proxy)
+      ok(token);
+    } catch (e) {
+      return fail(e instanceof HttpError ? e.message : 'ล็อกอิน Facebook ไม่สำเร็จ');
+    }
   }),
 );
 

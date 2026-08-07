@@ -45,6 +45,7 @@ class _ChatScreenState extends ConsumerState<ChatScreen> {
   String? _typingId; // id ข้อความพี่เงินที่กำลัง "พิมพ์ทีละตัว" (typewriter)
 
   String? _pendingImage; // รูปที่แนบรอส่ง (dataUrl) — ยังไม่ส่งจนกว่าจะกดส่ง
+  String _pendingSlipType = 'expense'; // ผู้ใช้เลือกก่อนส่งสลิป: รายจ่าย(default)/รายรับ
   CancelToken? _cancelToken; // ใช้กดหยุดระหว่างพี่เงินกำลังตอบ
   String? _lastUserText; // เก็บข้อความล่าสุดไว้ "ส่งซ้ำ"
   String? _lastUserImage;
@@ -107,6 +108,7 @@ class _ChatScreenState extends ConsumerState<ChatScreen> {
     _controller.clear();
     _lastUserText = text.trim();
     _lastUserImage = img;
+    final slipTypeToSend = img != null ? _pendingSlipType : null; // เก็บก่อน setState เคลียร์
 
     final cancel = CancelToken();
     _cancelToken = cancel;
@@ -117,6 +119,7 @@ class _ChatScreenState extends ConsumerState<ChatScreen> {
         content: msg,
         createdAt: DateTime.now(),
         hasImage: img != null,
+        imageDataUrl: img, // เก็บรูปไว้โชว์ในฟองแชท (ไม่ใช่แค่ไอคอน)
       ));
       _sending = true;
       _menuExpanded = false;
@@ -128,6 +131,7 @@ class _ChatScreenState extends ConsumerState<ChatScreen> {
       final reply = await ref.read(chatRepoProvider).send(
             msg,
             imageBase64: img,
+            slipType: slipTypeToSend,
             includeFinancialContext: privacy.allowFinancialAnalysis,
             personalizedRecommendations: privacy.personalizedRecommendations,
             storeConversationHistory: privacy.shareForAiImprovement,
@@ -217,6 +221,7 @@ class _ChatScreenState extends ConsumerState<ChatScreen> {
       setState(() {
         _attaching = false;
         _pendingImage = dataUrl;
+        _pendingSlipType = 'expense'; // เริ่มที่รายจ่าย ให้ผู้ใช้แตะเลือกรายรับได้
       });
     } catch (e) {
       if (mounted) setState(() => _attaching = false);
@@ -368,6 +373,8 @@ class _ChatScreenState extends ConsumerState<ChatScreen> {
               attaching: _attaching,
               busy: _sending,
               pendingImage: _pendingImage,
+              slipType: _pendingSlipType,
+              onSlipTypeChanged: (t) => setState(() => _pendingSlipType = t),
               onMic: _toggleMic,
               onImage: _attachImage,
               onRemoveImage: () => setState(() => _pendingImage = null),
@@ -938,7 +945,24 @@ class _Bubble extends StatelessWidget {
               ),
               const SizedBox(height: 5),
             ],
-            if (isUser && message.hasImage) ...[
+            if (isUser && message.imageDataUrl != null) ...[
+              // โชว์รูปที่ผู้ใช้ส่งจริง (สลิป/ใบเสร็จ) ในฟองแชท
+              ClipRRect(
+                borderRadius: BorderRadius.circular(12),
+                child: ConstrainedBox(
+                  constraints: const BoxConstraints(maxHeight: 240, maxWidth: 220),
+                  child: Image.memory(
+                    base64Decode(message.imageDataUrl!.split(',').last),
+                    fit: BoxFit.cover,
+                    gaplessPlayback: true,
+                    errorBuilder: (_, __, ___) => const Icon(Icons.broken_image_outlined,
+                        color: Colors.white70, size: 32),
+                  ),
+                ),
+              ),
+              const SizedBox(height: 8),
+            ] else if (isUser && message.hasImage) ...[
+              // ประวัติเก่า (backend ไม่เก็บรูป) → ป้ายบอกว่าเคยส่งรูป
               const Row(
                 mainAxisSize: MainAxisSize.min,
                 children: [
@@ -1533,6 +1557,72 @@ class _TypingBubble extends StatelessWidget {
   }
 }
 
+/// ปุ่มสลับ รายจ่าย/รายรับ ตอนแนบสลิป — ให้ผู้ใช้เลือกเองแทนให้ระบบเดา (แม่นกว่า)
+class _SlipTypeToggle extends StatelessWidget {
+  const _SlipTypeToggle({required this.value, required this.onChanged});
+  final String value; // 'income' | 'expense'
+  final ValueChanged<String> onChanged;
+
+  @override
+  Widget build(BuildContext context) {
+    return Column(
+      mainAxisSize: MainAxisSize.min,
+      crossAxisAlignment: CrossAxisAlignment.start,
+      children: [
+        const Text('บันทึกสลิปเป็น',
+            style: TextStyle(
+                color: _chatMutedTextColor,
+                fontSize: 11,
+                fontWeight: FontWeight.w600)),
+        const SizedBox(height: 6),
+        Row(
+          mainAxisSize: MainAxisSize.min,
+          children: [
+            _chip('รายจ่าย', 'expense', Icons.trending_down,
+                const Color(0xFFF87171)),
+            const SizedBox(width: 6),
+            _chip('รายรับ', 'income', Icons.trending_up,
+                const Color(0xFF34D399)),
+          ],
+        ),
+      ],
+    );
+  }
+
+  Widget _chip(String label, String type, IconData icon, Color color) {
+    final selected = value == type;
+    return GestureDetector(
+      onTap: () => onChanged(type),
+      child: AnimatedContainer(
+        duration: const Duration(milliseconds: 150),
+        padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 8),
+        decoration: BoxDecoration(
+          color: selected
+              ? color.withValues(alpha: 0.20)
+              : const Color(0xFF16202E),
+          borderRadius: BorderRadius.circular(20),
+          border: Border.all(
+              color: selected ? color : const Color(0xFF334155),
+              width: selected ? 1.5 : 1),
+        ),
+        child: Row(
+          mainAxisSize: MainAxisSize.min,
+          children: [
+            Icon(icon, size: 15, color: selected ? color : _chatMutedTextColor),
+            const SizedBox(width: 4),
+            Text(label,
+                style: TextStyle(
+                    color: selected ? color : _chatMutedTextColor,
+                    fontSize: 12,
+                    fontWeight:
+                        selected ? FontWeight.w700 : FontWeight.w500)),
+          ],
+        ),
+      ),
+    );
+  }
+}
+
 class _InputBar extends StatelessWidget {
   const _InputBar({
     required this.controller,
@@ -1540,6 +1630,8 @@ class _InputBar extends StatelessWidget {
     required this.attaching,
     required this.busy,
     required this.pendingImage,
+    required this.slipType,
+    required this.onSlipTypeChanged,
     required this.onMic,
     required this.onImage,
     required this.onRemoveImage,
@@ -1551,6 +1643,8 @@ class _InputBar extends StatelessWidget {
   final bool attaching;
   final bool busy;
   final String? pendingImage; // dataUrl ของรูปที่แนบรอส่ง
+  final String slipType; // 'income' | 'expense' — ผู้ใช้เลือกก่อนส่งสลิป
+  final ValueChanged<String> onSlipTypeChanged;
   final VoidCallback onMic;
   final VoidCallback onImage;
   final VoidCallback onRemoveImage;
@@ -1569,32 +1663,42 @@ class _InputBar extends StatelessWidget {
               alignment: Alignment.centerLeft,
               child: Padding(
                 padding: const EdgeInsets.only(bottom: 6, left: 6),
-                child: Stack(
-                  clipBehavior: Clip.none,
+                child: Row(
+                  mainAxisSize: MainAxisSize.min,
+                  crossAxisAlignment: CrossAxisAlignment.center,
                   children: [
-                    ClipRRect(
-                      borderRadius: BorderRadius.circular(12),
-                      child: Image.memory(
-                        base64Decode(pendingImage!.split(',').last),
-                        width: 72,
-                        height: 72,
-                        fit: BoxFit.cover,
-                      ),
-                    ),
-                    Positioned(
-                      top: -6,
-                      right: -6,
-                      child: GestureDetector(
-                        onTap: onRemoveImage,
-                        child: Container(
-                          decoration: const BoxDecoration(
-                              color: Color(0xFF0F172A), shape: BoxShape.circle),
-                          padding: const EdgeInsets.all(3),
-                          child: const Icon(Icons.close,
-                              size: 16, color: Colors.white),
+                    Stack(
+                      clipBehavior: Clip.none,
+                      children: [
+                        ClipRRect(
+                          borderRadius: BorderRadius.circular(12),
+                          child: Image.memory(
+                            base64Decode(pendingImage!.split(',').last),
+                            width: 72,
+                            height: 72,
+                            fit: BoxFit.cover,
+                          ),
                         ),
-                      ),
+                        Positioned(
+                          top: -6,
+                          right: -6,
+                          child: GestureDetector(
+                            onTap: onRemoveImage,
+                            child: Container(
+                              decoration: const BoxDecoration(
+                                  color: Color(0xFF0F172A),
+                                  shape: BoxShape.circle),
+                              padding: const EdgeInsets.all(3),
+                              child: const Icon(Icons.close,
+                                  size: 16, color: Colors.white),
+                            ),
+                          ),
+                        ),
+                      ],
                     ),
+                    const SizedBox(width: 12),
+                    // ให้ผู้ใช้เลือกก่อนส่งว่าเป็นรายรับหรือรายจ่าย (แม่นกว่าให้ระบบเดา)
+                    _SlipTypeToggle(value: slipType, onChanged: onSlipTypeChanged),
                   ],
                 ),
               ),
