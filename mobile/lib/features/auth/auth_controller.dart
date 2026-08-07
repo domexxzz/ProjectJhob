@@ -114,6 +114,27 @@ class AuthController extends StateNotifier<AuthState> {
     await _tokens.write(token);
   }
 
+  /// รับ JWT ที่ได้จาก server-side OAuth (หน้า /oauth) → เก็บ token + โหลดโปรไฟล์
+  Future<bool> applyOAuthToken(String token) async {
+    state = state.copyWith(loading: true, clearError: true);
+    try {
+      await _tokens.write(token);
+      final res = await _dio.get('/auth/me');
+      state = state.copyWith(
+        user: AppUser.fromJson(res.data['user'] as Map<String, dynamic>),
+        loading: false,
+      );
+      await _ref
+          .read(appSettingsProvider.notifier)
+          .refreshNotificationPreferences();
+      return true;
+    } catch (_) {
+      await _tokens.clear();
+      state = state.copyWith(loading: false, error: 'ล็อกอินไม่สำเร็จ กรุณาลองใหม่');
+      return false;
+    }
+  }
+
   Future<bool> login(String email, String password) =>
       _authRequest('/auth/login', {'email': email, 'password': password});
 
