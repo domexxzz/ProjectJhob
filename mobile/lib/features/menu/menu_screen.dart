@@ -69,8 +69,8 @@ class MenuScreen extends ConsumerWidget {
                       const SizedBox(width: 14),
                       Expanded(
                         child: _MenuCard(
-                          icon: Icons.receipt_long,
-                          title: 'Subscription',
+                          icon: Icons.card_membership_rounded,
+                          title: 'ค่าสมาชิก',
                           subtitle: 'การสมัครสมาชิก,\nบิลประจำงวด',
                           onTap: () => context.push('/subscriptions'),
                         ),
