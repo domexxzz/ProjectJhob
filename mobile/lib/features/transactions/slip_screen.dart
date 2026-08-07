@@ -11,7 +11,6 @@ import '../../core/money.dart';
 import 'transaction.dart';
 import 'transactions_repository.dart';
 import '../notifications/notifications_repository.dart';
-import '../settings/settings_screen.dart';
 import '../auth/auth_controller.dart';
 
 const _thMonths = [
@@ -280,92 +279,230 @@ class _SlipScreenState extends ConsumerState<SlipScreen> {
     showModalBottomSheet(
       context: context,
       isScrollControlled: true,
-      backgroundColor: AppColors.surface,
+      backgroundColor: const Color(0xFF111714),
       shape: const RoundedRectangleBorder(
-          borderRadius: BorderRadius.vertical(top: Radius.circular(20))),
+        borderRadius: BorderRadius.vertical(top: Radius.circular(24)),
+      ),
       builder: (_) => SafeArea(
         child: ConstrainedBox(
-          constraints: BoxConstraints(maxHeight: MediaQuery.of(context).size.height * 0.7),
+          constraints: BoxConstraints(
+            maxHeight: MediaQuery.of(context).size.height * 0.75,
+          ),
           child: Consumer(builder: (ctx, ref2, __) {
             final asyncVal = ref2.watch(categoriesProvider);
             return asyncVal.when(
               loading: () => const SizedBox(
-                  height: 160,
-                  child: Center(
-                      child: CircularProgressIndicator(color: AppColors.primary))),
+                height: 200,
+                child: Center(
+                  child: CircularProgressIndicator(color: AppColors.primary),
+                ),
+              ),
               error: (e, _) => Padding(
-                padding: const EdgeInsets.all(20),
-                child: Text('โหลดหมวดหมู่ไม่ได้: $e', style: const TextStyle(color: Colors.redAccent)),
+                padding: const EdgeInsets.all(24),
+                child: Text('โหลดหมวดหมู่ไม่ได้: $e',
+                    style: const TextStyle(color: Colors.redAccent)),
               ),
               data: (cats) {
-                if (cats.isEmpty) {
-                  return const Padding(
-                    padding: EdgeInsets.all(32),
-                    child: Center(
-                      child: Text('ไม่มีหมวดหมู่ในระบบ', style: TextStyle(color: Colors.white54)),
-                    ),
-                  );
-                }
                 return Column(
                   mainAxisSize: MainAxisSize.min,
                   crossAxisAlignment: CrossAxisAlignment.start,
                   children: [
-                    Padding(
-                      padding: const EdgeInsets.fromLTRB(18, 16, 18, 8),
-                      child: Row(
-                        children: [
-                          const Icon(Icons.category_rounded, color: AppColors.primary, size: 20),
-                          const SizedBox(width: 8),
-                          const Text('เลือกหมวดหมู่',
-                              style: TextStyle(color: Colors.white, fontSize: 16, fontWeight: FontWeight.bold)),
-                        ],
+                    // ── Drag Handle Bar ──
+                    Center(
+                      child: Container(
+                        margin: const EdgeInsets.only(top: 10, bottom: 6),
+                        width: 40,
+                        height: 4.5,
+                        decoration: BoxDecoration(
+                          color: Colors.white24,
+                          borderRadius: BorderRadius.circular(3),
+                        ),
                       ),
                     ),
-                    Flexible(
-                      child: ListView.separated(
-                        padding: const EdgeInsets.fromLTRB(16, 0, 16, 16),
-                        shrinkWrap: true,
-                        itemCount: cats.length,
-                        separatorBuilder: (_, __) => const SizedBox(height: 8),
-                        itemBuilder: (ctx2, i) {
-                          final c = cats[i];
-                          final sel = c.id == _categoryId && _selectedBudget == null;
-                          return GestureDetector(
-                            onTap: () {
-                              setState(() {
-                                _categoryId = c.id;
-                                _selectedBudget = null;
-                              });
-                              Navigator.pop(ctx);
-                            },
-                            child: Container(
-                              padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 14),
-                              decoration: BoxDecoration(
-                                color: sel ? const Color(0xFF0C2E1B) : AppColors.bg,
-                                borderRadius: BorderRadius.circular(14),
-                                border: Border.all(
-                                  color: sel ? AppColors.primary : const Color(0xFF1E293B),
-                                  width: sel ? 2 : 1,
+
+                    // ── Header Title & Add Button ──
+                    Padding(
+                      padding: const EdgeInsets.fromLTRB(20, 10, 20, 14),
+                      child: Row(
+                        mainAxisAlignment: MainAxisAlignment.spaceBetween,
+                        children: [
+                          const Row(
+                            children: [
+                              Icon(Icons.widgets_rounded,
+                                  color: AppColors.primary, size: 22),
+                              SizedBox(width: 10),
+                              Text(
+                                'เลือกหมวดหมู่',
+                                style: TextStyle(
+                                  color: Colors.white,
+                                  fontSize: 18,
+                                  fontWeight: FontWeight.bold,
+                                  letterSpacing: 0.3,
                                 ),
                               ),
-                              child: Row(
+                            ],
+                          ),
+                          GestureDetector(
+                            onTap: () {
+                              Navigator.pop(ctx);
+                              _showCreateCategoryDialog(context, ref2);
+                            },
+                            child: Container(
+                              padding: const EdgeInsets.symmetric(
+                                  horizontal: 12, vertical: 6),
+                              decoration: BoxDecoration(
+                                color: AppColors.primary.withOpacity(0.15),
+                                borderRadius: BorderRadius.circular(16),
+                                border: Border.all(
+                                    color: AppColors.primary.withOpacity(0.3)),
+                              ),
+                              child: const Row(
                                 children: [
-                                  Text(c.icon, style: const TextStyle(fontSize: 22)),
-                                  const SizedBox(width: 12),
+                                  Icon(Icons.add_rounded,
+                                      color: AppColors.primary, size: 16),
+                                  SizedBox(width: 4),
                                   Text(
-                                    c.nameTh,
+                                    'เพิ่มใหม่',
                                     style: TextStyle(
-                                      color: sel ? Colors.white : Colors.white70,
-                                      fontWeight: sel ? FontWeight.bold : FontWeight.normal,
+                                      color: AppColors.primary,
+                                      fontSize: 12,
+                                      fontWeight: FontWeight.bold,
                                     ),
                                   ),
                                 ],
                               ),
                             ),
-                          );
-                        },
+                          ),
+                        ],
                       ),
                     ),
+
+                    if (cats.isEmpty)
+                      const Padding(
+                        padding: EdgeInsets.all(32),
+                        child: Center(
+                          child: Text('ยังไม่มีหมวดหมู่ในระบบ',
+                              style: TextStyle(color: Colors.white54)),
+                        ),
+                      )
+                    else
+                      Flexible(
+                        child: ListView.separated(
+                          padding: const EdgeInsets.fromLTRB(18, 0, 18, 16),
+                          shrinkWrap: true,
+                          itemCount: cats.length + 1,
+                          separatorBuilder: (_, __) =>
+                              const SizedBox(height: 10),
+                          itemBuilder: (ctx2, i) {
+                            // การ์ดปุ่ม "+ เพิ่มหมวดหมู่ใหม่ด้วยตัวเอง" ที่ด้านล่างสุด
+                            if (i == cats.length) {
+                              return GestureDetector(
+                                onTap: () {
+                                  Navigator.pop(ctx);
+                                  _showCreateCategoryDialog(context, ref2);
+                                },
+                                child: Container(
+                                  padding: const EdgeInsets.symmetric(
+                                      horizontal: 16, vertical: 15),
+                                  decoration: BoxDecoration(
+                                    color: const Color(0xFF172C20),
+                                    borderRadius: BorderRadius.circular(16),
+                                    border: Border.all(
+                                      color:
+                                          AppColors.primary.withOpacity(0.5),
+                                      width: 1.5,
+                                    ),
+                                  ),
+                                  child: const Row(
+                                    mainAxisAlignment: MainAxisAlignment.center,
+                                    children: [
+                                      Icon(Icons.add_circle_outline_rounded,
+                                          color: AppColors.primary, size: 20),
+                                      SizedBox(width: 8),
+                                      Text(
+                                        '+ เพิ่มหมวดหมู่ใหม่ด้วยตัวเอง',
+                                        style: TextStyle(
+                                          color: AppColors.primary,
+                                          fontWeight: FontWeight.bold,
+                                          fontSize: 14,
+                                        ),
+                                      ),
+                                    ],
+                                  ),
+                                ),
+                              );
+                            }
+
+                            final c = cats[i];
+                            final sel =
+                                c.id == _categoryId && _selectedBudget == null;
+
+                            return GestureDetector(
+                              onTap: () {
+                                setState(() {
+                                  _categoryId = c.id;
+                                  _selectedBudget = null;
+                                });
+                                Navigator.pop(ctx);
+                              },
+                              child: AnimatedContainer(
+                                duration: const Duration(milliseconds: 150),
+                                padding: const EdgeInsets.symmetric(
+                                    horizontal: 16, vertical: 14),
+                                decoration: BoxDecoration(
+                                  color: sel
+                                      ? const Color(0xFF143522)
+                                      : const Color(0xFF1A221E),
+                                  borderRadius: BorderRadius.circular(16),
+                                  border: Border.all(
+                                    color: sel
+                                        ? AppColors.primary
+                                        : Colors.white.withOpacity(0.08),
+                                    width: sel ? 2 : 1,
+                                  ),
+                                ),
+                                child: Row(
+                                  children: [
+                                    Container(
+                                      width: 40,
+                                      height: 40,
+                                      decoration: BoxDecoration(
+                                        color: sel
+                                            ? AppColors.primary.withOpacity(0.2)
+                                            : Colors.white.withOpacity(0.06),
+                                        borderRadius: BorderRadius.circular(12),
+                                      ),
+                                      child: Center(
+                                        child: Text(c.icon,
+                                            style:
+                                                const TextStyle(fontSize: 22)),
+                                      ),
+                                    ),
+                                    const SizedBox(width: 14),
+                                    Expanded(
+                                      child: Text(
+                                        c.nameTh,
+                                        style: TextStyle(
+                                          color: sel
+                                              ? Colors.white
+                                              : Colors.white70,
+                                          fontSize: 15,
+                                          fontWeight: sel
+                                              ? FontWeight.bold
+                                              : FontWeight.w500,
+                                        ),
+                                      ),
+                                    ),
+                                    if (sel)
+                                      const Icon(Icons.check_circle_rounded,
+                                          color: AppColors.primary, size: 22),
+                                  ],
+                                ),
+                              ),
+                            );
+                          },
+                        ),
+                      ),
                   ],
                 );
               },
@@ -374,6 +511,123 @@ class _SlipScreenState extends ConsumerState<SlipScreen> {
         ),
       ),
     );
+  }
+
+  Future<void> _showCreateCategoryDialog(BuildContext context, WidgetRef ref) async {
+    final nameController = TextEditingController();
+    String selectedIcon = '📁';
+    final selectedType = _type;
+    
+    final icons = ['📁', '🍲', '☕', '🚗', '🛍️', '🏠', '🎮', '💊', '✈️', '🐾', '🎁', '🎓', '💰', '💸', '📱', '⚡'];
+
+    final newCategory = await showDialog<Category>(
+      context: context,
+      builder: (dlgCtx) => StatefulBuilder(
+        builder: (context, setDlgState) => AlertDialog(
+          backgroundColor: const Color(0xFF1A221E),
+          shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(20)),
+          title: const Row(
+            children: [
+              Icon(Icons.add_circle_outline_rounded, color: AppColors.primary),
+              SizedBox(width: 8),
+              Text('เพิ่มหมวดหมู่ใหม่', style: TextStyle(color: Colors.white, fontSize: 18, fontWeight: FontWeight.bold)),
+            ],
+          ),
+          content: SingleChildScrollView(
+            child: Column(
+              mainAxisSize: MainAxisSize.min,
+              crossAxisAlignment: CrossAxisAlignment.start,
+              children: [
+                const Text('ชื่อหมวดหมู่', style: TextStyle(color: Colors.white70, fontSize: 13)),
+                const SizedBox(height: 6),
+                TextField(
+                  controller: nameController,
+                  style: const TextStyle(color: Colors.white),
+                  autofocus: true,
+                  decoration: InputDecoration(
+                    hintText: 'เช่น ค่าน้ำผลไม้, ค่าสัตว์เลี้ยง',
+                    hintStyle: const TextStyle(color: Colors.white38, fontSize: 13),
+                    filled: true,
+                    fillColor: const Color(0xFF111714),
+                    contentPadding: const EdgeInsets.symmetric(horizontal: 14, vertical: 12),
+                    border: OutlineInputBorder(
+                      borderRadius: BorderRadius.circular(12),
+                      borderSide: const BorderSide(color: Colors.white12),
+                    ),
+                    focusedBorder: OutlineInputBorder(
+                      borderRadius: BorderRadius.circular(12),
+                      borderSide: const BorderSide(color: AppColors.primary),
+                    ),
+                  ),
+                ),
+                const SizedBox(height: 16),
+                const Text('เลือกไอคอน', style: TextStyle(color: Colors.white70, fontSize: 13)),
+                const SizedBox(height: 8),
+                Wrap(
+                  spacing: 8,
+                  runSpacing: 8,
+                  children: icons.map((ic) {
+                    final isSel = selectedIcon == ic;
+                    return InkWell(
+                      onTap: () => setDlgState(() => selectedIcon = ic),
+                      borderRadius: BorderRadius.circular(10),
+                      child: Container(
+                        padding: const EdgeInsets.all(8),
+                        decoration: BoxDecoration(
+                          color: isSel ? AppColors.primary.withOpacity(0.25) : const Color(0xFF111714),
+                          borderRadius: BorderRadius.circular(10),
+                          border: Border.all(color: isSel ? AppColors.primary : Colors.white10),
+                        ),
+                        child: Text(ic, style: const TextStyle(fontSize: 22)),
+                      ),
+                    );
+                  }).toList(),
+                ),
+              ],
+            ),
+          ),
+          actions: [
+            TextButton(
+              onPressed: () => Navigator.pop(dlgCtx),
+              child: const Text('ยกเลิก', style: TextStyle(color: Colors.white54)),
+            ),
+            FilledButton(
+              style: FilledButton.styleFrom(
+                backgroundColor: AppColors.primary,
+                shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(12)),
+              ),
+              onPressed: () async {
+                final name = nameController.text.trim();
+                if (name.isEmpty) return;
+                try {
+                  final cat = await ref.read(transactionsRepoProvider).createCategory(
+                    nameTh: name,
+                    icon: selectedIcon,
+                    type: selectedType,
+                  );
+                  if (dlgCtx.mounted) Navigator.pop(dlgCtx, cat);
+                } catch (e) {
+                  if (dlgCtx.mounted) {
+                    ScaffoldMessenger.of(dlgCtx).showSnackBar(
+                      SnackBar(content: Text('สร้างหมวดหมู่ไม่สำเร็จ: $e')),
+                    );
+                  }
+                }
+              },
+              child: const Text('สร้างหมวดหมู่', style: TextStyle(color: Colors.white, fontWeight: FontWeight.bold)),
+            ),
+          ],
+        ),
+      ),
+    );
+
+    if (newCategory != null) {
+      ref.invalidate(categoriesProvider);
+      setState(() {
+        _categoryId = newCategory.id;
+        _selectedBudget = null;
+      });
+    }
   }
 
   Future<void> _confirm() async {
