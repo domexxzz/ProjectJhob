@@ -171,6 +171,21 @@ PREDICTION_API_URL="http://127.0.0.1:8000/predict"
 Render ตั้ง **Auto-Deploy = On Commit** → **push เข้า `deploy/cloud` เมื่อไหร่ เว็บจริงเปลี่ยนทันที**
 ถ้า push โค้ดพัง = แอปที่อาจารย์/เพื่อนใช้อยู่พังทันที
 
+> ⚠️ **push เข้า `main` งานจะไม่ขึ้น production!** เพราะ Render ดูที่ `deploy/cloud` เท่านั้น
+> แตก branch จาก `deploy/cloud` และเปิด PR กลับเข้า `deploy/cloud` เสมอ
+
+### 🖼️ แก้โค้ด Flutter แล้วต้อง rebuild web ด้วย (คนลืมบ่อยมาก)
+เว็บ/PWA ถูกเสิร์ฟจาก **`backend/public`** ซึ่งเป็น **ไฟล์ build ที่ commit ไว้ในกิต**
+แก้ไฟล์ใน `mobile/lib/` แล้ว push เฉย ๆ **หน้าเว็บจะไม่เปลี่ยน** ต้องทำเพิ่ม:
+```bash
+cd mobile
+flutter build web --release
+cd ..
+rm -rf backend/public && cp -r mobile/build/web backend/public
+git add backend/public && git commit -m "chore: rebuild web"
+```
+> (แอป Android ไม่เกี่ยว — ต้อง build APK ใหม่แยกอยู่แล้ว)
+
 ### ✅ วิธีทำงานที่ถูกต้อง
 ```bash
 # 1) แตก branch ของตัวเองก่อนเสมอ
