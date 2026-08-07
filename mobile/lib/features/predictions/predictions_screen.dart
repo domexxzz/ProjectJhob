@@ -6,7 +6,6 @@ import 'package:intl/intl.dart';
 
 import '../../app/theme.dart';
 import '../../core/money.dart';
-import '../dashboard/dashboard_screen.dart';
 import '../transactions/transactions_repository.dart';
 import '../settings/settings_screen.dart';
 import 'predictions_model.dart';

@@ -1,9 +1,7 @@
-import 'package:flutter/foundation.dart' show kIsWeb;
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:go_router/go_router.dart';
 
-import '../../app/theme.dart';
 import 'auth_controller.dart';
 
 /// ปุ่มล็อกอินด้วย Google / Facebook — ใช้ทั้งหน้า Login และ Register

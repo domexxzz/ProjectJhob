@@ -62,9 +62,10 @@ jobs:
           cd mobile
           flutter pub get
 
-      # --no-fatal-infos: ตอนนี้โปรเจกต์มี info ~180 ตัว (พวก withOpacity deprecated)
-      # แต่ error/warning = 0 → ให้ CI แดงเฉพาะตอนมีปัญหาจริง ไม่ใช่แดงตลอด
+      # ให้ CI แดงเฉพาะตอนมี "error" จริง (โค้ดคอมไพล์ไม่ผ่าน) — จะได้ไม่แดงตลอดจนทีมชินแล้วมองข้าม
+      # สถานะปัจจุบัน: error 0 · warning 4 (โค้ดที่ประกาศไว้แต่ยังไม่ได้ใช้) · info ~180 (withOpacity deprecated)
+      # TODO: เก็บกวาด warning/info แล้วค่อยเปลี่ยนเป็น --no-fatal-infos อย่างเดียว เพื่อให้เข้มขึ้น
       - name: Run analyzer
         run: |
           cd mobile
-          flutter analyze --no-fatal-infos
+          flutter analyze --no-fatal-infos --no-fatal-warnings

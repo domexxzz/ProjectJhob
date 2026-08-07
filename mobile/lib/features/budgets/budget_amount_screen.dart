@@ -4,12 +4,9 @@ import 'package:flutter/services.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:go_router/go_router.dart';
 
-import 'package:intl/intl.dart';
 
 import '../../app/theme.dart';
-import '../goals/set_deadline_screen.dart';
 import '../transactions/transactions_repository.dart';
-import '../settings/settings_screen.dart';
 import '../../core/money.dart';
 import '../auth/auth_controller.dart';
 

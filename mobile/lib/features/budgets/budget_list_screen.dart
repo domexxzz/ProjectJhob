@@ -10,7 +10,6 @@ import '../auth/auth_controller.dart';
 import '../settings/settings_screen.dart';
 import '../profile/profile_avatar.dart';
 import '../../widgets/app_bottom_nav_bar.dart';
-import 'package:intl/intl.dart';
 
 class BudgetListScreen extends ConsumerWidget {
   const BudgetListScreen({super.key});
