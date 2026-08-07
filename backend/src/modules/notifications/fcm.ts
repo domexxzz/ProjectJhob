@@ -1,5 +1,6 @@
 import { readFileSync } from 'fs';
 import { prisma } from '../../lib/prisma';
+import { env } from '../../config/env';
 
 // 🔔 FCM push แบบ "เปิดได้ทีหลัง" — ถ้ายังไม่ลง firebase-admin หรือไม่มี creds
 // ทุกอย่างจะ no-op เงียบ ๆ (in-app notification center ยังทำงานปกติ)
@@ -47,6 +48,11 @@ export async function sendPush(userId: string, title: string, body: string): Pro
       notification: { title, body },
       // ใช้ channel IMPORTANCE_HIGH (สร้างใน MainActivity ฝั่งแอป) → เด้ง heads-up + มีเสียง
       android: { priority: 'high', notification: { channelId: 'high_importance_channel' } },
+      // เว็บ/PWA (รวม iPhone ที่เพิ่มลงหน้าจอโฮม) — ใส่ไอคอนและให้แตะแล้วเปิดแอป
+      webpush: {
+        notification: { icon: '/icons/Icon-192.png', badge: '/icons/Icon-192.png' },
+        fcmOptions: { link: env.webAppUrl || '/' },
+      },
     });
   } catch (e) {
     console.error('[fcm] ส่ง push ล้มเหลว:', (e as Error).message);

@@ -1,8 +1,11 @@
+import 'package:flutter/foundation.dart' show kIsWeb;
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:go_router/go_router.dart';
 import 'package:shared_preferences/shared_preferences.dart';
 
+import '../notifications/fcm_service.dart';
+import '../../app/theme.dart';
 import '../../core/api/api_client.dart';
 
 class AppSettings {
@@ -233,6 +236,24 @@ class SettingsScreen extends ConsumerWidget {
                 const SizedBox(height: 12),
                 _SettingsGroup(
                   children: [
+                    // เว็บ/PWA: iOS บังคับว่าการขอสิทธิ์แจ้งเตือนต้องมาจากการกดของผู้ใช้
+                    // (แอป Android ขอให้อัตโนมัติตอนล็อกอินอยู่แล้ว จึงไม่ต้องมีปุ่มนี้)
+                    if (kIsWeb)
+                      _SettingsActionTile(
+                        icon: Icons.notifications_active_rounded,
+                        title: 'เปิดแจ้งเตือนบนเครื่องนี้',
+                        value: 'แตะเพื่ออนุญาต',
+                        onTap: () async {
+                          final messenger = ScaffoldMessenger.of(context);
+                          final r = await enableWebNotifications(
+                              ref.read(dioProvider));
+                          messenger.showSnackBar(SnackBar(
+                            content: Text(r.message),
+                            backgroundColor:
+                                r.ok ? AppColors.primary : AppColors.expense,
+                          ));
+                        },
+                      ),
                     _SettingsSwitchTile(
                       icon: Icons.notifications_active_outlined,
                       title: 'เปิดการแจ้งเตือน',
