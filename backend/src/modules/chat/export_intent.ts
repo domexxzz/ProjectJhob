@@ -21,6 +21,9 @@ export interface ChatAttachment {
   filename: string;
   label: string;
   token: string;
+  /** เก็บไว้กู้ไฟล์ตอน cache หมดอายุ (เฉพาะไฟล์ที่ LLM จัดจากแชท) */
+  cacheId?: string;
+  payload?: DynamicExportPayload;
 }
 
 const STRUCTURED_FORMATS: ExportFormat[] = ['xlsx', 'xml', 'csv', 'json'];
@@ -108,7 +111,11 @@ export async function buildDynamicExportReply(
   const filename = `${safe}-${stamp}.${format}`;
   const countText = itemCount === null ? '' : ` (${itemCount} แถว)`;
   const reply = `ได้เลยครับ 📄 พี่เงินจัด **${label}** จากที่คุยกันเป็นไฟล์ ${formatLabel(format)} ให้แล้ว${countText} — กดปุ่มด้านล่างเพื่อดาวน์โหลด 📥`;
-  return { reply, attachment: { kind: 'custom', format, filename, label, token } };
+  // แนบ payload ไปกับข้อความด้วย → ถูกบันทึกลง DB ทำให้โหลดซ้ำได้แม้ cache หมดอายุ/เซิร์ฟเวอร์รีสตาร์ต
+  return {
+    reply,
+    attachment: { kind: 'custom', format, filename, label, token, cacheId, payload },
+  };
 }
 
 function documentFromHistory(history: ChatTurn[]): DynamicDocument | null {

@@ -3,6 +3,9 @@ import 'dart:convert';
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:intl/intl.dart';
+import 'package:url_launcher/url_launcher.dart';
+
+import '../../core/api/api_client.dart';
 
 import 'chat_repository.dart';
 import 'chat_session.dart';
@@ -488,6 +491,37 @@ class _ChatSidebarState extends ConsumerState<ChatSidebar> {
     );
   }
 
+
+  IconData _fileIcon(String format) => switch (format) {
+        'pdf' => Icons.picture_as_pdf_rounded,
+        'xlsx' || 'csv' => Icons.table_chart_rounded,
+        'docx' || 'txt' || 'html' => Icons.description_rounded,
+        _ => Icons.code_rounded,
+      };
+
+  /// เปิดไฟล์ที่พี่เงินสร้างไว้ — ใช้ URL เดียวกับปุ่มดาวน์โหลดในฟองแชท
+  Future<void> _downloadFile(ChatFile f) async {
+    final messenger = ScaffoldMessenger.of(context);
+    final url =
+        '$kApiBaseUrl/api/v1/export/${f.kind}?format=${f.format}&dt=${f.token}';
+    try {
+      final ok = await launchUrl(
+        Uri.parse(url),
+        webOnlyWindowName: '_blank',
+        mode: LaunchMode.externalApplication,
+      );
+      if (!ok && mounted) {
+        messenger.showSnackBar(const SnackBar(
+            content: Text('เปิดไฟล์ไม่ได้ ลองใหม่อีกครั้งครับ')));
+      }
+    } catch (_) {
+      if (mounted) {
+        messenger.showSnackBar(const SnackBar(
+            content: Text('ดาวน์โหลดไม่สำเร็จ — ไฟล์อาจหมดอายุแล้ว')));
+      }
+    }
+  }
+
   // ── แท็บ 3: ไฟล์ที่พี่เงินสร้างให้ ──────────────────────────────────────────
   Widget _filesTab() {
     final files = ref.watch(chatFilesProvider);
@@ -529,16 +563,30 @@ class _ChatSidebarState extends ConsumerState<ChatSidebar> {
                   color: _card, borderRadius: BorderRadius.circular(11)),
               child: ListTile(
                 dense: true,
+                onTap: () => _downloadFile(f),
+                trailing: IconButton(
+                  tooltip: 'ดาวน์โหลด',
+                  icon: const Icon(Icons.download_rounded,
+                      color: _greenLight, size: 21),
+                  onPressed: () => _downloadFile(f),
+                ),
                 leading: Container(
                   padding: const EdgeInsets.all(7),
                   decoration: BoxDecoration(
                       color: _green.withValues(alpha: 0.16),
                       borderRadius: BorderRadius.circular(9)),
-                  child: Text(f.format.toUpperCase(),
-                      style: const TextStyle(
-                          color: _greenLight,
-                          fontSize: 10,
-                          fontWeight: FontWeight.bold)),
+                  child: Column(
+                    mainAxisSize: MainAxisSize.min,
+                    children: [
+                      Icon(_fileIcon(f.format), color: _greenLight, size: 16),
+                      const SizedBox(height: 1),
+                      Text(f.format.toUpperCase(),
+                          style: const TextStyle(
+                              color: _greenLight,
+                              fontSize: 8,
+                              fontWeight: FontWeight.bold)),
+                    ],
+                  ),
                 ),
                 title: Text(f.label.isNotEmpty ? f.label : f.filename,
                     maxLines: 1,

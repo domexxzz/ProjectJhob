@@ -57,6 +57,7 @@ class ChatMedia {
 class ChatFile {
   ChatFile({
     required this.id,
+    required this.kind,
     required this.format,
     required this.filename,
     required this.label,
@@ -67,6 +68,7 @@ class ChatFile {
   });
 
   final String id;
+  final String kind; // custom | transactions | budget | summary | subscriptions
   final String format;
   final String filename;
   final String label;
@@ -77,6 +79,7 @@ class ChatFile {
 
   factory ChatFile.fromJson(Map<String, dynamic> j) => ChatFile(
         id: j['id'] as String,
+        kind: (j['kind'] ?? 'custom') as String,
         format: (j['format'] ?? '') as String,
         filename: (j['filename'] ?? '') as String,
         label: (j['label'] ?? '') as String,
