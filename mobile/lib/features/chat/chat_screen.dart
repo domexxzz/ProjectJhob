@@ -15,6 +15,8 @@ import '../../app/theme.dart';
 import '../../core/api/api_client.dart';
 import 'chat_message.dart';
 import 'chat_repository.dart';
+import 'chat_sessions_provider.dart';
+import 'chat_sidebar.dart';
 import '../transactions/transactions_repository.dart';
 import '../transactions/transaction.dart' show Category;
 import '../privacy/privacy_screen.dart';
@@ -81,9 +83,40 @@ class _ChatScreenState extends ConsumerState<ChatScreen> {
     super.dispose();
   }
 
+  /// เริ่มบทสนทนาใหม่ — สร้างห้องใหม่แล้วล้างหน้าจอ
+  Future<void> _startNewChat() async {
+    ref.read(sidebarOpenProvider.notifier).state = false;
+    setState(() {
+      _messages.clear();
+      _loading = true;
+    });
+    try {
+      final s = await ref.read(chatRepoProvider).createSession();
+      ref.read(currentSessionIdProvider.notifier).state = s.id;
+      ref.invalidate(chatSessionsProvider);
+    } catch (_) {
+      // สร้างห้องไม่ได้ (ออฟไลน์) → ปล่อยให้ backend เลือกห้องเองตอนส่งข้อความ
+      ref.read(currentSessionIdProvider.notifier).state = null;
+    }
+    if (mounted) setState(() => _loading = false);
+  }
+
+  /// สลับไปห้องอื่น
+  Future<void> _switchSession(String sessionId) async {
+    ref.read(sidebarOpenProvider.notifier).state = false;
+    ref.read(currentSessionIdProvider.notifier).state = sessionId;
+    setState(() {
+      _messages.clear();
+      _loading = true;
+    });
+    await _loadHistory();
+  }
+
   Future<void> _loadHistory() async {
     try {
-      final h = await ref.read(chatRepoProvider).history();
+      final h = await ref
+          .read(chatRepoProvider)
+          .historyOf(ref.read(currentSessionIdProvider));
       if (!mounted) return;
       setState(() {
         _messages
@@ -128,9 +161,13 @@ class _ChatScreenState extends ConsumerState<ChatScreen> {
     _scrollToBottom();
     try {
       final privacy = ref.read(privacySettingsProvider);
+      // ย่อรูปไว้โชว์ในแกลเลอรี (ไม่เก็บรูปเต็มลง DB)
+      final thumb = img != null ? await makeThumbnail(img) : null;
       final reply = await ref.read(chatRepoProvider).send(
             msg,
             imageBase64: img,
+            thumbnail: thumb,
+            sessionId: ref.read(currentSessionIdProvider),
             slipType: slipTypeToSend,
             includeFinancialContext: privacy.allowFinancialAnalysis,
             personalizedRecommendations: privacy.personalizedRecommendations,
@@ -138,6 +175,8 @@ class _ChatScreenState extends ConsumerState<ChatScreen> {
             cancelToken: cancel,
           );
       if (!mounted) return;
+      // ห้องอาจถูกตั้งชื่อ/เลื่อนลำดับ → รีเฟรชรายการใน sidebar
+      ref.invalidate(chatSessionsProvider);
       setState(() {
         _messages.add(reply);
         _typingId = reply.id; // ให้ค่อย ๆ พิมพ์ออกมา
@@ -259,6 +298,10 @@ class _ChatScreenState extends ConsumerState<ChatScreen> {
 
   @override
   Widget build(BuildContext context) {
+    final sidebarOpen = ref.watch(sidebarOpenProvider);
+    // จอกว้าง (แท็บเล็ต/เว็บ) ให้แถบข้างกว้างคงที่ · มือถือใช้ 82% ของจอ
+    final screenW = MediaQuery.of(context).size.width;
+    final sidebarWidth = screenW > 620 ? 320.0 : screenW * 0.82;
     final hasConversation = _messages.isNotEmpty;
     final showFullMenu = !hasConversation || _menuExpanded;
 
@@ -266,24 +309,43 @@ class _ChatScreenState extends ConsumerState<ChatScreen> {
       appBar: AppBar(
         centerTitle: true,
         leading: IconButton(
-          icon: const Icon(Icons.arrow_back, color: Colors.white, size: 24),
-          onPressed: () {
-            if (Navigator.of(context).canPop() || context.canPop()) {
-              context.pop();
-            } else {
-              context.go('/');
-            }
-          },
+          tooltip: 'บทสนทนา',
+          icon: const Icon(Icons.view_sidebar_rounded,
+              color: Colors.white, size: 22),
+          onPressed: () => ref
+              .read(sidebarOpenProvider.notifier)
+              .update((v) => !v),
         ),
         title: const Text(
           'พี่เงิน',
           style: TextStyle(fontSize: 18, fontWeight: FontWeight.w800),
         ),
+        actions: [
+          IconButton(
+            tooltip: 'แชทใหม่',
+            icon: const Icon(Icons.add_comment_outlined,
+                color: Colors.white, size: 21),
+            onPressed: _startNewChat,
+          ),
+          IconButton(
+            tooltip: 'กลับหน้าหลัก',
+            icon: const Icon(Icons.home_rounded, color: Colors.white, size: 22),
+            onPressed: () {
+              if (Navigator.of(context).canPop() || context.canPop()) {
+                context.pop();
+              } else {
+                context.go('/');
+              }
+            },
+          ),
+        ],
       ),
-      body: SafeArea(
-        child: Column(
-          children: [
-            _AvatarHeader(mood: _mood),
+      body: Stack(
+        children: [
+          SafeArea(
+            child: Column(
+              children: [
+                _AvatarHeader(mood: _mood),
             _RichMenu(
               busy: _sending,
               expanded: showFullMenu,
@@ -381,8 +443,34 @@ class _ChatScreenState extends ConsumerState<ChatScreen> {
               onSend: () => _send(_controller.text),
               onStop: _stopGenerating,
             ),
+              ],
+            ),
+          ),
+
+          // ── แถบข้าง: รายการบทสนทนา / รูป / ไฟล์ ──
+          if (sidebarOpen) ...[
+            // แตะพื้นที่มืดเพื่อปิด
+            Positioned.fill(
+              child: GestureDetector(
+                onTap: () =>
+                    ref.read(sidebarOpenProvider.notifier).state = false,
+                child: Container(color: Colors.black54),
+              ),
+            ),
+            Align(
+              alignment: Alignment.centerLeft,
+              child: SizedBox(
+                width: sidebarWidth,
+                child: ChatSidebar(
+                  onSelectSession: _switchSession,
+                  onNewChat: _startNewChat,
+                  onClose: () =>
+                      ref.read(sidebarOpenProvider.notifier).state = false,
+                ),
+              ),
+            ),
           ],
-        ),
+        ],
       ),
     );
   }
