@@ -28,6 +28,7 @@ class ChatMedia {
     required this.thumbnail,
     required this.createdAt,
     this.sessionId,
+    this.sessionTitle,
     this.caption,
     this.ocrPreview,
   });
@@ -36,6 +37,7 @@ class ChatMedia {
   final String thumbnail; // data URL
   final DateTime createdAt;
   final String? sessionId;
+  final String? sessionTitle;
   final String? caption;
   final String? ocrPreview;
 
@@ -45,6 +47,7 @@ class ChatMedia {
         createdAt:
             DateTime.tryParse('${j['createdAt']}')?.toLocal() ?? DateTime.now(),
         sessionId: j['sessionId'] as String?,
+        sessionTitle: j['sessionTitle'] as String?,
         caption: j['caption'] as String?,
         ocrPreview: j['ocrPreview'] as String?,
       );
@@ -60,6 +63,7 @@ class ChatFile {
     required this.token,
     required this.createdAt,
     this.sessionId,
+    this.sessionTitle,
   });
 
   final String id;
@@ -69,6 +73,7 @@ class ChatFile {
   final String token;
   final DateTime createdAt;
   final String? sessionId;
+  final String? sessionTitle;
 
   factory ChatFile.fromJson(Map<String, dynamic> j) => ChatFile(
         id: j['id'] as String,
@@ -79,5 +84,6 @@ class ChatFile {
         createdAt:
             DateTime.tryParse('${j['createdAt']}')?.toLocal() ?? DateTime.now(),
         sessionId: j['sessionId'] as String?,
+        sessionTitle: j['sessionTitle'] as String?,
       );
 }

@@ -32,6 +32,8 @@ class ChatSidebar extends ConsumerStatefulWidget {
 
 class _ChatSidebarState extends ConsumerState<ChatSidebar> {
   int _tab = 0; // 0 = แชท · 1 = รูป · 2 = ไฟล์
+  String? _mediaFilter; // null = ทุกแชท
+  String? _fileFilter;
 
   @override
   Widget build(BuildContext context) {
@@ -302,6 +304,62 @@ class _ChatSidebarState extends ConsumerState<ChatSidebar> {
     }
   }
 
+
+  /// แถบเลือกกรองตามห้องแชท — สร้างรายการจากข้อมูลที่โหลดมาเลย ไม่ต้องยิง API เพิ่ม
+  Widget _sessionFilterBar({
+    required List<({String? id, String title})> options,
+    required String? selected,
+    required ValueChanged<String?> onChanged,
+  }) {
+    if (options.isEmpty) return const SizedBox.shrink();
+    return SizedBox(
+      height: 38,
+      child: ListView.separated(
+        scrollDirection: Axis.horizontal,
+        padding: const EdgeInsets.fromLTRB(10, 6, 10, 4),
+        itemCount: options.length + 1,
+        separatorBuilder: (_, __) => const SizedBox(width: 6),
+        itemBuilder: (_, i) {
+          final opt = i == 0 ? (id: null, title: 'ทุกแชท') : options[i - 1];
+          final active = selected == opt.id;
+          return GestureDetector(
+            onTap: () => onChanged(opt.id),
+            child: Container(
+              padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 7),
+              decoration: BoxDecoration(
+                color: active ? _green.withValues(alpha: 0.20) : _card,
+                borderRadius: BorderRadius.circular(20),
+                border: Border.all(
+                    color: active ? _greenLight : const Color(0xFF243040)),
+              ),
+              child: Text(
+                opt.title,
+                style: TextStyle(
+                  fontSize: 11.5,
+                  color: active ? _greenLight : Colors.white60,
+                  fontWeight: active ? FontWeight.bold : FontWeight.w500,
+                ),
+              ),
+            ),
+          );
+        },
+      ),
+    );
+  }
+
+  /// รวมรายชื่อห้องที่ปรากฏในข้อมูล (ไม่ซ้ำ เรียงตามที่เจอ)
+  List<({String? id, String title})> _optionsFrom(
+      Iterable<({String? id, String? title})> items) {
+    final seen = <String>{};
+    final out = <({String? id, String title})>[];
+    for (final it in items) {
+      final id = it.id;
+      if (id == null || !seen.add(id)) continue;
+      out.add((id: id, title: it.title?.trim().isNotEmpty == true ? it.title! : 'ไม่มีชื่อ'));
+    }
+    return out;
+  }
+
   // ── แท็บ 2: รูปที่ผู้ใช้เคยส่ง ──────────────────────────────────────────────
   Widget _mediaTab() {
     final media = ref.watch(chatMediaProvider);
@@ -315,16 +373,33 @@ class _ChatSidebarState extends ConsumerState<ChatSidebar> {
           return _emptyBox(Icons.image_outlined, 'ยังไม่มีรูป',
               'รูปสลิป/ใบเสร็จที่ส่งให้พี่เงินจะมาอยู่ที่นี่');
         }
-        return GridView.builder(
+        final options =
+            _optionsFrom(list.map((m) => (id: m.sessionId, title: m.sessionTitle)));
+        final shown = _mediaFilter == null
+            ? list
+            : list.where((m) => m.sessionId == _mediaFilter).toList();
+        return Column(children: [
+          _sessionFilterBar(
+            options: options,
+            selected: _mediaFilter,
+            onChanged: (v) => setState(() => _mediaFilter = v),
+          ),
+          if (shown.isEmpty)
+            Expanded(
+                child: _emptyBox(Icons.filter_alt_off_rounded, 'ไม่มีรูปในแชทนี้',
+                    'ลองเลือก "ทุกแชท" ดูครับ'))
+          else
+            Expanded(
+              child: GridView.builder(
           padding: const EdgeInsets.all(10),
           gridDelegate: const SliverGridDelegateWithFixedCrossAxisCount(
             crossAxisCount: 2,
             mainAxisSpacing: 8,
             crossAxisSpacing: 8,
           ),
-          itemCount: list.length,
+          itemCount: shown.length,
           itemBuilder: (_, i) {
-            final m = list[i];
+            final m = shown[i];
             return GestureDetector(
               onTap: () => _previewMedia(m),
               child: ClipRRect(
@@ -352,8 +427,10 @@ class _ChatSidebarState extends ConsumerState<ChatSidebar> {
                 ),
               ),
             );
-          },
-        );
+                },
+              ),
+            ),
+        ]);
       },
     );
   }
@@ -424,12 +501,29 @@ class _ChatSidebarState extends ConsumerState<ChatSidebar> {
           return _emptyBox(Icons.folder_open_rounded, 'ยังไม่มีไฟล์',
               'ลองบอกพี่เงินว่า "ขอไฟล์ Excel สรุปรายจ่าย"');
         }
-        return ListView.separated(
+        final options =
+            _optionsFrom(list.map((f) => (id: f.sessionId, title: f.sessionTitle)));
+        final shown = _fileFilter == null
+            ? list
+            : list.where((f) => f.sessionId == _fileFilter).toList();
+        return Column(children: [
+          _sessionFilterBar(
+            options: options,
+            selected: _fileFilter,
+            onChanged: (v) => setState(() => _fileFilter = v),
+          ),
+          if (shown.isEmpty)
+            Expanded(
+                child: _emptyBox(Icons.filter_alt_off_rounded,
+                    'ไม่มีไฟล์ในแชทนี้', 'ลองเลือก "ทุกแชท" ดูครับ'))
+          else
+            Expanded(
+              child: ListView.separated(
           padding: const EdgeInsets.all(10),
-          itemCount: list.length,
+          itemCount: shown.length,
           separatorBuilder: (_, __) => const SizedBox(height: 6),
           itemBuilder: (_, i) {
-            final f = list[i];
+            final f = shown[i];
             return Container(
               decoration: BoxDecoration(
                   color: _card, borderRadius: BorderRadius.circular(11)),
@@ -451,13 +545,18 @@ class _ChatSidebarState extends ConsumerState<ChatSidebar> {
                     overflow: TextOverflow.ellipsis,
                     style: const TextStyle(color: Colors.white, fontSize: 13.5)),
                 subtitle: Text(
-                    DateFormat('d MMM y', 'th').format(f.createdAt),
+                    '${DateFormat('d MMM y', 'th').format(f.createdAt)}'
+                    '${f.sessionTitle != null ? ' · ${f.sessionTitle}' : ''}',
+                    maxLines: 1,
+                    overflow: TextOverflow.ellipsis,
                     style:
                         const TextStyle(color: Colors.white38, fontSize: 11)),
               ),
             );
-          },
-        );
+                },
+              ),
+            ),
+        ]);
       },
     );
   }

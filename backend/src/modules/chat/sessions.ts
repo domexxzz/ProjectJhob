@@ -3,6 +3,7 @@
  * ข้อความเก่าที่ยังไม่มีห้อง (sessionId = null) จะถูกย้ายเข้าห้องให้อัตโนมัติครั้งแรกที่เปิดรายการห้อง
  */
 import { prisma } from '../../lib/prisma';
+import { chatComplete } from './coach';
 
 /** ตัดข้อความแรกมาเป็นชื่อห้อง เช่น "กาแฟ 50 บาท" */
 export function titleFromMessage(message: string): string {
@@ -71,11 +72,71 @@ export async function assertOwnedSession(userId: string, sessionId: string): Pro
 export async function touchSession(sessionId: string, userMessage: string): Promise<void> {
   const session = await prisma.chatSession.findUnique({
     where: { id: sessionId },
-    select: { title: true },
+    select: { title: true, titleLocked: true },
   });
-  const shouldRename = !session?.title || session.title === 'แชทใหม่';
+  // ตั้งชื่อชั่วคราวจากข้อความแรกก่อน (จะได้มีชื่อทันที) — เดี๋ยว AI มาตั้งให้ดีกว่าทีหลัง
+  const shouldRename = !session?.titleLocked && (!session?.title || session.title === 'แชทใหม่');
   await prisma.chatSession.update({
     where: { id: sessionId },
     data: shouldRename ? { title: titleFromMessage(userMessage) } : { updatedAt: new Date() },
   });
+}
+
+/**
+ * ให้ AI อ่านบทสนทนาทั้งห้องแล้วตั้งชื่อที่สื่อความหมาย
+ * เรียกแบบ fire-and-forget หลังตอบผู้ใช้ไปแล้ว (ไม่ให้ผู้ใช้รอ)
+ * ทำเฉพาะตอนบทสนทนาเริ่มมีเนื้อหาพอ (4 ข้อความ) และซ้ำอีกครั้งตอนยาวขึ้น (12)
+ */
+export async function autoTitleSession(sessionId: string): Promise<void> {
+  try {
+    const session = await prisma.chatSession.findUnique({
+      where: { id: sessionId },
+      select: { titleLocked: true, _count: { select: { messages: true } } },
+    });
+    if (!session || session.titleLocked) return;
+
+    const count = session._count.messages;
+    if (count !== 4 && count !== 12) return; // ตั้งชื่อเฉพาะจังหวะที่กำหนด กันเรียก LLM ถี่เกิน
+
+    const messages = await prisma.chatMessage.findMany({
+      where: { sessionId },
+      orderBy: { createdAt: 'asc' },
+      take: 12,
+      select: { role: true, content: true },
+    });
+    if (messages.length < 2) return;
+
+    const transcript = messages
+      .map((m) => `${m.role === 'user' ? 'ผู้ใช้' : 'พี่เงิน'}: ${m.content.slice(0, 300)}`)
+      .join('\n');
+
+    const out = await chatComplete(
+      [
+        {
+          role: 'system',
+          content:
+            'ตั้งชื่อหัวข้อบทสนทนาให้สั้นกระชับเป็นภาษาไทย บอกว่าคุยเรื่องอะไร\n' +
+            'กติกา: ยาวไม่เกิน 6 คำ · ห้ามใส่เครื่องหมายคำพูด · ห้ามขึ้นต้นว่า "บทสนทนาเรื่อง"\n' +
+            'ตอบมาเฉพาะชื่อหัวข้อเท่านั้น ห้ามมีข้อความอื่น\n' +
+            'ตัวอย่าง: วางแผนออมเงินซื้อโน้ตบุ๊ก / บันทึกค่ากาแฟรายวัน / สรุปรายจ่ายเดือนนี้',
+        },
+        { role: 'user', content: transcript.slice(0, 4000) },
+      ],
+      { temperature: 0.3, maxTokens: 60 },
+    );
+    if (!out?.text) return;
+
+    // เก็บกวาดคำตอบ: ตัดอัญประกาศ/บรรทัดเกิน แล้วจำกัดความยาว
+    const title = out.text
+      .split('\n')[0]
+      .replace(/^["'“”‘’\s]+|["'“”‘’\s.]+$/g, '')
+      .slice(0, 60)
+      .trim();
+    if (title.length < 2) return;
+
+    await prisma.chatSession.update({ where: { id: sessionId }, data: { title } });
+  } catch (e) {
+    // ตั้งชื่อไม่สำเร็จไม่ใช่เรื่องคอขาดบาดตาย — ใช้ชื่อจากข้อความแรกต่อไป
+    console.warn('[sessions] ตั้งชื่อห้องอัตโนมัติไม่สำเร็จ:', (e as Error).message);
+  }
 }

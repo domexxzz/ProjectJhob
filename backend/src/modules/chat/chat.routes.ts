@@ -20,6 +20,7 @@ import {
   ensureSession,
   assertOwnedSession,
   touchSession,
+  autoTitleSession,
 } from './sessions';
 
 export const chatRouter = Router();
@@ -92,7 +93,7 @@ chatRouter.patch(
     }
     const session = await prisma.chatSession.update({
       where: { id: req.params.id },
-      data: { title: title.trim() },
+      data: { title: title.trim(), titleLocked: true }, // ผู้ใช้ตั้งเอง → AI ห้ามทับ
     });
     res.json({ session });
   }),
@@ -116,11 +117,20 @@ chatRouter.delete(
 chatRouter.get(
   '/media',
   asyncHandler(async (req, res) => {
+    const filterSession = typeof req.query.sessionId === 'string' ? req.query.sessionId : undefined;
     const rows = await prisma.chatMessage.findMany({
-      where: { userId: req.userId!, role: 'user', thumbnail: { not: null } },
+      where: {
+        userId: req.userId!,
+        role: 'user',
+        thumbnail: { not: null },
+        ...(filterSession ? { sessionId: filterSession } : {}),
+      },
       orderBy: { createdAt: 'desc' },
       take: 60,
-      select: { id: true, sessionId: true, content: true, thumbnail: true, createdAt: true, context: true },
+      select: {
+        id: true, sessionId: true, content: true, thumbnail: true, createdAt: true, context: true,
+        session: { select: { title: true } }, // ให้ UI รู้ว่ามาจากแชทไหน
+      },
     });
     res.json({
       media: rows.map((m) => {
@@ -133,6 +143,7 @@ chatRouter.get(
         return {
           id: m.id,
           sessionId: m.sessionId,
+          sessionTitle: m.session?.title,
           caption: m.content,
           thumbnail: m.thumbnail,
           createdAt: m.createdAt,
@@ -147,11 +158,20 @@ chatRouter.get(
 chatRouter.get(
   '/files',
   asyncHandler(async (req, res) => {
+    const filterSession = typeof req.query.sessionId === 'string' ? req.query.sessionId : undefined;
     const rows = await prisma.chatMessage.findMany({
-      where: { userId: req.userId!, role: 'assistant', context: { contains: '"attachment"' } },
+      where: {
+        userId: req.userId!,
+        role: 'assistant',
+        context: { contains: '"attachment"' },
+        ...(filterSession ? { sessionId: filterSession } : {}),
+      },
       orderBy: { createdAt: 'desc' },
       take: 60,
-      select: { id: true, sessionId: true, context: true, createdAt: true },
+      select: {
+        id: true, sessionId: true, context: true, createdAt: true,
+        session: { select: { title: true } },
+      },
     });
     const files = [];
     for (const r of rows) {
@@ -161,6 +181,7 @@ chatRouter.get(
           files.push({
             id: r.id,
             sessionId: r.sessionId,
+            sessionTitle: r.session?.title,
             createdAt: r.createdAt,
             kind: att.kind,
             format: att.format,
@@ -454,6 +475,8 @@ chatRouter.post(
     );
 
     await awardChatPoints(userId);
+    // ให้ AI ตั้งชื่อห้องจากเนื้อหาทั้งบทสนทนา — ทำเบื้องหลัง ไม่ให้ผู้ใช้รอ
+    if (sessionId) autoTitleSession(sessionId).catch(() => {});
     res.status(201).json({ message: saved, source });
   }),
 );

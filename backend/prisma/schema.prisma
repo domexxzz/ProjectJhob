@@ -112,7 +112,8 @@ model Goal {
 model ChatSession {
   id        String   @id @default(cuid())
   userId    String
-  title     String   @default("แชทใหม่") // ตั้งอัตโนมัติจากข้อความแรก แก้เองได้
+  title       String  @default("แชทใหม่") // AI ตั้งให้จากเนื้อหาบทสนทนา แก้เองได้
+  titleLocked Boolean @default(false) // true = ผู้ใช้ตั้งชื่อเอง ห้าม AI ทับ
   createdAt DateTime @default(now())
   updatedAt DateTime @updatedAt // ใช้เรียงห้องล่าสุดขึ้นก่อน
 
