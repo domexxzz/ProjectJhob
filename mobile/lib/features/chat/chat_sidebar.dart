@@ -502,6 +502,14 @@ class _ChatSidebarState extends ConsumerState<ChatSidebar> {
   /// เปิดไฟล์ที่พี่เงินสร้างไว้ — ใช้ URL เดียวกับปุ่มดาวน์โหลดในฟองแชท
   Future<void> _downloadFile(ChatFile f) async {
     final messenger = ScaffoldMessenger.of(context);
+    if (!f.downloadable) {
+      messenger.showSnackBar(const SnackBar(
+        content: Text('ไฟล์นี้สร้างไว้ก่อนอัปเดตระบบ จึงโหลดซ้ำไม่ได้ '
+            '— บอกพี่เงินให้สร้างใหม่ได้เลยครับ'),
+        duration: Duration(seconds: 4),
+      ));
+      return;
+    }
     final url =
         '$kApiBaseUrl/api/v1/export/${f.kind}?format=${f.format}&dt=${f.token}';
     try {
@@ -565,9 +573,13 @@ class _ChatSidebarState extends ConsumerState<ChatSidebar> {
                 dense: true,
                 onTap: () => _downloadFile(f),
                 trailing: IconButton(
-                  tooltip: 'ดาวน์โหลด',
-                  icon: const Icon(Icons.download_rounded,
-                      color: _greenLight, size: 21),
+                  tooltip: f.downloadable ? 'ดาวน์โหลด' : 'โหลดซ้ำไม่ได้',
+                  icon: Icon(
+                      f.downloadable
+                          ? Icons.download_rounded
+                          : Icons.refresh_rounded,
+                      color: f.downloadable ? _greenLight : Colors.white30,
+                      size: 21),
                   onPressed: () => _downloadFile(f),
                 ),
                 leading: Container(

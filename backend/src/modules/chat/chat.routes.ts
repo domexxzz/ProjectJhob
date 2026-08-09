@@ -188,6 +188,9 @@ chatRouter.get(
             filename: att.filename,
             label: att.label,
             token: att.token,
+            // ไฟล์ชนิดมาตรฐานสร้างใหม่จากข้อมูลสดได้เสมอ ส่วนไฟล์ที่ LLM จัดเอง (custom)
+            // ต้องมี payload เก็บไว้ถึงจะโหลดซ้ำได้ (ไฟล์ที่สร้างก่อนอัปเดตจะไม่มี)
+            downloadable: att.kind !== 'custom' || !!att.payload,
           });
         }
       } catch {

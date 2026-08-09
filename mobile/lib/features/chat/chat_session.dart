@@ -65,6 +65,7 @@ class ChatFile {
     required this.createdAt,
     this.sessionId,
     this.sessionTitle,
+    this.downloadable = true,
   });
 
   final String id;
@@ -76,6 +77,8 @@ class ChatFile {
   final DateTime createdAt;
   final String? sessionId;
   final String? sessionTitle;
+  /// false = ไฟล์เก่าที่ไม่ได้เก็บข้อมูลไว้ (สร้างก่อนอัปเดต) → โหลดซ้ำไม่ได้
+  final bool downloadable;
 
   factory ChatFile.fromJson(Map<String, dynamic> j) => ChatFile(
         id: j['id'] as String,
@@ -88,5 +91,6 @@ class ChatFile {
             DateTime.tryParse('${j['createdAt']}')?.toLocal() ?? DateTime.now(),
         sessionId: j['sessionId'] as String?,
         sessionTitle: j['sessionTitle'] as String?,
+        downloadable: (j['downloadable'] ?? true) as bool,
       );
 }
