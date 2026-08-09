@@ -14,6 +14,7 @@ import 'package:url_launcher/url_launcher.dart';
 import '../../app/theme.dart';
 import '../../core/api/api_client.dart';
 import 'chat_message.dart';
+import '../../core/download/file_download.dart';
 import 'chat_repository.dart';
 import 'chat_sessions_provider.dart';
 import 'chat_sidebar.dart';
@@ -1548,8 +1549,8 @@ class _DownloadButton extends StatelessWidget {
       onPressed: () {
         final url =
             '$kApiBaseUrl/api/v1/export/${att.kind}?format=${att.format}&dt=${att.token}';
-        launchUrl(Uri.parse(url),
-            webOnlyWindowName: '_blank', mode: LaunchMode.externalApplication);
+        // ใช้ตัวช่วยที่รองรับ iOS PWA (เปิด URL attachment ตรง ๆ จะได้หน้าขาว)
+        downloadFile(url, att.filename);
       },
       icon: Icon(icon, size: 18, color: AppColors.primary),
       label: Text('ดาวน์โหลด ${att.filename}',

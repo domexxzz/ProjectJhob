@@ -3,9 +3,9 @@ import 'dart:convert';
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:intl/intl.dart';
-import 'package:url_launcher/url_launcher.dart';
 
 import '../../core/api/api_client.dart';
+import '../../core/download/file_download.dart';
 
 import 'chat_repository.dart';
 import 'chat_session.dart';
@@ -513,14 +513,11 @@ class _ChatSidebarState extends ConsumerState<ChatSidebar> {
     final url =
         '$kApiBaseUrl/api/v1/export/${f.kind}?format=${f.format}&dt=${f.token}';
     try {
-      final ok = await launchUrl(
-        Uri.parse(url),
-        webOnlyWindowName: '_blank',
-        mode: LaunchMode.externalApplication,
-      );
-      if (!ok && mounted) {
-        messenger.showSnackBar(const SnackBar(
-            content: Text('เปิดไฟล์ไม่ได้ ลองใหม่อีกครั้งครับ')));
+      downloadFile(url, f.filename);
+      if (mounted) {
+        messenger.showSnackBar(SnackBar(
+            content: Text('กำลังดาวน์โหลด ${f.filename} 📥'),
+            duration: const Duration(seconds: 2)));
       }
     } catch (_) {
       if (mounted) {
