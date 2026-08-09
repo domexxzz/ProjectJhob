@@ -52,7 +52,10 @@ export function detectExportRequest(message: string): { kind: ExportKind | 'cust
   else if (/สรุปการเงิน|สรุปบัญชี|ภาพรวมการเงิน/.test(m)) kind = 'summary';
 
   // ข้อมูลจากฐานข้อมูลเหมาะกับ Excel; เนื้อหาคำแนะนำ/บทสนทนาเหมาะกับ PDF
-  return { kind, format: format ?? (kind === 'custom' ? 'pdf' : 'xlsx') };
+  // แต่ถ้าผู้ใช้พูดถึง "ตาราง" ชัดเจน ให้เป็น Excel (เอาไปกรอกต่อได้จริง)
+  const asksForTable = /ทำตาราง|เป็นตาราง|คอลัมน์|แถว/.test(m);
+  const fallbackFormat: ExportFormat = kind === 'custom' && !asksForTable ? 'pdf' : 'xlsx';
+  return { kind, format: format ?? fallbackFormat };
 }
 
 export function buildExportReply(userId: string, kind: ExportKind, format: ExportFormat): { reply: string; attachment: ChatAttachment } {
@@ -76,10 +79,13 @@ export async function buildDynamicExportReply(
   const wantsTable = STRUCTURED_FORMATS.includes(format) || /ตาราง|คอลัมน์|แถว|spreadsheet|สเปรดชีต/i.test(message);
 
   if (isDocumentFormat(format) && !wantsTable) {
-    payload = documentFromHistory(history);
+    payload = documentFromHistory(history) ?? fallbackTableFromContext(ctx);
   } else {
     const generated = await generateTable(ctx, message, history);
-    const table = generated ? normalizeSavingsPlanDates(generated, message) : null;
+    // LLM จัดตารางไม่ได้ → ใช้ตารางสรุปจากข้อมูลจริงแทน ผู้ใช้จะได้ไฟล์เสมอ
+    const table = generated
+      ? normalizeSavingsPlanDates(generated, message)
+      : fallbackTableFromContext(ctx);
     payload = table;
     itemCount = table?.rows.length ?? null;
   }
@@ -125,17 +131,69 @@ async function generateTable(ctx: CoachContext, question: string, history: ChatT
   const currentDate = `${today.day}/${today.month}/${today.year + 543}`;
   const system =
     'คุณเป็นตัวช่วยจัดข้อมูลการเงินเป็น “ตาราง” สำหรับส่งออกเป็นไฟล์\n' +
-    'จากบทสนทนาและคำขอล่าสุด ให้ดึง/จัดข้อมูลที่ผู้ใช้ต้องการเป็นตาราง แล้วตอบเป็น JSON เท่านั้น ห้ามมีข้อความอื่นหรือ code fence\n' +
+    'ให้ดู "บทสนทนาก่อนหน้า" เป็นหลัก แล้วแปลงสิ่งที่คุยกันไว้ให้เป็นตาราง เช่น ถ้าเพิ่งคุยเรื่อง\n' +
+    'แผนออมเงิน ให้ทำตารางแผนออม (งวด/วันที่/ยอดออม/ยอดสะสม/คงเหลือ) ถ้าคุยเรื่องสรุปรายจ่าย\n' +
+    'ให้ทำตารางรายจ่ายตามหมวด — ยึดตัวเลขที่ปรากฏในบทสนทนาเป็นหลัก\n' +
+    'ตอบเป็น JSON เท่านั้น ห้ามมีข้อความอื่นหรือ code fence\n' +
     'รูปแบบ: {"title":"ชื่อสั้นๆ","sheet":"ชื่อชีต","headers":["คอลัมน์1","คอลัมน์2"],"rows":[["ค่า","ค่า"]]}\n' +
     `วันนี้ตามเวลาไทยคือ ${currentDate} ถ้าเป็นแผนรายเดือนต้องเริ่มจากวัน/เดือน/ปีนี้ ห้ามเริ่มจากมกราคมโดยอัตโนมัติ ` +
     'แต่ละงวดเป็นหนึ่งเดือนเต็ม: เริ่มวันเดียวกันของเดือนถัดไป และสิ้นสุดหนึ่งวันก่อนงวดถัดไป\n' +
-    'เงินเป็นบาท อ้างอิงข้อมูลจริงของผู้ใช้ด้านล่างถ้าเกี่ยวข้อง ถ้าข้อมูลไม่พอให้ headers และ rows เป็น []\n\n' +
+    'เงินเป็นบาท\n' +
+    '⚠️ สำคัญ: ห้ามคืน rows เป็น [] เด็ดขาด ต้องมีอย่างน้อย 1 แถวเสมอ\n' +
+    'ถ้าบทสนทนาไม่มีตัวเลขให้ใช้ ให้สร้างตารางสรุปจาก "ข้อมูลผู้ใช้จริง" ด้านล่างแทน\n\n' +
     '## ข้อมูลผู้ใช้ (context จริง)\n' +
     buildContextBlock(ctx);
   const messages: LlmMessage[] = [{ role: 'system', content: system }, ...history.slice(-12), { role: 'user', content: question }];
+
   const output = await chatComplete(messages, { temperature: 0.2, maxTokens: 1200 });
-  if (!output) return null;
-  return parseTable(output.text);
+  const first = output ? parseTable(output.text) : null;
+  if (first) return first;
+
+  // ลองอีกครั้งแบบบังคับให้ตอบ JSON ล้วน (บางครั้งโมเดลเผลอเขียนคำอธิบายนำ)
+  const retry = await chatComplete(
+    [
+      ...messages,
+      {
+        role: 'user',
+        content:
+          'ตอบใหม่เป็น JSON ล้วน ๆ อย่างเดียว ขึ้นต้นด้วย { และจบด้วย } '
+          + 'ห้ามมีคำอธิบาย ห้ามมี ``` และ rows ต้องมีอย่างน้อย 1 แถว',
+      },
+    ],
+    { temperature: 0, maxTokens: 1200 },
+  );
+  return retry ? parseTable(retry.text) : null;
+}
+
+/**
+ * ตารางสำรอง — สร้างจากข้อมูลจริงของผู้ใช้ เมื่อ LLM จัดตารางไม่สำเร็จ
+ * เพื่อให้ผู้ใช้ "ได้ไฟล์เสมอ" แทนที่จะเจอทางตัน
+ */
+function fallbackTableFromContext(ctx: CoachContext): DynamicTable | null {
+  const baht = (satang: number) => Math.round(satang / 100);
+  const rows: (string | number)[][] = [];
+
+  rows.push(['รายได้ต่อเดือน', baht(ctx.monthlyIncome)]);
+  rows.push(['ใช้ไปเดือนนี้', baht(ctx.thisMonthSpent)]);
+  rows.push(['คงเหลือเดือนนี้', baht(ctx.monthlyIncome - ctx.thisMonthSpent)]);
+
+  for (const b of ctx.budgetRemaining ?? []) {
+    rows.push([`งบ: ${b.category}`, baht(b.remaining)]);
+  }
+  for (const t of ctx.topExpenses ?? []) {
+    rows.push([`ใช้จ่าย: ${t.category}`, baht(t.amount)]);
+  }
+  for (const g of ctx.goals ?? []) {
+    rows.push([`เป้าหมาย: ${g.name}`, `${g.progressPct}%`]);
+  }
+
+  if (rows.length === 0) return null;
+  return {
+    title: 'สรุปการเงินของฉัน',
+    sheet: 'สรุป',
+    headers: ['รายการ', 'จำนวน (บาท)'],
+    rows,
+  };
 }
 
 function parseTable(text: string): DynamicTable | null {
