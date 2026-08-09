@@ -3,6 +3,7 @@ import { z } from 'zod';
 import { asyncHandler, HttpError } from '../../lib/http';
 import { requireAuth } from '../../lib/auth';
 import { prisma } from '../../lib/prisma';
+import { signExportToken } from '../export/export.service';
 import { cache } from '../../lib/cache';
 import { buildContext } from './context_builder';
 import { generateReply, generateReplyWithTools, ChatTurn, ocrImage } from './coach';
@@ -187,7 +188,11 @@ chatRouter.get(
             format: att.format,
             filename: att.filename,
             label: att.label,
-            token: att.token,
+            // ออก token ใหม่ทุกครั้งที่เปิดรายการ — token มีอายุ 15 นาที
+            // ถ้าใช้ตัวที่เก็บใน DB ไฟล์เก่าจะหมดอายุแล้วกดโหลดได้หน้าขาว
+            token: att.cacheId
+              ? signExportToken(req.userId!, att.cacheId)
+              : signExportToken(req.userId!),
             // ไฟล์ชนิดมาตรฐานสร้างใหม่จากข้อมูลสดได้เสมอ ส่วนไฟล์ที่ LLM จัดเอง (custom)
             // ต้องมี payload เก็บไว้ถึงจะโหลดซ้ำได้ (ไฟล์ที่สร้างก่อนอัปเดตจะไม่มี)
             downloadable: att.kind !== 'custom' || !!att.payload,

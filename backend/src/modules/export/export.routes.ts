@@ -72,7 +72,13 @@ exportRouter.get(
     }
 
     res.setHeader('Content-Type', file.contentType);
-    res.setHeader('Content-Disposition', `attachment; filename="${encodeURIComponent(file.filename)}"`);
+    // ชื่อไฟล์ภาษาไทยต้องส่งตามมาตรฐาน RFC 5987 (filename*) ไม่งั้นเบราว์เซอร์
+    // จะโชว์เป็น %E0%B9%81... หรืออักขระเพี้ยน · filename= ธรรมดาไว้เป็นตัวสำรอง
+    const asciiFallback = file.filename.replace(/[^ -~]/g, '_').replace(/"/g, '');
+    res.setHeader(
+      'Content-Disposition',
+      `attachment; filename="${asciiFallback}"; filename*=UTF-8''${encodeURIComponent(file.filename)}`,
+    );
     res.send(file.body);
   }),
 );
