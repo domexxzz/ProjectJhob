@@ -87,7 +87,12 @@ export async function buildDynamicExportReply(
     const generated = await generateTable(ctx, message, history);
     // LLM จัดตารางไม่ได้ → ใช้ตารางสรุปจากข้อมูลจริงแทน ผู้ใช้จะได้ไฟล์เสมอ
     const table = generated
-      ? normalizeSavingsPlanDates(generated, message)
+      // ส่งบทสนทนาไปด้วย เพราะระยะเวลาแผน (เช่น "10 ปี") มักอยู่ในข้อความก่อนหน้า
+      // ไม่ใช่ในคำขอล่าสุดที่ผู้ใช้พิมพ์สั้น ๆ ว่า "ขอเป็น Excel"
+      ? normalizeSavingsPlanDates(
+          generated,
+          `${history.slice(-6).map((h) => h.content).join(' ')} ${message}`,
+        )
       : fallbackTableFromContext(ctx);
     payload = table;
     itemCount = table?.rows.length ?? null;
@@ -146,7 +151,8 @@ async function generateTable(ctx: CoachContext, question: string, history: ChatT
     `วันนี้ตามเวลาไทยคือ ${currentDate} ถ้าเป็นแผนรายเดือนต้องเริ่มจากวัน/เดือน/ปีนี้ ห้ามเริ่มจากมกราคมโดยอัตโนมัติ ` +
     'แต่ละงวดเป็นหนึ่งเดือนเต็ม: เริ่มวันเดียวกันของเดือนถัดไป และสิ้นสุดหนึ่งวันก่อนงวดถัดไป\n' +
     'เงินเป็นบาท\n' +
-    '⚠️ สำคัญ: ห้ามคืน rows เป็น [] เด็ดขาด ต้องมีอย่างน้อย 1 แถวเสมอ\n' +
+    '⚠️ สำคัญ: ห้ามคืน rows เป็น [] เด็ดขาด\n' +
+    'ถ้าเป็นแผนรายเดือน ต้องสร้างแถวให้ครบทุกงวดตามระยะเวลาที่คุยกัน (10 ปี = 120 แถว, 6 เดือน = 6 แถว)\n' +
     'ถ้าบทสนทนาไม่มีตัวเลขให้ใช้ ให้สร้างตารางสรุปจาก "ข้อมูลผู้ใช้จริง" ด้านล่างแทน\n\n' +
     '## ข้อมูลผู้ใช้ (context จริง)\n' +
     buildContextBlock(ctx);
@@ -164,7 +170,7 @@ async function generateTable(ctx: CoachContext, question: string, history: ChatT
         role: 'user',
         content:
           'ตอบใหม่เป็น JSON ล้วน ๆ อย่างเดียว ขึ้นต้นด้วย { และจบด้วย } '
-          + 'ห้ามมีคำอธิบาย ห้ามมี ``` และ rows ต้องมีอย่างน้อย 1 แถว',
+          + 'ห้ามมีคำอธิบาย ห้ามมี ``` และ rows ต้องครบทุกงวดตามที่คุยกัน',
       },
     ],
     { temperature: 0, maxTokens: 1200 },
@@ -247,12 +253,27 @@ function anchoredMonthDate(year: number, month: number, anchorDay: number, offse
 }
 
 /** บังคับแกนเวลาของแผนออมให้สัมพันธ์กับวันที่จริง แม้ LLM จะคืน ม.ค.-มิ.ย. มา */
+
+/**
+ * หา "จำนวนเดือน" ของแผนจากข้อความ — รองรับทั้ง "10 ปี" (=120 เดือน) และ "6 เดือน"
+ * ใช้ค่าที่พูดถึงล่าสุด เพราะเป็นสิ่งที่กำลังคุยกันอยู่ · คืน null ถ้าไม่เจอ
+ */
+export function parsePlanMonths(text: string): number | null {
+  const matches = [...text.matchAll(/(\d{1,3})\s*(ปี|เดือน)/g)];
+  if (matches.length === 0) return null;
+  const last = matches[matches.length - 1];
+  const value = Number(last[1]);
+  if (!Number.isFinite(value) || value <= 0) return null;
+  return last[2] === 'ปี' ? value * 12 : value;
+}
+
 export function normalizeSavingsPlanDates(table: DynamicTable, message: string, now = new Date()): DynamicTable {
   const isSavingsPlan = /แผน.*ออม|ออม.*เดือน|saving\s*plan/i.test(`${message} ${table.title ?? ''}`);
   if (!isSavingsPlan) return table;
 
-  const durationFromMessage = message.match(/(\d{1,2})\s*เดือน/);
-  const duration = Math.min(Math.max(Number(durationFromMessage?.[1] ?? table.rows.length ?? 1), 1), 120);
+  // อ่านระยะเวลาจาก "ทั้งบทสนทนา" ไม่ใช่แค่ข้อความล่าสุด — ผู้ใช้มักพิมพ์สั้น ๆ ว่า "ขอเป็น Excel"
+  // แต่ระยะเวลาจริง (เช่น "10 ปี") อยู่ในข้อความก่อนหน้า · รองรับทั้งปีและเดือน
+  const duration = Math.min(Math.max(parsePlanMonths(message) ?? table.rows.length ?? 1, 1), 120);
   const today = bangkokDateParts(now);
   const rows: (string | number)[][] = [];
   const amountColumn = table.headers.findIndex((header) => /ยอดออม|เงินออม|ออม.*บาท/.test(header));
