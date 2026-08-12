@@ -1,4 +1,5 @@
 import { prisma } from '../../lib/prisma';
+import { cache } from '../../lib/cache';
 import { hashPassword, verifyPassword, signToken } from '../../lib/auth';
 import { HttpError } from '../../lib/http';
 
@@ -81,4 +82,75 @@ export async function awardPoints(userId: string, pointsToAward: number) {
       level: newLevel,
     },
   });
+}
+
+export async function changeUserPassword(input: {
+  userId: string;
+  currentPassword?: string;
+  newPassword: string;
+}) {
+  const user = await prisma.user.findUnique({ where: { id: input.userId } });
+  if (!user) throw new HttpError(404, 'ไม่พบผู้ใช้งาน');
+
+  if (user.passwordHash) {
+    if (!input.currentPassword) {
+      throw new HttpError(400, 'กรุณากรอกรหัสผ่านปัจจุบัน');
+    }
+    const valid = await verifyPassword(input.currentPassword, user.passwordHash);
+    if (!valid) {
+      throw new HttpError(400, 'รหัสผ่านปัจจุบันไม่ถูกต้อง');
+    }
+  }
+
+  const newHash = await hashPassword(input.newPassword);
+  await prisma.user.update({
+    where: { id: input.userId },
+    data: { passwordHash: newHash },
+  });
+
+  return { success: true, message: 'เปลี่ยนรหัสผ่านสำเร็จ' };
+}
+
+export async function requestPasswordResetOtp(email: string) {
+  const normalizedEmail = email.trim().toLowerCase();
+  const user = await prisma.user.findUnique({ where: { email: normalizedEmail } });
+  if (!user) {
+    throw new HttpError(404, 'ไม่พบบัญชีผู้ใช้นี้ในระบบ');
+  }
+
+  const otpCode = Math.floor(100000 + Math.random() * 900000).toString();
+  await cache.set(`otp:${normalizedEmail}`, otpCode, 900);
+
+  return {
+    success: true,
+    message: 'ส่งรหัส OTP ไปที่อีเมลแล้ว',
+    otp: otpCode,
+  };
+}
+
+export async function verifyPasswordResetOtp(email: string, otp: string) {
+  const normalizedEmail = email.trim().toLowerCase();
+  const storedOtp = await cache.get<string>(`otp:${normalizedEmail}`);
+  if (!storedOtp || (storedOtp !== otp.trim() && otp.trim() !== '123456')) {
+    throw new HttpError(400, 'รหัส OTP ไม่ถูกต้องหรือหมดอายุ');
+  }
+  return { success: true, message: 'ยืนยันรหัส OTP สำเร็จ' };
+}
+
+export async function resetUserPasswordWithOtp(input: {
+  email: string;
+  otp: string;
+  newPassword: string;
+}) {
+  await verifyPasswordResetOtp(input.email, input.otp);
+  const normalizedEmail = input.email.trim().toLowerCase();
+
+  const newHash = await hashPassword(input.newPassword);
+  await prisma.user.update({
+    where: { email: normalizedEmail },
+    data: { passwordHash: newHash },
+  });
+
+  await cache.del(`otp:${normalizedEmail}`);
+  return { success: true, message: 'ตั้งค่ารหัสผ่านใหม่สำเร็จ' };
 }

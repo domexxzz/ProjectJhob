@@ -36,6 +36,7 @@ model User {
   budgets       Budget[]
   goals         Goal[]
   chatMessages  ChatMessage[]
+  chatSessions  ChatSession[]
   achievements  Achievement[]
   notifications Notification[]
   subscriptions Subscription[]
@@ -107,15 +108,36 @@ model Goal {
   user User @relation(fields: [userId], references: [id], onDelete: Cascade)
 }
 
+/// ห้องแชท 1 ห้อง = 1 บทสนทนา (ผู้ใช้สร้างใหม่ได้เรื่อย ๆ)
+model ChatSession {
+  id        String   @id @default(cuid())
+  userId    String
+  title       String  @default("แชทใหม่") // AI ตั้งให้จากเนื้อหาบทสนทนา แก้เองได้
+  titleLocked Boolean @default(false) // true = ผู้ใช้ตั้งชื่อเอง ห้าม AI ทับ
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt // ใช้เรียงห้องล่าสุดขึ้นก่อน
+
+  user     User          @relation(fields: [userId], references: [id], onDelete: Cascade)
+  messages ChatMessage[]
+
+  @@index([userId, updatedAt])
+}
+
 model ChatMessage {
   id        String   @id @default(cuid())
   userId    String
+  sessionId String? // null = ข้อความเก่าก่อนมีระบบห้อง (ระบบจะย้ายเข้าห้องให้อัตโนมัติ)
   role      String // user | assistant
   content   String
   context   String? // JSON snapshot ของ context injection
+  /// รูปย่อ (data URL) ของภาพที่ผู้ใช้ส่ง — เก็บเฉพาะขนาดเล็กไว้โชว์ในแกลเลอรี
+  thumbnail String?
   createdAt DateTime @default(now())
 
-  user User @relation(fields: [userId], references: [id], onDelete: Cascade)
+  user    User         @relation(fields: [userId], references: [id], onDelete: Cascade)
+  session ChatSession? @relation(fields: [sessionId], references: [id], onDelete: Cascade)
+
+  @@index([userId, sessionId, createdAt])
 }
 
 model Achievement {

@@ -4,7 +4,14 @@ import { asyncHandler } from '../../lib/http';
 import { HttpError } from '../../lib/http';
 import { requireAuth } from '../../lib/auth';
 import { registerSchema, loginSchema } from '../../lib/validate';
-import { registerUser, loginUser } from './auth.service';
+import {
+  registerUser,
+  loginUser,
+  changeUserPassword,
+  requestPasswordResetOtp,
+  verifyPasswordResetOtp,
+  resetUserPasswordWithOtp,
+} from './auth.service';
 import { verifyGoogleIdToken, verifyGoogleAccessToken, verifyFacebookToken, oauthLogin } from './oauth.service';
 import { prisma } from '../../lib/prisma';
 import { env } from '../../config/env';
@@ -284,5 +291,66 @@ authRouter.patch(
       select: profileSelect,
     });
     res.json({ user });
+  }),
+);
+
+const changePasswordSchema = z.object({
+  currentPassword: z.string().optional(),
+  newPassword: z.string().min(6, 'รหัสผ่านใหม่ต้องอย่างน้อย 6 ตัวอักษร'),
+});
+
+authRouter.post(
+  '/change-password',
+  requireAuth,
+  asyncHandler(async (req, res) => {
+    const data = changePasswordSchema.parse(req.body);
+    const result = await changeUserPassword({
+      userId: req.userId!,
+      currentPassword: data.currentPassword,
+      newPassword: data.newPassword,
+    });
+    res.json(result);
+  }),
+);
+
+const forgotPasswordSchema = z.object({
+  email: z.string().trim().email('รูปแบบอีเมลไม่ถูกต้อง'),
+});
+
+authRouter.post(
+  '/forgot-password',
+  asyncHandler(async (req, res) => {
+    const { email } = forgotPasswordSchema.parse(req.body);
+    const result = await requestPasswordResetOtp(email);
+    res.json(result);
+  }),
+);
+
+const verifyOtpSchema = z.object({
+  email: z.string().trim().email(),
+  otp: z.string().trim().min(4),
+});
+
+authRouter.post(
+  '/verify-otp',
+  asyncHandler(async (req, res) => {
+    const { email, otp } = verifyOtpSchema.parse(req.body);
+    const result = await verifyPasswordResetOtp(email, otp);
+    res.json(result);
+  }),
+);
+
+const resetPasswordSchema = z.object({
+  email: z.string().trim().email(),
+  otp: z.string().trim().min(4),
+  newPassword: z.string().min(6, 'รหัสผ่านใหม่ต้องอย่างน้อย 6 ตัวอักษร'),
+});
+
+authRouter.post(
+  '/reset-password',
+  asyncHandler(async (req, res) => {
+    const data = resetPasswordSchema.parse(req.body);
+    const result = await resetUserPasswordWithOtp(data);
+    res.json(result);
   }),
 );

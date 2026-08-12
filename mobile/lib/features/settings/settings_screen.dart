@@ -1,9 +1,14 @@
+import 'package:dio/dio.dart' show DioException;
+import 'package:flutter/foundation.dart' show kIsWeb;
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:go_router/go_router.dart';
 import 'package:shared_preferences/shared_preferences.dart';
 
+import '../notifications/fcm_service.dart';
+import '../../app/theme.dart';
 import '../../core/api/api_client.dart';
+import '../auth/auth_controller.dart';
 
 class AppSettings {
   const AppSettings({
@@ -233,6 +238,51 @@ class SettingsScreen extends ConsumerWidget {
                 const SizedBox(height: 12),
                 _SettingsGroup(
                   children: [
+                    // เว็บ/PWA: iOS บังคับว่าการขอสิทธิ์แจ้งเตือนต้องมาจากการกดของผู้ใช้
+                    // (แอป Android ขอให้อัตโนมัติตอนล็อกอินอยู่แล้ว จึงไม่ต้องมีปุ่มนี้)
+                    if (kIsWeb)
+                      _SettingsActionTile(
+                        icon: Icons.notifications_active_rounded,
+                        title: 'เปิดแจ้งเตือนบนเครื่องนี้',
+                        value: 'แตะเพื่ออนุญาต',
+                        onTap: () async {
+                          final messenger = ScaffoldMessenger.of(context);
+                          final r = await enableWebNotifications(
+                              ref.read(dioProvider));
+                          messenger.showSnackBar(SnackBar(
+                            content: Text(r.message),
+                            backgroundColor:
+                                r.ok ? AppColors.primary : AppColors.expense,
+                          ));
+                        },
+                      ),
+                    _SettingsActionTile(
+                      icon: Icons.send_rounded,
+                      title: 'ทดสอบแจ้งเตือน',
+                      value: 'ส่งหาเครื่องนี้',
+                      onTap: () async {
+                        final messenger = ScaffoldMessenger.of(context);
+                        try {
+                          await ref
+                              .read(dioProvider)
+                              .post('/notifications/test');
+                          messenger.showSnackBar(const SnackBar(
+                            content: Text('ส่งแล้ว! รอสักครู่ดูที่แถบแจ้งเตือน 🔔'),
+                            backgroundColor: AppColors.primary,
+                          ));
+                        } catch (e) {
+                          final msg = e is DioException
+                              ? (e.response?.data is Map
+                                  ? '${(e.response!.data as Map)['error']}'
+                                  : 'ส่งไม่สำเร็จ ลองใหม่อีกครั้ง')
+                              : 'ส่งไม่สำเร็จ ลองใหม่อีกครั้ง';
+                          messenger.showSnackBar(SnackBar(
+                            content: Text(msg),
+                            backgroundColor: AppColors.expense,
+                          ));
+                        }
+                      },
+                    ),
                     _SettingsSwitchTile(
                       icon: Icons.notifications_active_outlined,
                       title: 'เปิดการแจ้งเตือน',
@@ -307,6 +357,12 @@ class SettingsScreen extends ConsumerWidget {
                 const SizedBox(height: 12),
                 _SettingsGroup(
                   children: [
+                    _SettingsActionTile(
+                      icon: Icons.lock_reset_rounded,
+                      title: 'เปลี่ยนรหัสผ่าน',
+                      value: 'แก้ไข',
+                      onTap: () => _showChangePasswordSheet(context, ref),
+                    ),
                     _SettingsActionTile(
                       icon: Icons.notifications_outlined,
                       title: 'รายการแจ้งเตือน',
@@ -637,6 +693,233 @@ class _SettingsActionTile extends StatelessWidget {
           const Icon(Icons.chevron_right_rounded,
               color: Colors.white38, size: 22),
         ],
+      ),
+    );
+  }
+}
+
+void _showChangePasswordSheet(BuildContext context, WidgetRef ref) {
+  showModalBottomSheet<void>(
+    context: context,
+    isScrollControlled: true,
+    backgroundColor: const Color(0xFF1B221E),
+    shape: const RoundedRectangleBorder(
+      borderRadius: BorderRadius.vertical(top: Radius.circular(24)),
+    ),
+    builder: (context) => _ChangePasswordSheet(ref: ref),
+  );
+}
+
+class _ChangePasswordSheet extends StatefulWidget {
+  const _ChangePasswordSheet({required this.ref});
+  final WidgetRef ref;
+
+  @override
+  State<_ChangePasswordSheet> createState() => _ChangePasswordSheetState();
+}
+
+class _ChangePasswordSheetState extends State<_ChangePasswordSheet> {
+  final _formKey = GlobalKey<FormState>();
+  final _currentController = TextEditingController();
+  final _newController = TextEditingController();
+  final _confirmController = TextEditingController();
+
+  bool _obscureCurrent = true;
+  bool _obscureNew = true;
+  bool _obscureConfirm = true;
+  bool _loading = false;
+  String? _errorMessage;
+
+  @override
+  void dispose() {
+    _currentController.dispose();
+    _newController.dispose();
+    _confirmController.dispose();
+    super.dispose();
+  }
+
+  Future<void> _submit() async {
+    if (!_formKey.currentState!.validate()) return;
+    setState(() {
+      _loading = true;
+      _errorMessage = null;
+    });
+
+    final res = await widget.ref.read(authControllerProvider.notifier).changePassword(
+          currentPassword: _currentController.text,
+          newPassword: _newController.text,
+        );
+
+    if (!mounted) return;
+    setState(() => _loading = false);
+
+    if (res.success) {
+      Navigator.pop(context);
+      ScaffoldMessenger.of(context).showSnackBar(
+        SnackBar(
+          content: Text(res.message),
+          backgroundColor: const Color(0xFF22C55E),
+        ),
+      );
+    } else {
+      setState(() => _errorMessage = res.message);
+    }
+  }
+
+  @override
+  Widget build(BuildContext context) {
+    final bottomInset = MediaQuery.of(context).viewInsets.bottom;
+    return Padding(
+      padding: EdgeInsets.fromLTRB(20, 16, 20, 24 + bottomInset),
+      child: Form(
+        key: _formKey,
+        child: Column(
+          mainAxisSize: MainAxisSize.min,
+          crossAxisAlignment: CrossAxisAlignment.start,
+          children: [
+            Center(
+              child: Container(
+                width: 38,
+                height: 4,
+                decoration: BoxDecoration(
+                  color: Colors.white24,
+                  borderRadius: BorderRadius.circular(2),
+                ),
+              ),
+            ),
+            const SizedBox(height: 16),
+            const Row(
+              children: [
+                Icon(Icons.lock_reset_rounded, color: Color(0xFF4CD97B), size: 24),
+                SizedBox(width: 10),
+                Text(
+                  'เปลี่ยนรหัสผ่าน',
+                  style: TextStyle(
+                    color: Colors.white,
+                    fontSize: 20,
+                    fontWeight: FontWeight.bold,
+                  ),
+                ),
+              ],
+            ),
+            const SizedBox(height: 6),
+            const Text(
+              'กรอกรหัสผ่านปัจจุบันและรหัสผ่านใหม่เพื่อทำการอัปเดต',
+              style: TextStyle(color: Colors.white54, fontSize: 12),
+            ),
+            if (_errorMessage != null) ...[
+              const SizedBox(height: 12),
+              Container(
+                width: double.infinity,
+                padding: const EdgeInsets.all(10),
+                decoration: BoxDecoration(
+                  color: const Color(0xFFEF4444).withOpacity(0.15),
+                  borderRadius: BorderRadius.circular(10),
+                  border: Border.all(color: const Color(0xFFEF4444).withOpacity(0.4)),
+                ),
+                child: Text(
+                  _errorMessage!,
+                  style: const TextStyle(color: Color(0xFFEF4444), fontSize: 13),
+                ),
+              ),
+            ],
+            const SizedBox(height: 16),
+            TextFormField(
+              controller: _currentController,
+              obscureText: _obscureCurrent,
+              style: const TextStyle(color: Colors.white),
+              decoration: InputDecoration(
+                labelText: 'รหัสผ่านปัจจุบัน',
+                labelStyle: const TextStyle(color: Colors.white70),
+                filled: true,
+                fillColor: const Color(0xFF101412),
+                border: OutlineInputBorder(borderRadius: BorderRadius.circular(12)),
+                suffixIcon: IconButton(
+                  icon: Icon(
+                    _obscureCurrent ? Icons.visibility_off : Icons.visibility,
+                    color: Colors.white54,
+                  ),
+                  onPressed: () => setState(() => _obscureCurrent = !_obscureCurrent),
+                ),
+              ),
+            ),
+            const SizedBox(height: 14),
+            TextFormField(
+              controller: _newController,
+              obscureText: _obscureNew,
+              style: const TextStyle(color: Colors.white),
+              decoration: InputDecoration(
+                labelText: 'รหัสผ่านใหม่ (อย่างน้อย 6 ตัวอักษร)',
+                labelStyle: const TextStyle(color: Colors.white70),
+                filled: true,
+                fillColor: const Color(0xFF101412),
+                border: OutlineInputBorder(borderRadius: BorderRadius.circular(12)),
+                suffixIcon: IconButton(
+                  icon: Icon(
+                    _obscureNew ? Icons.visibility_off : Icons.visibility,
+                    color: Colors.white54,
+                  ),
+                  onPressed: () => setState(() => _obscureNew = !_obscureNew),
+                ),
+              ),
+              validator: (v) {
+                if (v == null || v.isEmpty) return 'กรุณากรอกรหัสผ่านใหม่';
+                if (v.length < 6) return 'รหัสผ่านใหม่ต้องอย่างน้อย 6 ตัวอักษร';
+                return null;
+              },
+            ),
+            const SizedBox(height: 14),
+            TextFormField(
+              controller: _confirmController,
+              obscureText: _obscureConfirm,
+              style: const TextStyle(color: Colors.white),
+              decoration: InputDecoration(
+                labelText: 'ยืนยันรหัสผ่านใหม่',
+                labelStyle: const TextStyle(color: Colors.white70),
+                filled: true,
+                fillColor: const Color(0xFF101412),
+                border: OutlineInputBorder(borderRadius: BorderRadius.circular(12)),
+                suffixIcon: IconButton(
+                  icon: Icon(
+                    _obscureConfirm ? Icons.visibility_off : Icons.visibility,
+                    color: Colors.white54,
+                  ),
+                  onPressed: () => setState(() => _obscureConfirm = !_obscureConfirm),
+                ),
+              ),
+              validator: (v) {
+                if (v != _newController.text) return 'รหัสผ่านใหม่ไม่ตรงกัน';
+                return null;
+              },
+            ),
+            const SizedBox(height: 20),
+            SizedBox(
+              width: double.infinity,
+              height: 48,
+              child: ElevatedButton(
+                onPressed: _loading ? null : _submit,
+                style: ElevatedButton.styleFrom(
+                  backgroundColor: const Color(0xFF22C55E),
+                  shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(12)),
+                ),
+                child: _loading
+                    ? const SizedBox(
+                        width: 22,
+                        height: 22,
+                        child: CircularProgressIndicator(color: Colors.black, strokeWidth: 2),
+                      )
+                    : const Text(
+                        'บันทึกรหัสผ่านใหม่',
+                        style: TextStyle(
+                          color: Colors.black,
+                          fontSize: 16,
+                          fontWeight: FontWeight.bold,
+                        ),
+                      ),
+              ),
+            ),
+          ],
+        ),
       ),
     );
   }

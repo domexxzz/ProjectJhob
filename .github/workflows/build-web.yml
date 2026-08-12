@@ -33,6 +33,14 @@ jobs:
         id: chg
         run: |
           BEFORE="${{ github.event.before }}"
+          # กันลูป: ถ้าคอมมิตล่าสุดเป็นของบอทเอง (build ที่เพิ่งทำไป) ไม่ต้อง build ซ้ำ
+          # — ข้ามแค่ขั้น build แต่ยังไปสั่ง deploy ต่อ ต่างจาก [skip ci] ที่ข้ามทั้ง workflow
+          if [ "$(git log -1 --pretty=%an)" = "github-actions[bot]" ] \
+             && [ "${{ github.event_name }}" != "workflow_dispatch" ]; then
+            echo "คอมมิตล่าสุดมาจากบอทเอง → ข้าม build ไปสั่ง deploy เลย"
+            echo "mobile=false" >> "$GITHUB_OUTPUT"
+            exit 0
+          fi
           if [ "${{ github.event_name }}" = "workflow_dispatch" ] \
              || [ -z "$BEFORE" ] || [ "$BEFORE" = "0000000000000000000000000000000000000000" ] \
              || ! git cat-file -e "$BEFORE^{commit}" 2>/dev/null; then
@@ -77,8 +85,11 @@ jobs:
             echo "build ออกมาเหมือนเดิม — ไม่ต้อง commit"
             exit 0
           fi
-          # [skip ci] + commit ด้วย GITHUB_TOKEN → ไม่ trigger workflow ซ้ำ (กันลูป)
-          git commit -m "chore(ci): rebuild web → backend/public [skip ci]"
+          # ไม่ใส่ [skip ci] โดยตั้งใจ — commit ด้วย GITHUB_TOKEN ไม่ trigger workflow ซ้ำ
+          # อยู่แล้ว (GitHub กันลูปให้) ส่วน [skip ci] กลับเป็นโทษ เพราะถ้าคนก๊อปข้อความนี้
+          # ไปใช้ตอน commit เอง GitHub จะข้าม workflow ทั้ง push → deploy hook ไม่ถูกยิง
+          # → โค้ดขึ้น GitHub แต่ไม่ขึ้น production (เคยเจอมาแล้ว)
+          git commit -m "chore(ci): rebuild web → backend/public"
           git push origin HEAD:deploy/cloud || {
             echo "push ชนกับคนอื่น — rebase แล้วลองใหม่"
             git pull --rebase origin deploy/cloud

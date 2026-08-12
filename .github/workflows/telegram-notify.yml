@@ -1,0 +1,77 @@
+name: แจ้งเตือน Telegram เมื่อมีงานใหม่
+
+# ส่งข้อความเข้ากลุ่ม Telegram ทุกครั้งที่มีคน push งานขึ้น GitHub
+# ต้องตั้ง secret 2 ตัวก่อน: TELEGRAM_BOT_TOKEN, TELEGRAM_CHAT_ID
+on:
+  push:
+    branches: ['**'] # ทุก branch
+  pull_request:
+    types: [opened, reopened, ready_for_review, closed]
+
+jobs:
+  notify:
+    name: ส่งเข้า Telegram
+    runs-on: ubuntu-latest
+    # ข้าม commit ของบอท (CI rebuild web) ไม่งั้นกลุ่มจะรก
+    if: github.actor != 'github-actions[bot]'
+    steps:
+      - name: ประกอบข้อความแล้วส่ง
+        env:
+          TOKEN: ${{ secrets.TELEGRAM_BOT_TOKEN }}
+          CHAT_ID: ${{ secrets.TELEGRAM_CHAT_ID }}
+          EVENT: ${{ github.event_name }}
+          ACTOR: ${{ github.actor }}
+          REPO: ${{ github.repository }}
+          REF_NAME: ${{ github.ref_name }}
+          COMPARE: ${{ github.event.compare }}
+          PR_TITLE: ${{ github.event.pull_request.title }}
+          PR_URL: ${{ github.event.pull_request.html_url }}
+          PR_BASE: ${{ github.event.pull_request.base.ref }}
+          PR_MERGED: ${{ github.event.pull_request.merged }}
+        run: |
+          if [ -z "$TOKEN" ] || [ -z "$CHAT_ID" ]; then
+            echo "⚠️ ยังไม่ได้ตั้ง secret TELEGRAM_BOT_TOKEN / TELEGRAM_CHAT_ID — ข้าม"
+            exit 0
+          fi
+
+          if [ "$EVENT" = "push" ]; then
+            COUNT=$(jq '.commits | length' "$GITHUB_EVENT_PATH")
+            [ "$COUNT" = "0" ] && { echo "ไม่มี commit (น่าจะสร้าง/ลบ branch) — ข้าม"; exit 0; }
+            # เอาเฉพาะบรรทัดแรกของแต่ละ commit สูงสุด 10 อัน
+            LIST=$(jq -r '.commits[:10][] | "• " + (.message | split("\n")[0])' "$GITHUB_EVENT_PATH")
+            [ "$COUNT" -gt 10 ] && LIST="$LIST"$'\n'"… และอีก $((COUNT - 10)) รายการ"
+
+            # เตือนเป็นพิเศษถ้าเข้า branch ที่ deploy ขึ้น production
+            HEAD_LINE="🚀 มีงานใหม่ขึ้น $REPO"
+            [ "$REF_NAME" = "deploy/cloud" ] && HEAD_LINE="🔴 ขึ้น PRODUCTION แล้ว ($REPO)"
+
+            TEXT="$HEAD_LINE
+          👤 $ACTOR
+          🌿 branch: $REF_NAME ($COUNT commit)
+
+          $LIST
+
+          🔗 $COMPARE"
+          else
+            # ── Pull request ──
+            ACTION="เปิด PR ใหม่"
+            ICON="📬"
+            if [ "${{ github.event.action }}" = "closed" ]; then
+              if [ "$PR_MERGED" = "true" ]; then ACTION="merge PR แล้ว"; ICON="✅"; else ACTION="ปิด PR (ไม่ merge)"; ICON="🚫"; fi
+            fi
+            TEXT="$ICON $ACTOR $ACTION
+          📦 $REPO
+          🎯 เข้า branch: $PR_BASE
+
+          $PR_TITLE
+
+          🔗 $PR_URL"
+          fi
+
+          # ส่งแบบ plain text (ไม่ใช้ parse_mode) กันภาษาไทย/อักขระพิเศษทำ format พัง
+          curl -fsS -X POST "https://api.telegram.org/bot${TOKEN}/sendMessage" \
+            --data-urlencode "chat_id=${CHAT_ID}" \
+            --data-urlencode "text=${TEXT}" \
+            --data-urlencode "disable_web_page_preview=true" \
+            -o /dev/null
+          echo "✅ ส่งเข้า Telegram แล้ว"

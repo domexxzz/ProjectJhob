@@ -81,6 +81,39 @@ export const TOOLS = [
       parameters: { type: 'object', properties: {} },
     },
   },
+  {
+    type: 'function',
+    function: {
+      name: 'create_goal',
+      description:
+        'สร้างเป้าหมายการออมใหม่ ใช้เมื่อผู้ใช้บอกว่าอยากเก็บเงินเพื่ออะไรสักอย่าง เช่น "อยากเก็บเงินซื้อโน้ตบุ๊ค 30000", "ตั้งเป้าออม 50000 ภายในสิ้นปี" — นี่คือ "เป้าหมาย" ไม่ใช่รายจ่าย ห้ามใช้ create_transaction กับกรณีนี้',
+      parameters: {
+        type: 'object',
+        properties: {
+          name: { type: 'string', description: 'ชื่อเป้าหมาย เช่น "ซื้อโน้ตบุ๊ค", "เที่ยวญี่ปุ่น" (ถ้าผู้ใช้ไม่ระบุให้ตั้งให้สั้น ๆ ตามบริบท)' },
+          targetBaht: { type: 'number', description: 'จำนวนเงินเป้าหมาย หน่วยบาท (ต้องมากกว่า 0)' },
+          deadline: { type: 'string', description: 'วันครบกำหนด YYYY-MM-DD (ไม่ระบุก็ได้)' },
+        },
+        required: ['name', 'targetBaht'],
+      },
+    },
+  },
+  {
+    type: 'function',
+    function: {
+      name: 'add_to_goal',
+      description:
+        'เพิ่มเงินออมเข้าเป้าหมายที่มีอยู่ ใช้เมื่อผู้ใช้บอกว่าเก็บเงินเข้าเป้าได้แล้ว เช่น "วันนี้หยอดกระปุกเป้าโน้ตบุ๊ค 500"',
+      parameters: {
+        type: 'object',
+        properties: {
+          goalName: { type: 'string', description: 'ชื่อเป้าหมาย (ตรงหรือใกล้เคียงกับที่มีอยู่)' },
+          amountBaht: { type: 'number', description: 'จำนวนเงินที่เพิ่มเข้าเป้า หน่วยบาท' },
+        },
+        required: ['goalName', 'amountBaht'],
+      },
+    },
+  },
 ] as const;
 
 /** หา category จากชื่อ (ไทยหรืออังกฤษ) — โหลดทั้งตาราง (เล็ก ~32 แถว) แล้ว match ใน JS กัน case/มาตรฐานภาษา */
@@ -257,6 +290,13 @@ const NOT_A_LOG =
   /[?？]|เท่าไหร่|เท่าไร|กี่บาท|กี่ครั้ง|อะไรบ้าง|มีอะไร|ไหม|หรือเปล่า|ทำไม|ยังไง|เมื่อไหร่|สรุป|ดูรายการ|ขอดู|รายงาน|ไฟล์|export|ส่งออก|ดาวน์โหลด/i;
 
 /**
+ * ประโยค "ตั้งใจ/วางแผน" ไม่ใช่การจ่ายเงินจริง — ต้องส่งให้ AI คุยแทนการจดทันที
+ * เช่น "อยากเก็บเงินซื้อโน้ตบุ๊ค 30,000" เคยถูกจดเป็นรายจ่าย 30,000 ทั้งที่ยังไม่ได้จ่าย
+ */
+const INTENT_NOT_SPENT =
+  /อยาก|ตั้งเป้า|เป้าหมาย|วางแผน|เก็บเงิน|ออมเงิน|ควร|ช่วยคิด|ช่วยวางแผน|แนะนำ|กำลังคิด|คิดจะ|ถ้า.*จะ|จะซื้อ|จะเก็บ|จะออม|น่าจะ|ผ่อนไหว|พอไหม/i;
+
+/**
  * ตรวจ "การจดแบบสั้น" สไตล์ป้านวล เช่น "ก๋วยเตี๋ยว 55", "เงินเดือน 30000", "ชอปปี้ (ของใช้) 354"
  * → แกะเองในโค้ด สร้างรายการได้เลยโดยไม่ต้องพึ่ง LLM เรียก tool (การ์ดขึ้นชัวร์ 100%)
  * คืน null ถ้าไม่เข้าเงื่อนไข (เช่นเป็นคำถาม/ประโยคยาว) → ให้ LLM จัดการต่อ
@@ -266,6 +306,8 @@ export function detectQuickLog(
 ): { type: 'income' | 'expense'; amountBaht: number; note: string } | null {
   const m = message.trim();
   if (NOT_A_LOG.test(m)) return null;
+  // ตั้งใจ/วางแผน ≠ จ่ายจริง → ให้ AI คุยเรื่องเป้าหมายแทนการจดเป็นรายจ่าย
+  if (INTENT_NOT_SPENT.test(m)) return null;
   // <ชื่อ ≤38 ตัว> <จำนวน> [บาท/฿] ท้ายบรรทัด
   const match = m.match(/^(\D.{0,38}?)\s+(\d[\d,]*(?:\.\d{1,2})?)\s*(?:บาท|฿|บ\.)?\s*$/);
   if (!match) return null;
@@ -288,6 +330,85 @@ export async function quickCreate(
   return { id: c.id, type: c.type, amountBaht: c.amountBaht, category: c.category, categoryId: c.categoryId, note: c.note, date: c.date };
 }
 
+
+/** สร้างเป้าหมายการออมใหม่ — คนละเรื่องกับ create_transaction (เป้าหมาย ≠ เงินที่จ่ายไปแล้ว) */
+async function createGoal(userId: string, args: any): Promise<ToolResult> {
+  const name = String(args.name ?? '').trim().slice(0, 80);
+  if (!name) return { error: 'ต้องระบุชื่อเป้าหมาย' };
+  const targetBaht = Number(args.targetBaht);
+  if (!Number.isFinite(targetBaht) || targetBaht <= 0) {
+    return { error: 'targetBaht ต้องเป็นตัวเลขมากกว่า 0' };
+  }
+
+  let deadline: Date | null = null;
+  if (typeof args.deadline === 'string' && /^\d{4}-\d{2}-\d{2}$/.test(args.deadline)) {
+    const [y, m, d] = args.deadline.split('-').map(Number);
+    deadline = new Date(Date.UTC(y, m - 1, d, 12, 0, 0));
+  }
+
+  const goal = await prisma.goal.create({
+    data: { userId, name, target: bahtToSatang(targetBaht), deadline },
+  });
+  await cache.delPattern(`user:${userId}:*`);
+
+  // ถ้ามีเดดไลน์ บอกด้วยว่าต้องเก็บเดือนละเท่าไหร่ (ผู้ใช้ได้ประโยชน์ทันที)
+  let perMonthBaht: number | undefined;
+  if (deadline) {
+    const months = Math.max(
+      1,
+      Math.ceil((deadline.getTime() - Date.now()) / (1000 * 60 * 60 * 24 * 30)),
+    );
+    perMonthBaht = Math.ceil(targetBaht / months);
+  }
+
+  return {
+    ok: true,
+    id: goal.id,
+    name: goal.name,
+    targetBaht: satangToBaht(goal.target),
+    currentBaht: 0,
+    deadline: deadline ? deadline.toISOString().split('T')[0] : null,
+    perMonthBaht,
+  };
+}
+
+/** เพิ่มเงินเข้าเป้าหมายที่มีอยู่ (จับคู่ชื่อแบบยืดหยุ่น) */
+async function addToGoal(userId: string, args: any): Promise<ToolResult> {
+  const q = String(args.goalName ?? '').trim().toLowerCase();
+  const amountBaht = Number(args.amountBaht);
+  if (!Number.isFinite(amountBaht) || amountBaht <= 0) {
+    return { error: 'amountBaht ต้องเป็นตัวเลขมากกว่า 0' };
+  }
+
+  const goals = await prisma.goal.findMany({ where: { userId } });
+  if (goals.length === 0) return { error: 'ยังไม่มีเป้าหมายในระบบ — สร้างก่อนด้วย create_goal' };
+
+  const goal =
+    goals.find((g) => g.name.toLowerCase() === q) ??
+    goals.find((g) => g.name.toLowerCase().includes(q) || q.includes(g.name.toLowerCase()));
+  if (!goal) {
+    return { error: `ไม่พบเป้าหมายชื่อ "${args.goalName}" — ที่มีอยู่: ${goals.map((g) => g.name).join(', ')}` };
+  }
+
+  const updated = await prisma.goal.update({
+    where: { id: goal.id },
+    data: { current: goal.current + bahtToSatang(amountBaht) },
+  });
+  await cache.delPattern(`user:${userId}:*`);
+
+  const targetBaht = satangToBaht(updated.target);
+  const currentBaht = satangToBaht(updated.current);
+  return {
+    ok: true,
+    name: updated.name,
+    addedBaht: amountBaht,
+    currentBaht,
+    targetBaht,
+    progressPct: targetBaht > 0 ? Math.round((currentBaht / targetBaht) * 100) : 0,
+    remainingBaht: Math.max(0, targetBaht - currentBaht),
+  };
+}
+
 /** ตัวรัน tool กลาง — เรียกจาก tool loop ใน coach.ts. ไม่ throw: ห่อ error เป็น { error } */
 export async function runTool(name: string, args: any, userId: string): Promise<ToolResult> {
   try {
@@ -300,6 +421,10 @@ export async function runTool(name: string, args: any, userId: string): Promise<
         return await getBudgetStatus(userId);
       case 'list_goals':
         return await listGoals(userId);
+      case 'create_goal':
+        return await createGoal(userId, args ?? {});
+      case 'add_to_goal':
+        return await addToGoal(userId, args ?? {});
       default:
         return { error: `ไม่รู้จัก tool "${name}"` };
     }

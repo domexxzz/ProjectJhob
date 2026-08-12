@@ -145,6 +145,78 @@ class AuthController extends StateNotifier<AuthState> {
         if (displayName.isNotEmpty) 'displayName': displayName,
       });
 
+  Future<({bool success, String message})> changePassword({
+    String? currentPassword,
+    required String newPassword,
+  }) async {
+    try {
+      final res = await _dio.post('/auth/change-password', data: {
+        if (currentPassword?.isNotEmpty == true)
+          'currentPassword': currentPassword,
+        'newPassword': newPassword,
+      });
+      return (
+        success: true,
+        message: (res.data['message'] as String?) ?? 'เปลี่ยนรหัสผ่านสำเร็จ'
+      );
+    } on DioException catch (e) {
+      final msg = e.response?.data?['message'] as String? ?? 'เปลี่ยนรหัสผ่านไม่สำเร็จ';
+      return (success: false, message: msg);
+    } catch (e) {
+      return (success: false, message: '$e');
+    }
+  }
+
+  Future<({bool success, String message, String? otp})> requestForgotPasswordOtp(String email) async {
+    try {
+      final res = await _dio.post('/auth/forgot-password', data: {'email': email.trim()});
+      return (
+        success: true,
+        message: (res.data['message'] as String?) ?? 'ส่งรหัส OTP เรียบร้อยแล้ว',
+        otp: res.data['otp'] as String?,
+      );
+    } on DioException catch (e) {
+      final msg = e.response?.data?['message'] as String? ?? 'ไม่สามารถส่ง OTP ได้';
+      return (success: false, message: msg, otp: null);
+    } catch (e) {
+      return (success: false, message: '$e', otp: null);
+    }
+  }
+
+  Future<({bool success, String message})> verifyForgotPasswordOtp(String email, String otp) async {
+    try {
+      final res = await _dio.post('/auth/verify-otp', data: {'email': email.trim(), 'otp': otp.trim()});
+      return (
+        success: true,
+        message: (res.data['message'] as String?) ?? 'ยืนยันรหัส OTP สำเร็จ'
+      );
+    } on DioException catch (e) {
+      final msg = e.response?.data?['message'] as String? ?? 'รหัส OTP ไม่ถูกต้อง';
+      return (success: false, message: msg);
+    } catch (e) {
+      return (success: false, message: '$e');
+    }
+  }
+
+  Future<({bool success, String message})> resetPasswordWithOtp(String email, String otp, String newPassword) async {
+    try {
+      final res = await _dio.post('/auth/reset-password', data: {
+        'email': email.trim(),
+        'otp': otp.trim(),
+        'newPassword': newPassword,
+      });
+      return (
+        success: true,
+        message: (res.data['message'] as String?) ?? 'ตั้งรหัสผ่านใหม่สำเร็จ'
+      );
+    } on DioException catch (e) {
+      final msg = e.response?.data?['message'] as String? ?? 'ตั้งรหัสผ่านใหม่ไม่สำเร็จ';
+      return (success: false, message: msg);
+    } catch (e) {
+      return (success: false, message: '$e');
+    }
+  }
+
   Future<bool> updateProfile({
     required String displayName,
     required String email,

@@ -17,10 +17,7 @@ import 'package:flutter/foundation.dart'
 class DefaultFirebaseOptions {
   static FirebaseOptions get currentPlatform {
     if (kIsWeb) {
-      throw UnsupportedError(
-        'DefaultFirebaseOptions have not been configured for web - '
-        'you can reconfigure this by running the FlutterFire CLI again.',
-      );
+      return web;
     }
     switch (defaultTargetPlatform) {
       case TargetPlatform.android:
@@ -51,6 +48,18 @@ class DefaultFirebaseOptions {
         );
     }
   }
+
+  /// เว็บ/PWA — ใช้สำหรับแจ้งเตือน Web Push (iPhone ต้องเพิ่มลงหน้าจอโฮมก่อน)
+  /// ค่าพวกนี้ไม่ใช่ความลับ (ฝังอยู่ในหน้าเว็บอยู่แล้ว) ความปลอดภัยอยู่ที่ Firebase Rules
+  static const FirebaseOptions web = FirebaseOptions(
+    apiKey: 'AIzaSyDXm7OkxFLW6YSaLaFy-_1Zib2yIZjhwfc',
+    appId: '1:52873487111:web:a9ef21ee2d93ce3ce65ba2',
+    messagingSenderId: '52873487111',
+    projectId: 'phee-ngern',
+    authDomain: 'phee-ngern.firebaseapp.com',
+    storageBucket: 'phee-ngern.firebasestorage.app',
+    measurementId: 'G-QJ07T3K293',
+  );
 
   static const FirebaseOptions android = FirebaseOptions(
     apiKey: 'AIzaSyCPhVfmQsKrsppagYaj_fv_5NY8Axds788',
