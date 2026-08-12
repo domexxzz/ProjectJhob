@@ -4,7 +4,7 @@ import { asyncHandler } from '../../lib/http';
 import { HttpError } from '../../lib/http';
 import { requireAuth } from '../../lib/auth';
 import { registerSchema, loginSchema } from '../../lib/validate';
-import { registerUser, loginUser } from './auth.service';
+import { registerUser, loginUser, changeUserPassword } from './auth.service';
 import { verifyGoogleIdToken, verifyGoogleAccessToken, verifyFacebookToken, oauthLogin } from './oauth.service';
 import { prisma } from '../../lib/prisma';
 import { env } from '../../config/env';
@@ -284,5 +284,24 @@ authRouter.patch(
       select: profileSelect,
     });
     res.json({ user });
+  }),
+);
+
+const changePasswordSchema = z.object({
+  currentPassword: z.string().optional(),
+  newPassword: z.string().min(6, 'รหัสผ่านใหม่ต้องอย่างน้อย 6 ตัวอักษร'),
+});
+
+authRouter.post(
+  '/change-password',
+  requireAuth,
+  asyncHandler(async (req, res) => {
+    const data = changePasswordSchema.parse(req.body);
+    const result = await changeUserPassword({
+      userId: req.userId!,
+      currentPassword: data.currentPassword,
+      newPassword: data.newPassword,
+    });
+    res.json(result);
   }),
 );

@@ -82,3 +82,30 @@ export async function awardPoints(userId: string, pointsToAward: number) {
     },
   });
 }
+
+export async function changeUserPassword(input: {
+  userId: string;
+  currentPassword?: string;
+  newPassword: string;
+}) {
+  const user = await prisma.user.findUnique({ where: { id: input.userId } });
+  if (!user) throw new HttpError(404, 'ไม่พบผู้ใช้งาน');
+
+  if (user.passwordHash) {
+    if (!input.currentPassword) {
+      throw new HttpError(400, 'กรุณากรอกรหัสผ่านปัจจุบัน');
+    }
+    const valid = await verifyPassword(input.currentPassword, user.passwordHash);
+    if (!valid) {
+      throw new HttpError(400, 'รหัสผ่านปัจจุบันไม่ถูกต้อง');
+    }
+  }
+
+  const newHash = await hashPassword(input.newPassword);
+  await prisma.user.update({
+    where: { id: input.userId },
+    data: { passwordHash: newHash },
+  });
+
+  return { success: true, message: 'เปลี่ยนรหัสผ่านสำเร็จ' };
+}

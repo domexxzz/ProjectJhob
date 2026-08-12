@@ -145,6 +145,28 @@ class AuthController extends StateNotifier<AuthState> {
         if (displayName.isNotEmpty) 'displayName': displayName,
       });
 
+  Future<({bool success, String message})> changePassword({
+    String? currentPassword,
+    required String newPassword,
+  }) async {
+    try {
+      final res = await _dio.post('/auth/change-password', data: {
+        if (currentPassword?.isNotEmpty == true)
+          'currentPassword': currentPassword,
+        'newPassword': newPassword,
+      });
+      return (
+        success: true,
+        message: (res.data['message'] as String?) ?? 'เปลี่ยนรหัสผ่านสำเร็จ'
+      );
+    } on DioException catch (e) {
+      final msg = e.response?.data?['message'] as String? ?? 'เปลี่ยนรหัสผ่านไม่สำเร็จ';
+      return (success: false, message: msg);
+    } catch (e) {
+      return (success: false, message: '$e');
+    }
+  }
+
   Future<bool> updateProfile({
     required String displayName,
     required String email,
