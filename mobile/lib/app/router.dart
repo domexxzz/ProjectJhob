@@ -5,7 +5,7 @@ import '../features/auth/auth_controller.dart';
 import '../features/auth/login_screen.dart';
 import '../features/auth/register_screen.dart';
 import '../features/auth/forgot_password_screen.dart'; // ➕ อิมพอร์ตหน้าลืมรหัสผ่านเข้ามาเพิ่ม
-import '../features/auth/otp_screen.dart'; // หน้าล็อกอินด้วย OTP / ยืนยันอีเมล
+import '../features/auth/otp_screen.dart'; // หน้ายืนยันอีเมลด้วยรหัส OTP
 import '../features/dashboard/dashboard_screen.dart';
 import '../features/dashboard/financial_dashboard_screen.dart';
 import '../features/transactions/slip_screen.dart';
@@ -88,15 +88,10 @@ final routerProvider = Provider<GoRouter>((ref) {
       GoRoute(
           path: '/forgot-password',
           builder: (_, __) => const ForgotPasswordScreen()),
-      // เข้าสู่ระบบด้วยรหัส OTP ทางอีเมล แทนการจำรหัสผ่าน
-      GoRoute(
-          path: '/otp-login',
-          builder: (_, __) => const OtpScreen(mode: OtpMode.login)),
       // ยืนยันอีเมลหลังสมัคร — ส่งอีเมลมาทาง query ได้ เช่น /verify-email?email=a@b.co
       GoRoute(
         path: '/verify-email',
         builder: (_, state) => OtpScreen(
-          mode: OtpMode.verifyEmail,
           presetEmail: state.uri.queryParameters['email'],
         ),
       ),

@@ -73,23 +73,6 @@ class OtpController {
     }
   }
 
-  /// เข้าสู่ระบบด้วย OTP — สำเร็จแล้วเข้าแอปได้เลย
-  Future<String?> loginWithCode(String email, String code) async {
-    try {
-      final res = await _dio.post('/auth/otp/login', data: {
-        'email': email.trim(),
-        'code': code.trim(),
-      });
-      // ใช้เส้นทางเดียวกับ OAuth — เก็บ token แล้วโหลดโปรไฟล์เข้า state
-      final ok = await _ref
-          .read(authControllerProvider.notifier)
-          .applyOAuthToken(res.data['token'] as String);
-      return ok ? null : 'เข้าสู่ระบบไม่สำเร็จ กรุณาลองใหม่';
-    } on DioException catch (e) {
-      return _errorFrom(e, 'รหัสไม่ถูกต้องหรือหมดอายุแล้ว');
-    }
-  }
-
   /// ยืนยันอีเมลตอนสมัคร — สำเร็จแล้วเข้าแอปได้เลยเช่นกัน
   Future<String?> verifyEmail(String email, String code) async {
     try {

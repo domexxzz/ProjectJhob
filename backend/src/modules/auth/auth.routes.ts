@@ -8,7 +8,6 @@ import { mailerStatus, lastMailResult } from '../../lib/mailer';
 import {
   requestOtp,
   verifyEmailOtp,
-  loginWithOtp,
   verifyResetOtp,
   resetPassword,
   OtpPurpose,
@@ -255,7 +254,7 @@ authRouter.get(
 
 const otpRequestSchema = z.object({
   email: z.string().email(),
-  purpose: z.enum(['reset', 'verify', 'login']),
+  purpose: z.enum(['reset', 'verify']),
 });
 const otpVerifySchema = z.object({
   email: z.string().email(),
@@ -285,16 +284,6 @@ authRouter.post(
   asyncHandler(async (req, res) => {
     const { email, code } = otpVerifySchema.parse(req.body);
     res.json(await verifyEmailOtp(email, code));
-  }),
-);
-
-/** POST /api/v1/auth/otp/login — เข้าสู่ระบบด้วยรหัสแทนรหัสผ่าน */
-authRouter.post(
-  '/otp/login',
-  authLimiter,
-  asyncHandler(async (req, res) => {
-    const { email, code } = otpVerifySchema.parse(req.body);
-    res.json(await loginWithOtp(email, code));
   }),
 );
 

@@ -141,12 +141,11 @@ async function _send(to: string, subject: string, html: string): Promise<MailRes
 /** เทมเพลตอีเมล OTP — ข้อความเปลี่ยนตามว่าใช้ทำอะไร */
 export function otpEmailTemplate(
   code: string,
-  purpose: 'reset' | 'verify' | 'login',
+  purpose: 'reset' | 'verify',
 ): { subject: string; html: string } {
   const label = {
     reset: { subject: 'รหัสยืนยันสำหรับตั้งรหัสผ่านใหม่ — พี่เงิน', lead: 'ใช้รหัสนี้เพื่อตั้งรหัสผ่านใหม่' },
     verify: { subject: 'ยืนยันอีเมลของคุณ — พี่เงิน', lead: 'ใช้รหัสนี้เพื่อยืนยันอีเมลของคุณ' },
-    login: { subject: 'รหัสเข้าสู่ระบบ — พี่เงิน', lead: 'ใช้รหัสนี้เพื่อเข้าสู่ระบบ' },
   }[purpose];
 
   const html = `

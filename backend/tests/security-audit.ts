@@ -262,11 +262,11 @@ async function main(): Promise<void> {
   // เคยเจอจริง: อีเมลที่ไม่มีในระบบตอบใน 0.16 วิ ส่วนอีเมลที่มีจริงตอบใน 120 วิ
   // เพราะรอส่งอีเมลให้เสร็จก่อน ต่างกัน 750 เท่า ใครจับเวลาก็รู้ว่าใครมีบัญชี
   const tReal = Date.now();
-  await call('POST', '/auth/otp/request', { body: { email: EMAIL_A, purpose: 'login' } });
+  await call('POST', '/auth/otp/request', { body: { email: EMAIL_A, purpose: 'reset' } });
   const msReal = Date.now() - tReal;
   const tFake = Date.now();
   await call('POST', '/auth/otp/request', {
-    body: { email: `ghost2-${stamp}@example.invalid`, purpose: 'login' },
+    body: { email: `ghost2-${stamp}@example.invalid`, purpose: 'reset' },
   });
   const msFake = Date.now() - tFake;
   const ratio = msFake > 0 ? msReal / msFake : msReal;
@@ -278,7 +278,6 @@ async function main(): Promise<void> {
 
   for (const [name, path] of [
     ['ยืนยันอีเมล', '/auth/otp/verify-email'],
-    ['ล็อกอินด้วย OTP', '/auth/otp/login'],
     ['ยืนยันรหัสตั้งรหัสผ่านใหม่', '/auth/otp/verify-reset'],
   ] as const) {
     const r = await call('POST', path, { body: { email: EMAIL_A, code: '000000' } });

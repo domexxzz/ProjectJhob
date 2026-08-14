@@ -12,21 +12,9 @@ const _kGreen = Color(0xFF4CD97B);
 const _kHint = Color(0xFF7A7A7A);
 const _kRed = Color(0xFFFF6B6B);
 
-/// ใช้หน้าจอเดียวทำได้ 2 อย่าง เพราะขั้นตอนเหมือนกันเป๊ะ
-/// (กรอกอีเมล → รับรหัสทางอีเมล → กรอกรหัส → เข้าแอป)
-/// ต่างกันแค่ข้อความและปลายทางที่เรียก จึงไม่ควรเขียนสองหน้าให้ซ้ำซ้อน
-enum OtpMode {
-  /// เข้าสู่ระบบด้วยรหัสแทนรหัสผ่าน
-  login,
-
-  /// ยืนยันอีเมลหลังสมัคร
-  verifyEmail,
-}
-
+/// หน้ายืนยันอีเมลด้วยรหัส 6 หลัก (กรอกอีเมล → รับรหัส → ยืนยัน → เข้าแอป)
 class OtpScreen extends ConsumerStatefulWidget {
-  const OtpScreen({super.key, required this.mode, this.presetEmail});
-
-  final OtpMode mode;
+  const OtpScreen({super.key, this.presetEmail});
 
   /// อีเมลที่รู้อยู่แล้ว เช่นเพิ่งสมัครเสร็จ — จะเติมให้ในช่องเลย
   final String? presetEmail;
@@ -56,9 +44,8 @@ class _OtpScreenState extends ConsumerState<OtpScreen> {
     super.dispose();
   }
 
-  bool get _isLogin => widget.mode == OtpMode.login;
-  String get _purpose => _isLogin ? 'login' : 'verify';
-  String get _title => _isLogin ? 'เข้าสู่ระบบด้วยรหัส' : 'ยืนยันอีเมล';
+  static const _purpose = 'verify';
+  static const _title = 'ยืนยันอีเมล';
 
   Future<void> _sendCode() async {
     final email = _emailController.text.trim();
@@ -91,9 +78,7 @@ class _OtpScreenState extends ConsumerState<OtpScreen> {
     });
     final otp = ref.read(otpControllerProvider);
     final email = _emailController.text.trim();
-    final err = _isLogin
-        ? await otp.loginWithCode(email, code)
-        : await otp.verifyEmail(email, code);
+    final err = await otp.verifyEmail(email, code);
     if (!mounted) return;
     setState(() {
       _busy = false;
@@ -101,7 +86,7 @@ class _OtpScreenState extends ConsumerState<OtpScreen> {
     });
     if (err == null && mounted) {
       ScaffoldMessenger.of(context).showSnackBar(
-        SnackBar(content: Text(_isLogin ? 'เข้าสู่ระบบสำเร็จ' : 'ยืนยันอีเมลเรียบร้อย')),
+        const SnackBar(content: Text('ยืนยันอีเมลเรียบร้อย')),
       );
       context.go('/');
     }
@@ -226,9 +211,7 @@ class _OtpScreenState extends ConsumerState<OtpScreen> {
                       // เพราะ backend ตอบเหมือนกันหมดเพื่อไม่ให้คนไล่เช็กว่าใครสมัครไว้บ้าง
                       // ถ้าหน้าจอเขียนยืนยันไปเลย ก็เท่ากับทำลายการป้องกันนั้นทิ้ง
                       ? 'ถ้าอีเมลนี้มีในระบบ เราส่งรหัส 6 หลักไปให้แล้ว\nรหัสใช้ได้ 10 นาที'
-                      : _isLogin
-                          ? 'กรอกอีเมลของคุณ เราจะส่งรหัสไปให้\nไม่ต้องจำรหัสผ่าน'
-                          : 'กรอกอีเมลที่ใช้สมัคร เพื่อรับรหัสยืนยัน',
+                      : 'กรอกอีเมลที่ใช้สมัคร เพื่อรับรหัสยืนยัน',
                   textAlign: TextAlign.center,
                   style: const TextStyle(color: _kHint, fontSize: 14, height: 1.4),
                 ),
@@ -260,7 +243,7 @@ class _OtpScreenState extends ConsumerState<OtpScreen> {
                   decoration: _fieldDecoration('------').copyWith(counterText: ''),
                 ),
                 const SizedBox(height: 20),
-                _button(_isLogin ? 'เข้าสู่ระบบ' : 'ยืนยันอีเมล', _submitCode),
+                _button('ยืนยันอีเมล', _submitCode),
                 Center(
                   child: TextButton(
                     onPressed: _busy ? null : _sendCode,
@@ -271,14 +254,6 @@ class _OtpScreenState extends ConsumerState<OtpScreen> {
               ],
               _errorBox(),
               const SizedBox(height: 24),
-              if (_isLogin && !_codeSent)
-                Center(
-                  child: TextButton(
-                    onPressed: () => context.go('/login'),
-                    child: const Text('เข้าสู่ระบบด้วยรหัสผ่านแทน',
-                        style: TextStyle(color: _kHint, fontSize: 13)),
-                  ),
-                ),
             ],
           ),
         ),

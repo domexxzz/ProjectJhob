@@ -1,9 +1,8 @@
 /**
- * รหัส OTP ทางอีเมล — ใช้ได้ 3 กรณี
+ * รหัส OTP ทางอีเมล — ใช้ได้ 2 กรณี
  *
  *   verify → ยืนยันอีเมลตอนสมัคร
  *   reset  → ลืมรหัสผ่าน (ยืนยันแล้วได้ token ไว้ตั้งรหัสใหม่)
- *   login  → เข้าสู่ระบบด้วยรหัสแทนรหัสผ่าน
  *
  * หลักความปลอดภัยที่ยึดไว้
  *  1. เก็บรหัสแบบเข้ารหัส (bcrypt) ไม่เก็บตัวเลขตรง ๆ — ฐานข้อมูลรั่วก็เอาไปใช้ไม่ได้
@@ -21,7 +20,7 @@ import { sendEmail, otpEmailTemplate } from '../../lib/mailer';
 import { env } from '../../config/env';
 import { HttpError } from '../../lib/http';
 
-export type OtpPurpose = 'reset' | 'verify' | 'login';
+export type OtpPurpose = 'reset' | 'verify';
 
 const CODE_TTL_MINUTES = 10;
 const MAX_ATTEMPTS = 5;
@@ -115,13 +114,6 @@ export async function verifyEmailOtp(email: string, code: string) {
     data: { emailVerifiedAt: new Date() },
   });
   return { token: signToken(user.id), emailVerified: true };
-}
-
-/** เข้าสู่ระบบด้วย OTP แทนรหัสผ่าน */
-export async function loginWithOtp(email: string, code: string) {
-  const userId = await consumeOtp(email, code, 'login');
-  await prisma.user.update({ where: { id: userId }, data: { lastLoginAt: new Date() } });
-  return { token: signToken(userId) };
 }
 
 /**
