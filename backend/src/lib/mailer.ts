@@ -38,6 +38,43 @@ async function sendViaResend(to: string, subject: string, html: string): Promise
   return { ok: true, detail: 'resend' };
 }
 
+/**
+ * Brevo — ส่งผ่าน HTTPS ไม่ใช่ SMTP
+ *
+ * จำเป็นเพราะ Render บล็อกพอร์ต SMTP ขาออก (พิสูจน์แล้ว: ต่อ smtp.gmail.com:587
+ * ได้ "Connection timeout" ทุกครั้ง ไม่ใช่รหัสผ่านผิด แต่ต่อไม่ติดตั้งแต่แรก)
+ * ผู้ให้บริการที่ใช้ HTTPS จึงเป็นทางเดียวที่ใช้ได้บนแพลตฟอร์มแบบนี้
+ *
+ * เลือก Brevo เพราะยืนยันแค่ "อีเมลผู้ส่ง" ก็ส่งหาใครก็ได้ ไม่ต้องมีโดเมนของตัวเอง
+ * (ต่างจาก Resend ที่ถ้าไม่ยืนยันโดเมน จะส่งได้เฉพาะอีเมลเจ้าของบัญชี)
+ */
+async function sendViaBrevo(to: string, subject: string, html: string): Promise<MailResult> {
+  // MAIL_FROM รูปแบบ "ชื่อ <อีเมล>" — Brevo ต้องการแยกชื่อกับอีเมลออกจากกัน
+  const match = FROM.match(/^(.*?)\s*<(.+)>$/);
+  const senderName = match ? match[1].trim() : 'พี่เงิน';
+  const senderEmail = match ? match[2].trim() : FROM.trim();
+
+  const res = await fetch('https://api.brevo.com/v3/smtp/email', {
+    method: 'POST',
+    headers: {
+      'api-key': process.env.BREVO_API_KEY as string,
+      'Content-Type': 'application/json',
+      accept: 'application/json',
+    },
+    body: JSON.stringify({
+      sender: { name: senderName, email: senderEmail },
+      to: [{ email: to }],
+      subject,
+      htmlContent: html,
+    }),
+  });
+  if (!res.ok) {
+    const body = await res.text().catch(() => '');
+    return { ok: false, detail: `brevo ตอบ ${res.status}: ${body.slice(0, 200)}` };
+  }
+  return { ok: true, detail: 'brevo' };
+}
+
 async function sendViaSmtp(to: string, subject: string, html: string): Promise<MailResult> {
   // import แบบ dynamic — คนที่ใช้ Resend ไม่จำเป็นต้องติดตั้ง nodemailer
   const nodemailer = await import('nodemailer').catch(() => null);
@@ -81,6 +118,8 @@ export async function sendEmail(to: string, subject: string, html: string): Prom
 
 async function _send(to: string, subject: string, html: string): Promise<MailResult> {
   try {
+    // เรียงตามความน่าจะใช้ได้จริงบนโฮสต์ที่บล็อกพอร์ต SMTP — HTTPS มาก่อนเสมอ
+    if (process.env.BREVO_API_KEY) return await sendViaBrevo(to, subject, html);
     if (process.env.RESEND_API_KEY) return await sendViaResend(to, subject, html);
     if (process.env.SMTP_HOST && process.env.SMTP_USER && process.env.SMTP_PASS) {
       return await sendViaSmtp(to, subject, html);
@@ -128,6 +167,7 @@ export function otpEmailTemplate(
 
 /** ไว้ตรวจว่าระบบส่งอีเมลพร้อมใช้งานไหม (ไม่เปิดเผยค่า key) */
 export function mailerStatus(): string {
+  if (process.env.BREVO_API_KEY) return 'brevo';
   if (process.env.RESEND_API_KEY) return 'resend';
   if (process.env.SMTP_HOST) return `smtp:${process.env.SMTP_HOST}`;
   return isProduction ? 'ยังไม่ได้ตั้งค่า' : 'dev-console';
