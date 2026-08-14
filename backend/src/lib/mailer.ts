@@ -50,6 +50,11 @@ async function sendViaSmtp(to: string, subject: string, html: string): Promise<M
     port,
     secure: port === 465,
     auth: { user: process.env.SMTP_USER, pass: process.env.SMTP_PASS },
+    // ตั้ง timeout ไว้ทุกจังหวะ — วัดจริงแล้วเคยค้างถึง 120 วินาที
+    // ถ้าปล่อยไม่จำกัด เวลามีปัญหาจะไม่มีทางรู้ว่าติดตรงไหน
+    connectionTimeout: 15_000, // ต่อไม่ติดใน 15 วิ = พอร์ตน่าจะถูกบล็อก
+    greetingTimeout: 10_000, // ต่อติดแต่เซิร์ฟเวอร์ไม่ทัก
+    socketTimeout: 20_000, // คุยกันอยู่แล้วเงียบไป
   });
   await transport.sendMail({ from: FROM, to, subject, html });
   return { ok: true, detail: `smtp:${process.env.SMTP_HOST}` };

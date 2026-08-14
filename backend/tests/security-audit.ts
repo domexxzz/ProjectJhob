@@ -258,6 +258,24 @@ async function main(): Promise<void> {
     `ทั้งคู่ตอบ HTTP ${reqReal.status} เหมือนกัน (ไม่เผยว่าใครสมัครไว้บ้าง)`,
   );
 
+  // ⚠️ ตอบข้อความเหมือนกันอย่างเดียวไม่พอ — "เวลา" ที่ใช้ตอบก็ต้องใกล้เคียงกันด้วย
+  // เคยเจอจริง: อีเมลที่ไม่มีในระบบตอบใน 0.16 วิ ส่วนอีเมลที่มีจริงตอบใน 120 วิ
+  // เพราะรอส่งอีเมลให้เสร็จก่อน ต่างกัน 750 เท่า ใครจับเวลาก็รู้ว่าใครมีบัญชี
+  const tReal = Date.now();
+  await call('POST', '/auth/otp/request', { body: { email: EMAIL_A, purpose: 'login' } });
+  const msReal = Date.now() - tReal;
+  const tFake = Date.now();
+  await call('POST', '/auth/otp/request', {
+    body: { email: `ghost2-${stamp}@example.invalid`, purpose: 'login' },
+  });
+  const msFake = Date.now() - tFake;
+  const ratio = msFake > 0 ? msReal / msFake : msReal;
+  check(
+    'เวลาตอบต้องไม่ต่างกันจนเดาได้ว่าอีเมลไหนมีบัญชี',
+    msReal < 5000 && ratio < 20,
+    `อีเมลจริง ${msReal}ms · ไม่มีในระบบ ${msFake}ms (ต่างกัน ${ratio.toFixed(1)} เท่า)`,
+  );
+
   for (const [name, path] of [
     ['ยืนยันอีเมล', '/auth/otp/verify-email'],
     ['ล็อกอินด้วย OTP', '/auth/otp/login'],
