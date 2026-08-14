@@ -2,6 +2,7 @@ import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:go_router/go_router.dart';
 
+import 'otp_code_field.dart';
 import 'otp_controller.dart';
 
 // โทนสีเซ็ตเดียวกับ LoginScreen
@@ -331,12 +332,11 @@ class _ForgotPasswordScreenState extends ConsumerState<ForgotPasswordScreen> {
           ),
         ),
         const SizedBox(height: 32),
-        _fieldLabel('Number'),
-        TextField(
+        _fieldLabel('รหัสยืนยัน 6 หลัก'),
+        OtpCodeField(
           controller: _otpController,
-          keyboardType: TextInputType.number,
-          style: const TextStyle(color: Colors.white),
-          decoration: _fieldDecoration('กรอกรหัสยืนยัน'),
+          enabled: !_busy,
+          onCompleted: (_) => _verifyCode(), // ครบ 6 หลักแล้วยืนยันให้เลย ไม่ต้องกดปุ่ม
         ),
         const SizedBox(height: 28),
         _actionButton(text: 'ยืนยัน', onPressed: _verifyCode),

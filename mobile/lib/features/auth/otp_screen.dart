@@ -2,6 +2,7 @@ import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:go_router/go_router.dart';
 
+import 'otp_code_field.dart';
 import 'otp_controller.dart';
 
 // โทนสีเซ็ตเดียวกับ LoginScreen / ForgotPasswordScreen
@@ -229,18 +230,10 @@ class _OtpScreenState extends ConsumerState<OtpScreen> {
                 _button('ส่งรหัสไปที่ Email', _sendCode),
               ] else ...[
                 _label('รหัสยืนยัน 6 หลัก'),
-                TextField(
+                OtpCodeField(
                   controller: _codeController,
-                  keyboardType: TextInputType.number,
-                  maxLength: 6,
-                  style: const TextStyle(
-                    color: Colors.white,
-                    fontSize: 22,
-                    letterSpacing: 8,
-                    fontWeight: FontWeight.w600,
-                  ),
-                  textAlign: TextAlign.center,
-                  decoration: _fieldDecoration('------').copyWith(counterText: ''),
+                  enabled: !_busy,
+                  onCompleted: (_) => _submitCode(), // ครบ 6 หลักแล้วยืนยันให้เลย
                 ),
                 const SizedBox(height: 20),
                 _button('ยืนยันอีเมล', _submitCode),
