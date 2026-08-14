@@ -7,6 +7,7 @@ import { signExportToken } from '../export/export.service';
 import { cache } from '../../lib/cache';
 import { buildContext } from './context_builder';
 import { generateReply, generateReplyWithTools, ChatTurn, ocrImage } from './coach';
+import { detectGoalIntent, deadlineFromMonths } from './goal_intent';
 import {
   detectExportRequest,
   buildExportReply,
@@ -14,7 +15,7 @@ import {
   ChatAttachment,
 } from './export_intent';
 import { checkFinanceScope, OUT_OF_SCOPE_REPLY } from './finance_scope';
-import { detectQuickLog, quickCreate } from './tools';
+import { detectQuickLog, quickCreate, runTool } from './tools';
 import { extractReceiptItems, logReceiptItems, analyzeContract, logTransferSlip } from './receipt';
 import {
   migrateLegacyMessages,
@@ -415,6 +416,39 @@ chatRouter.post(
           res.status(201).json({ message: saved, source: 'quick-log', cards: [card] });
           return;
         }
+      }
+    }
+
+    // ── ตั้งเป้าหมายออม → สร้างเองในโค้ด ไม่พึ่ง LLM เรียก tool ──
+    // ทดสอบกับ production แล้วพบว่าโมเดลไม่เรียก create_goal เลยสักครั้ง
+    // แถมตอบว่า "ตั้งไว้ในระบบเรียบร้อยแล้ว" ทั้งที่ไม่มีเป้าหมายเกิดขึ้นจริง
+    // ใช้วิธีเดียวกับ quick-log ด้านบนเพื่อให้การกระทำเกิดขึ้นแน่นอน 100%
+    if (includeFinancialContext && !imageBase64) {
+      const goal = detectGoalIntent(message);
+      if (goal) {
+        const created = (await runTool(
+          'create_goal',
+          { name: goal.name, targetBaht: goal.targetBaht, deadline: deadlineFromMonths(goal.months) },
+          userId,
+        )) as Record<string, unknown>;
+        if (created?.ok) {
+          const perMonth = goal.months ? Math.ceil(goal.targetBaht / goal.months) : null;
+          const within = goal.months ? ` ภายใน ${goal.months} เดือน` : '';
+          const advice = perMonth
+            ? `ต้องเก็บเดือนละประมาณ **${perMonth.toLocaleString('en-US')} บาท** นะครับ`
+            : 'ลองกำหนดเวลาด้วยจะช่วยให้เห็นภาพว่าต้องเก็บเดือนละเท่าไหร่';
+          const reply = `ตั้งเป้าหมายให้แล้วครับ 🎯 **${goal.name}** ${goal.targetBaht.toLocaleString('en-US')} บาท${within}
+
+${advice}
+
+ดูความคืบหน้าได้ที่หน้า "เป้าหมาย" ถ้าอยากแก้ยอดหรือลบก็ทำได้ที่นั่นเลยครับ 😊`;
+          const saved = await saveMessage('assistant', reply, JSON.stringify({ source: 'quick-goal' }));
+          await awardChatPoints(userId);
+          res.status(201).json({ message: saved, source: 'quick-goal' });
+          return;
+        }
+        // สร้างไม่สำเร็จ → ไม่ตอบว่าสำเร็จ ปล่อยให้ LLM คุยต่อตามปกติ
+        console.error('[chat] สร้างเป้าหมายอัตโนมัติไม่สำเร็จ:', created?.error);
       }
     }
 

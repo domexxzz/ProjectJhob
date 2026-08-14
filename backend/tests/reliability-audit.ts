@@ -11,6 +11,7 @@
  * วิธีวัด: ป้อนข้อมูลที่ "รู้คำตอบล่วงหน้า" เข้าไป แล้วเทียบผลลัพธ์กับคำตอบจริง
  */
 import { parseAmount, parseMerchant, parseDate, parseRef } from '../src/modules/transactions/parser';
+import { detectGoalIntent } from '../src/modules/chat/goal_intent';
 
 const LOCAL = process.argv.includes('--local');
 const SKIP_AI = process.argv.includes('--no-ai');
@@ -173,6 +174,52 @@ const SLIP_SAMPLES: Array<{ name: string; text: string; expect: number }> = [
   },
 ];
 
+/**
+ * ตัวตรวจจับเจตนา "ตั้งเป้าหมายออม" — ต้องจับให้ได้ และที่สำคัญกว่าคือ
+ * ต้อง "ไม่จับ" ข้อความที่ไม่ใช่ เพราะการสร้างเป้าหมายที่ผู้ใช้ไม่ได้ขอ
+ * สร้างความสับสนมากกว่าไม่สร้างเลย
+ */
+const GOAL_CASES: Array<{ msg: string; want: { name?: string; baht: number; months: number | null } | null }> = [
+  // ── ต้องจับได้ ──
+  { msg: 'ช่วยตั้งเป้าหมายเก็บเงิน 50000 บาท ภายใน 10 เดือนให้หน่อย', want: { baht: 50000, months: 10 } },
+  { msg: 'ตั้งเป้าออม 50000 บาท', want: { baht: 50000, months: null } },
+  { msg: 'อยากเก็บเงินซื้อโน้ตบุ๊ค 30000 บาท', want: { name: 'ซื้อโน้ตบุ๊ค', baht: 30000, months: null } },
+  { msg: 'อยากออมเงินไว้เที่ยวญี่ปุ่น 80000 ภายใน 2 ปี', want: { baht: 80000, months: 24 } },
+  { msg: 'วางแผนเก็บเงิน 120,000 ภายใน 12 เดือน', want: { baht: 120000, months: 12 } },
+  // ── ต้องไม่จับ ──
+  { msg: 'เป้าหมายของฉันมีอะไรบ้าง', want: null }, // คำถาม
+  { msg: 'ตั้งเป้าออมได้ไหม', want: null }, // คำถาม
+  { msg: 'หยอดกระปุกเป้าโน้ตบุ๊ค 500', want: null }, // เพิ่มเข้าเป้าเดิม
+  { msg: 'จ่ายค่าโน้ตบุ๊ค 30000', want: null }, // จ่ายไปแล้ว
+  { msg: 'ซื้อโน้ตบุ๊คไปแล้ว 30000', want: null }, // จ่ายไปแล้ว
+  { msg: 'ขอไฟล์แผนเก็บเงิน 50000 ภายใน 10 เดือน', want: null }, // ขอไฟล์
+  { msg: 'กาแฟ 50', want: null }, // จดรายจ่ายธรรมดา
+];
+
+function testGoalDetector(): void {
+  section('3. ตัวตรวจจับ "ตั้งเป้าหมายออม" (ไม่พึ่ง LLM)');
+
+  for (const c of GOAL_CASES) {
+    const got = detectGoalIntent(c.msg);
+    let ok: boolean;
+    let detail: string;
+    if (c.want === null) {
+      ok = got === null;
+      detail = ok ? 'ไม่จับ (ถูกต้อง)' : `จับผิด — ได้ ${JSON.stringify(got)}`;
+    } else {
+      ok =
+        got !== null &&
+        got.targetBaht === c.want.baht &&
+        got.months === c.want.months &&
+        (c.want.name === undefined || got.name === c.want.name);
+      detail = got
+        ? `ได้ "${got.name}" ฿${got.targetBaht.toLocaleString()} ${got.months ?? '-'} เดือน`
+        : 'ไม่จับ (ควรจับ)';
+    }
+    check(`${c.want === null ? 'ไม่จับ' : 'จับได้'}: "${c.msg.slice(0, 40)}"`, ok, detail);
+  }
+}
+
 function testSlipParsing(): void {
   section('2. ความแม่นยำของการอ่านสลิปโอนเงิน');
 
@@ -223,7 +270,7 @@ const EXPECT_EXPENSE = SEED.filter((s) => s.type === 'expense').reduce((a, b) =>
 const EXPECT_BALANCE = EXPECT_INCOME - EXPECT_EXPENSE;
 
 async function testTotals(token: string): Promise<void> {
-  section('3. ยอดรวมในระบบตรงกับข้อมูลที่บันทึกจริง');
+  section('4. ยอดรวมในระบบตรงกับข้อมูลที่บันทึกจริง');
 
   for (const s of SEED) {
     await call('POST', '/transactions', { token, body: { type: s.type, amount: s.amount, note: s.note } });
@@ -299,7 +346,7 @@ function usedRealModel(body: any): boolean {
 }
 
 async function testAiHonesty(token: string): Promise<void> {
-  section('4. AI ตอบตามข้อมูลจริง ไม่กุตัวเลขขึ้นมาเอง');
+  section('5. AI ตอบตามข้อมูลจริง ไม่กุตัวเลขขึ้นมาเอง');
 
   if (SKIP_AI) {
     console.log(`  ${C.gray}ข้าม (--no-ai)${C.reset}`);
@@ -371,7 +418,7 @@ async function testAiHonesty(token: string): Promise<void> {
 // หมวด 5 — ความพร้อมใช้งานและความเร็ว
 // ════════════════════════════════════════════════════════════════════════════
 async function testAvailability(token: string): Promise<void> {
-  section('5. ความพร้อมใช้งานและความเร็วในการตอบสนอง');
+  section('6. ความพร้อมใช้งานและความเร็วในการตอบสนอง');
 
   const health = await fetch(`${BASE}/health`).then((r) => r.json() as any);
   check('เซิร์ฟเวอร์ทำงานปกติ', health?.status === 'ok', `status = ${health?.status}`);
@@ -412,6 +459,7 @@ async function main(): Promise<void> {
   // หมวดที่ไม่ต้องใช้เซิร์ฟเวอร์ ทำก่อนเลย
   testMoneyMath();
   testSlipParsing();
+  testGoalDetector();
 
   // หมวดที่ต้องใช้ API จริง
   const stamp = `${Date.now().toString(36)}${Math.random().toString(36).slice(2, 7)}`;
