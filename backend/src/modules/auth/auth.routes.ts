@@ -220,6 +220,35 @@ authRouter.get(
   }),
 );
 
+/**
+ * GET /api/v1/auth/mail-events?email=... — ถาม Brevo ว่าอีเมลที่ส่งไปสถานะอะไร
+ *
+ * ระบบเราเรียก Brevo สำเร็จ (ok:true) แต่ผู้ใช้ไม่ได้รับอีเมล แปลว่าปัญหาอยู่
+ * ชั้นการนำส่งของ Brevo ซึ่งมองไม่เห็นจากฝั่งเรา endpoint นี้จึงถาม Brevo ตรง ๆ
+ * ว่าเกิดอะไรขึ้นกับแต่ละฉบับ (delivered / blocked / bounce พร้อมเหตุผล)
+ *
+ * ต้องล็อกอินก่อน และไม่ส่งค่า API key ออกมาในคำตอบ
+ */
+authRouter.get(
+  '/mail-events',
+  requireAuth,
+  asyncHandler(async (req, res) => {
+    const key = process.env.BREVO_API_KEY;
+    if (!key) {
+      res.json({ error: 'ใช้ได้เฉพาะตอนตั้งค่า Brevo' });
+      return;
+    }
+    const email = typeof req.query.email === 'string' ? req.query.email : undefined;
+    const url = new URL('https://api.brevo.com/v3/smtp/statistics/events');
+    url.searchParams.set('limit', '15');
+    if (email) url.searchParams.set('email', email);
+
+    const r = await fetch(url, { headers: { 'api-key': key, accept: 'application/json' } });
+    const body = await r.json().catch(() => null);
+    res.json({ status: r.status, events: body });
+  }),
+);
+
 // ── OTP ทางอีเมล ────────────────────────────────────────────────────────────
 // ทุก endpoint ใต้กลุ่มนี้ผ่าน authLimiter เพราะเป็นประตูรับข้อมูลยืนยันตัวตน
 // (10 ครั้ง/5 นาที — กันเดารหัส 6 หลักด้วยการยิงรัว)
