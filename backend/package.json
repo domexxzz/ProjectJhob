@@ -17,7 +17,8 @@
     "db:seed": "tsx prisma/seed.ts",
     "db:studio": "prisma studio",
     "prisma:generate": "prisma generate",
-    "test:security": "tsx tests/security-audit.ts"
+    "test:security": "tsx tests/security-audit.ts",
+    "test:reliability": "tsx tests/reliability-audit.ts"
   },
   "prisma": {
     "seed": "tsx prisma/seed.ts"

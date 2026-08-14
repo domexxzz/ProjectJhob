@@ -92,6 +92,8 @@ function cleanName(raw: string): string | null {
     .trim();
   // ตัดเลขบัญชีแบบปิดบัง x-xxxx-x หรือเลขยาว ๆ ที่ติดมา
   v = v.replace(/[xX*]{1,}[-\dxX*]*/g, '').replace(/\b\d{4,}\b/g, '').replace(/\s{2,}/g, ' ').trim();
+  // ตัดวงเล็บที่เหลือว่างหลังลบเลขบัญชีออก — ไม่งั้นได้ชื่อแบบ "ร้านกาแฟดี ()"
+  v = v.replace(/\(\s*\)/g, '').replace(/\s{2,}/g, ' ').replace(/[\s,]+$/, '').trim();
   if (v.length < 2) return null;
   const nonSpace = v.replace(/\s/g, '');
   const digits = (nonSpace.match(/\d/g) || []).length;
