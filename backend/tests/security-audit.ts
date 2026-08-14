@@ -240,6 +240,49 @@ async function main(): Promise<void> {
     head.headers.get('x-powered-by') ? `เผยว่า: ${head.headers.get('x-powered-by')}` : 'ซ่อนแล้ว',
   );
 
+  // ── 9. OTP ทางอีเมล ──────────────────────────────────────────────────────
+  section('9. OTP ทางอีเมล');
+
+  // ขอรหัสกับอีเมลที่ไม่มีในระบบ ต้องตอบเหมือนอีเมลที่มีจริงทุกประการ
+  // ถ้าตอบต่างกัน หน้าลืมรหัสผ่านจะกลายเป็นเครื่องมือไล่เช็กว่าใครสมัครไว้บ้าง
+  const reqReal = await call('POST', '/auth/otp/request', {
+    body: { email: EMAIL_A, purpose: 'reset' },
+  });
+  const reqFake = await call('POST', '/auth/otp/request', {
+    body: { email: `ghost-${stamp}@example.invalid`, purpose: 'reset' },
+  });
+  check(
+    'ขอรหัสกับอีเมลที่ไม่มีในระบบ ต้องตอบเหมือนอีเมลที่มีจริง',
+    reqReal.status === reqFake.status &&
+      JSON.stringify(reqReal.body) === JSON.stringify(reqFake.body),
+    `ทั้งคู่ตอบ HTTP ${reqReal.status} เหมือนกัน (ไม่เผยว่าใครสมัครไว้บ้าง)`,
+  );
+
+  for (const [name, path] of [
+    ['ยืนยันอีเมล', '/auth/otp/verify-email'],
+    ['ล็อกอินด้วย OTP', '/auth/otp/login'],
+    ['ยืนยันรหัสตั้งรหัสผ่านใหม่', '/auth/otp/verify-reset'],
+  ] as const) {
+    const r = await call('POST', path, { body: { email: EMAIL_A, code: '000000' } });
+    check(`${name} ด้วยรหัสมั่ว ต้องไม่ผ่าน`, r.status === 400, `ตอบ HTTP ${r.status}`);
+  }
+
+  const badReset = await call('POST', '/auth/password/reset', {
+    body: { resetToken: 'not-a-real-token-at-all', newPassword: 'Hacked!2569' },
+  });
+  check('ตั้งรหัสผ่านใหม่ด้วย token ปลอม', badReset.status === 400, `ตอบ HTTP ${badReset.status}`);
+
+  // ⚠️ ข้อสำคัญ: token ล็อกอินธรรมดาต้องเอามาตั้งรหัสผ่านใหม่ไม่ได้
+  // ถ้าไม่เช็ก purpose ใน token ใครที่ขโมย token ไปได้จะเปลี่ยนรหัสผ่านเหยื่อได้ทันที
+  const loginTokenReset = await call('POST', '/auth/password/reset', {
+    body: { resetToken: tokenA, newPassword: 'Hacked!2569' },
+  });
+  check(
+    'เอา token ล็อกอินธรรมดามาตั้งรหัสผ่านใหม่ ต้องไม่ได้',
+    loginTokenReset.status === 400,
+    `ตอบ HTTP ${loginTokenReset.status}`,
+  );
+
   // ── เก็บกวาด ─────────────────────────────────────────────────────────────
   section('เก็บกวาด — ลบบัญชีทดสอบทิ้ง');
   const delA = await call('DELETE', '/auth/me', { token: tokenA });

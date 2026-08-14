@@ -4,6 +4,14 @@ import { asyncHandler } from '../../lib/http';
 import { HttpError } from '../../lib/http';
 import { requireAuth } from '../../lib/auth';
 import { authLimiter } from '../../middleware/rate_limit';
+import {
+  requestOtp,
+  verifyEmailOtp,
+  loginWithOtp,
+  verifyResetOtp,
+  resetPassword,
+  OtpPurpose,
+} from './otp.service';
 import { registerSchema, loginSchema } from '../../lib/validate';
 import { registerUser, loginUser } from './auth.service';
 import { verifyGoogleIdToken, verifyGoogleAccessToken, verifyFacebookToken, oauthLogin } from './oauth.service';
@@ -189,6 +197,79 @@ authRouter.get(
     } catch (e) {
       return fail(e instanceof HttpError ? e.message : 'ล็อกอิน Facebook ไม่สำเร็จ');
     }
+  }),
+);
+
+// ── OTP ทางอีเมล ────────────────────────────────────────────────────────────
+// ทุก endpoint ใต้กลุ่มนี้ผ่าน authLimiter เพราะเป็นประตูรับข้อมูลยืนยันตัวตน
+// (10 ครั้ง/5 นาที — กันเดารหัส 6 หลักด้วยการยิงรัว)
+
+const otpRequestSchema = z.object({
+  email: z.string().email(),
+  purpose: z.enum(['reset', 'verify', 'login']),
+});
+const otpVerifySchema = z.object({
+  email: z.string().email(),
+  code: z.string().trim().length(6, 'รหัสต้องเป็นตัวเลข 6 หลัก'),
+});
+
+/**
+ * POST /api/v1/auth/otp/request — ขอรหัสทางอีเมล
+ *
+ * ⚠️ ตอบ 200 เสมอ ไม่ว่าอีเมลนั้นจะมีในระบบหรือไม่
+ * ถ้าตอบต่างกัน หน้านี้จะกลายเป็นเครื่องมือไล่เช็กว่าใครสมัครไว้บ้าง
+ */
+authRouter.post(
+  '/otp/request',
+  authLimiter,
+  asyncHandler(async (req, res) => {
+    const { email, purpose } = otpRequestSchema.parse(req.body);
+    await requestOtp(email, purpose as OtpPurpose);
+    res.json({ ok: true, message: 'ถ้าอีเมลนี้มีในระบบ เราส่งรหัสไปให้แล้ว กรุณาตรวจกล่องจดหมาย' });
+  }),
+);
+
+/** POST /api/v1/auth/otp/verify-email — ยืนยันอีเมลตอนสมัคร */
+authRouter.post(
+  '/otp/verify-email',
+  authLimiter,
+  asyncHandler(async (req, res) => {
+    const { email, code } = otpVerifySchema.parse(req.body);
+    res.json(await verifyEmailOtp(email, code));
+  }),
+);
+
+/** POST /api/v1/auth/otp/login — เข้าสู่ระบบด้วยรหัสแทนรหัสผ่าน */
+authRouter.post(
+  '/otp/login',
+  authLimiter,
+  asyncHandler(async (req, res) => {
+    const { email, code } = otpVerifySchema.parse(req.body);
+    res.json(await loginWithOtp(email, code));
+  }),
+);
+
+/** POST /api/v1/auth/otp/verify-reset — ลืมรหัสผ่าน ขั้น 1: ยืนยันรหัส → ได้ resetToken */
+authRouter.post(
+  '/otp/verify-reset',
+  authLimiter,
+  asyncHandler(async (req, res) => {
+    const { email, code } = otpVerifySchema.parse(req.body);
+    res.json(await verifyResetOtp(email, code));
+  }),
+);
+
+/** POST /api/v1/auth/password/reset — ลืมรหัสผ่าน ขั้น 2: ตั้งรหัสใหม่ */
+authRouter.post(
+  '/password/reset',
+  authLimiter,
+  asyncHandler(async (req, res) => {
+    const schema = z.object({
+      resetToken: z.string().min(10),
+      newPassword: z.string().min(6, 'รหัสผ่านต้องอย่างน้อย 6 ตัว'),
+    });
+    const { resetToken, newPassword } = schema.parse(req.body);
+    res.json(await resetPassword(resetToken, newPassword));
   }),
 );
 

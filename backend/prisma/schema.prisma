@@ -26,6 +26,7 @@ model User {
   points        Int      @default(0)
   lastLoginAt   DateTime?
   lastChatPointsDate String?
+  emailVerifiedAt DateTime? // null = ยังไม่ได้ยืนยันอีเมล (ไม่บล็อกการใช้งาน — ผู้ใช้เดิมยังเข้าได้ปกติ)
   deviceToken   String? // FCM device token (สำหรับ push)
   notificationsEnabled Boolean @default(true)
   budgetAlertsEnabled  Boolean @default(true)
@@ -40,6 +41,26 @@ model User {
   achievements  Achievement[]
   notifications Notification[]
   subscriptions Subscription[]
+  otpCodes      OtpCode[]
+}
+
+/// รหัส OTP ที่ส่งไปทางอีเมล
+///
+/// ⚠️ เก็บเป็น "ค่าที่เข้ารหัสแล้ว" (bcrypt) ไม่เก็บตัวเลข 6 หลักตรง ๆ
+/// เพราะถ้าฐานข้อมูลรั่ว คนที่เห็นจะเอารหัสไปใช้ยืนยันตัวตนแทนผู้ใช้ได้ทันที
+model OtpCode {
+  id         String    @id @default(cuid())
+  userId     String
+  purpose    String // reset (ลืมรหัสผ่าน) | verify (ยืนยันอีเมล) | login (ล็อกอินด้วย OTP)
+  codeHash   String // bcrypt ของรหัส 6 หลัก
+  expiresAt  DateTime // หมดอายุ 10 นาที
+  attempts   Int       @default(0) // กรอกผิดได้ไม่เกิน 5 ครั้ง กันเดารหัส
+  consumedAt DateTime? // ใช้แล้วใช้ซ้ำไม่ได้
+  createdAt  DateTime  @default(now())
+
+  user User @relation(fields: [userId], references: [id], onDelete: Cascade)
+
+  @@index([userId, purpose, createdAt])
 }
 
 model Category {
