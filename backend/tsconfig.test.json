@@ -1,0 +1,13 @@
+{
+  // ตรวจชนิดข้อมูลรวมโฟลเดอร์ tests/ ด้วย
+  //
+  // tsconfig.json หลักตั้ง rootDir เป็น src เพราะต้องใช้ตอน build ลง dist/
+  // ผลข้างเคียงคือไฟล์ใน tests/ ไม่เคยถูกตรวจเลย — เคยทำให้ได้ "ไฟเขียวปลอม"
+  // ในเครื่อง แล้วไปพังบน CI ตอน esbuild แปลงไฟล์จริง
+  "extends": "./tsconfig.json",
+  "compilerOptions": {
+    "noEmit": true,
+    "rootDir": "."
+  },
+  "include": ["src", "tests"]
+}
