@@ -1,4 +1,5 @@
 import { z } from 'zod';
+import { MAX_SATANG } from './money_limits';
 
 // 💡 amount = สตางค์ (integer, 1 บาท = 100)
 export const registerSchema = z.object({
@@ -15,7 +16,7 @@ export const loginSchema = z.object({
 
 export const createTransactionSchema = z.object({
   type: z.enum(['income', 'expense']),
-  amount: z.number().int().positive(),
+  amount: z.number().int().positive().max(MAX_SATANG),
   note: z.string().max(280).optional(),
   source: z.enum(['manual', 'ocr', 'sms']).default('manual'),
   categoryId: z.string().nullable().optional(),

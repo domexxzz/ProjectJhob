@@ -6,9 +6,29 @@ function get(name: string, fallback?: string): string {
   return v;
 }
 
+
+/**
+ * ค่าลับที่ห้ามใช้ค่า default ตอนขึ้น production
+ *
+ * repo เราเป็น public ใครก็อ่านค่า default ในโค้ดได้ ถ้าลืมตั้ง env var
+ * บนเซิร์ฟเวอร์ ระบบจะไม่แจ้งอะไรเลยแต่ใครก็ปลอม token เป็นใครก็ได้
+ * จึงให้ "ไม่ยอมสตาร์ท" ไปเลยดีกว่าเปิดใช้งานทั้งที่ไม่ปลอดภัย
+ */
+function requireSecretInProduction(key: string, devFallback: string): string {
+  const value = process.env[key];
+  if (value && value.trim()) return value;
+  if (process.env.NODE_ENV === 'production') {
+    throw new Error(
+      `[config] ไม่ได้ตั้ง ${key} — ระบบไม่ยอมสตาร์ทบน production เพราะค่า default ` +
+        `อยู่ในซอร์สโค้ดสาธารณะ ใครก็ปลอม token ได้ · ตั้งค่าใน Render → Environment`,
+    );
+  }
+  return devFallback;
+}
+
 export const env = {
   databaseUrl: get('DATABASE_URL', 'file:./dev.db'),
-  jwtSecret: get('JWT_SECRET', 'dev-insecure-secret-change-me'),
+  jwtSecret: requireSecretInProduction('JWT_SECRET', 'dev-insecure-secret-change-me'),
   jwtExpiresIn: process.env.JWT_EXPIRES_IN ?? '7d',
   port: Number(process.env.PORT ?? 4000),
   corsOrigin: process.env.CORS_ORIGIN ?? '*',

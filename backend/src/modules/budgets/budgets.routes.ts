@@ -5,6 +5,7 @@ import { requireAuth } from '../../lib/auth';
 import { z } from 'zod';
 import { cache } from '../../lib/cache';
 import { awardPoints } from '../auth/auth.service';
+import { MAX_SATANG } from '../../lib/money_limits';
 
 export const budgetsRouter = Router();
 budgetsRouter.use(requireAuth);
@@ -12,7 +13,7 @@ budgetsRouter.use(requireAuth);
 const createBudgetSchema = z.object({
   name: z.string().min(1, 'กรุณาใส่ชื่อหัวข้องบประมาณ').optional(),
   categoryId: z.string().nullable().optional(),
-  amount: z.number().int().positive('amount ต้องมากกว่า 0'),
+  amount: z.number().int().positive('amount ต้องมากกว่า 0').max(MAX_SATANG),
   period: z.enum(['monthly', 'weekly']).default('monthly').optional(),
   startDate: z.string().nullable().optional(),
   endDate: z.string().nullable().optional(),

@@ -17,15 +17,29 @@ import { predictionsRouter } from "./modules/predictions/predictions.routes";
 import { exportRouter } from "./modules/export/export.routes";
 import { currencyRouter } from "./modules/currency/currency.routes";
 import { notFound, errorHandler } from "./middleware/error";
+import helmet from "helmet";
+import { authLimiter, aiLimiter, apiLimiter } from "./middleware/rate_limit";
 
 export function createApp() {
   const app = express();
 
+  // Render อยู่หลัง reverse proxy — ถ้าไม่บอก Express ให้เชื่อ X-Forwarded-For
+  // ระบบจะเห็นผู้ใช้ทุกคนเป็น IP เดียวกัน (IP ของ proxy) แล้ว rate limit จะไป
+  // นับรวมกันทั้งระบบ = ผู้ใช้จริงโดนบล็อกทั้งหมด · 1 = เชื่อ proxy ชั้นเดียว
+  app.set("trust proxy", 1);
+
+  // ปิดการบอกว่าเซิร์ฟเวอร์รันด้วยอะไร — ลดข้อมูลที่ผู้โจมตีใช้เลือกช่องโหว่
+  app.disable("x-powered-by");
+  // security headers: กันเดาชนิดไฟล์ (nosniff), กันเว็บอื่นเอาไปฝัง, บังคับ HTTPS
+  // contentSecurityPolicy ปิดไว้เพราะหน้าเว็บเป็น Flutter build ที่ใช้ inline script
+  app.use(helmet({ contentSecurityPolicy: false, crossOriginEmbedderPolicy: false }));
   app.use(cors({ origin: env.corsOrigin }));
   app.use(express.json({ limit: "15mb" })); // รองรับรูป base64 (OCR สลิป/เอกสาร)
 
   app.use("/health", healthRouter);
-  app.use("/api/v1/auth", authRouter);
+  app.use("/api/v1", apiLimiter); // เพดานรวมทุก endpoint
+  app.use("/api/v1/auth", authLimiter, authRouter); // เข้มเป็นพิเศษ — กันเดารหัสผ่าน
+  app.use("/api/v1/chat", aiLimiter); // กันยิงรัวจนเผาโควต้า LLM (เสียเงินจริง)
   app.use("/api/v1/transactions", transactionsRouter);
   app.use("/api/v1/categories", categoriesRouter);
   app.use("/api/v1/budgets", budgetsRouter);

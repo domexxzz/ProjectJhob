@@ -187,6 +187,22 @@ authRouter.get(
   }),
 );
 
+/**
+ * DELETE /api/v1/auth/me — ลบบัญชีตัวเองพร้อมข้อมูลทั้งหมด
+ *
+ * สิทธิขอลบข้อมูลตาม PDPA · ลบ User แล้วรายการเงิน งบประมาณ เป้าหมาย แชท
+ * และการแจ้งเตือนถูกลบตามทั้งหมด (onDelete: Cascade ใน schema)
+ * ลบได้เฉพาะบัญชีของตัวเองเท่านั้น — ใช้ userId จาก token ไม่รับ id จากผู้ใช้
+ */
+authRouter.delete(
+  '/me',
+  requireAuth,
+  asyncHandler(async (req, res) => {
+    await prisma.user.delete({ where: { id: req.userId! } });
+    res.json({ ok: true });
+  }),
+);
+
 authRouter.get(
   '/me',
   requireAuth,
