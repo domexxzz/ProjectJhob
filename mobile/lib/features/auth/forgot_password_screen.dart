@@ -1,5 +1,8 @@
 import 'package:flutter/material.dart';
+import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:go_router/go_router.dart';
+
+import 'otp_controller.dart';
 
 // โทนสีเซ็ตเดียวกับ LoginScreen
 const _kBg = Color(0xFF1F1F1F);
@@ -8,15 +11,19 @@ const _kFieldBorder = Color(0xFF2A2A2A);
 const _kGreen = Color(0xFF4CD97B);
 const _kHint = Color(0xFF7A7A7A);
 
-class ForgotPasswordScreen extends StatefulWidget {
+class ForgotPasswordScreen extends ConsumerStatefulWidget {
   const ForgotPasswordScreen({super.key});
 
   @override
-  State<ForgotPasswordScreen> createState() => _ForgotPasswordScreenState();
+  ConsumerState<ForgotPasswordScreen> createState() => _ForgotPasswordScreenState();
 }
 
-class _ForgotPasswordScreenState extends State<ForgotPasswordScreen> {
+class _ForgotPasswordScreenState extends ConsumerState<ForgotPasswordScreen> {
   int _currentStep = 1; // 1: กรอก Email, 2: กรอก OTP, 3: ตั้งรหัสใหม่
+
+  bool _busy = false; // กันกดปุ่มซ้ำระหว่างรอเซิร์ฟเวอร์
+  String? _error; // ข้อความผิดพลาดที่แสดงใต้ฟอร์ม
+  String? _resetToken; // ได้จากขั้นที่ 2 ใช้ตอนตั้งรหัสใหม่ในขั้นที่ 3
 
   // Controllers สำหรับดักจับข้อมูล
   final _emailController = TextEditingController();
@@ -35,6 +42,103 @@ class _ForgotPasswordScreenState extends State<ForgotPasswordScreen> {
     _passwordController.dispose();
     _confirmPasswordController.dispose();
     super.dispose();
+  }
+
+  /// ครอบการเรียก API ให้จัดการสถานะกำลังโหลดกับข้อความผิดพลาดที่เดียว
+  /// คืน true ถ้าสำเร็จ — หน้าจอเอาไปตัดสินใจว่าจะไปขั้นถัดไปไหม
+  Future<bool> _run(Future<String?> Function() action) async {
+    if (_busy) return false;
+    setState(() {
+      _busy = true;
+      _error = null;
+    });
+    final err = await action();
+    if (!mounted) return false;
+    setState(() {
+      _busy = false;
+      _error = err;
+    });
+    return err == null;
+  }
+
+  Future<void> _sendCode() async {
+    final email = _emailController.text.trim();
+    if (!email.contains('@')) {
+      setState(() => _error = 'กรุณากรอกอีเมลให้ถูกต้อง');
+      return;
+    }
+    final ok = await _run(() => ref.read(otpControllerProvider).requestCode(email, 'reset'));
+    if (ok && mounted) setState(() => _currentStep = 2);
+  }
+
+  Future<void> _verifyCode() async {
+    final code = _otpController.text.trim();
+    if (code.length != 6) {
+      setState(() => _error = 'รหัสยืนยันเป็นตัวเลข 6 หลัก');
+      return;
+    }
+    setState(() {
+      _busy = true;
+      _error = null;
+    });
+    final res = await ref
+        .read(otpControllerProvider)
+        .verifyResetCode(_emailController.text.trim(), code);
+    if (!mounted) return;
+    setState(() {
+      _busy = false;
+      _error = res.error;
+      _resetToken = res.resetToken;
+    });
+    if (res.resetToken != null) setState(() => _currentStep = 3);
+  }
+
+  Future<void> _submitNewPassword() async {
+    final pw = _passwordController.text;
+    if (pw.length < 6) {
+      setState(() => _error = 'รหัสผ่านต้องอย่างน้อย 6 ตัว');
+      return;
+    }
+    if (pw != _confirmPasswordController.text) {
+      setState(() => _error = 'รหัสผ่านทั้งสองช่องไม่ตรงกัน');
+      return;
+    }
+    final token = _resetToken;
+    if (token == null) {
+      setState(() {
+        _error = 'หมดเวลาแล้ว กรุณาขอรหัสใหม่';
+        _currentStep = 1;
+      });
+      return;
+    }
+    final ok = await _run(() => ref.read(otpControllerProvider).resetPassword(token, pw));
+    if (ok && mounted) {
+      ScaffoldMessenger.of(context).showSnackBar(
+        const SnackBar(content: Text('ตั้งรหัสผ่านใหม่เรียบร้อย เข้าสู่ระบบได้เลย')),
+      );
+      context.go('/login');
+    }
+  }
+
+  /// กล่องข้อความผิดพลาด — ไม่มี error ก็ไม่กินที่
+  Widget _errorBox() {
+    if (_error == null) return const SizedBox.shrink();
+    return Padding(
+      padding: const EdgeInsets.only(top: 16),
+      child: Row(
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: [
+          const Icon(Icons.error_outline, color: Color(0xFFFF6B6B), size: 18),
+          const SizedBox(width: 8),
+          Expanded(
+            child: Text(
+              _error!,
+              style: const TextStyle(color: Color(0xFFFF6B6B), fontSize: 13, height: 1.4),
+            ),
+          ),
+        ],
+      ),
+    );
   }
 
   // ตัวตกแต่ง TextField ถอดมาจาก login_screen.dart
@@ -75,21 +179,29 @@ class _ForgotPasswordScreenState extends State<ForgotPasswordScreen> {
       width: double.infinity,
       height: 52,
       child: ElevatedButton(
-        onPressed: onPressed,
+        // ปิดปุ่มระหว่างรอเซิร์ฟเวอร์ — กันกดซ้ำจนขอรหัสหลายใบหรือส่งคำขอซ้ำ
+        onPressed: _busy ? null : onPressed,
         style: ElevatedButton.styleFrom(
           backgroundColor: _kGreen,
+          disabledBackgroundColor: _kGreen.withValues(alpha: 0.4),
           shape: RoundedRectangleBorder(
             borderRadius: BorderRadius.circular(12),
           ),
         ),
-        child: Text(
-          text,
-          style: const TextStyle(
-            color: Colors.black,
-            fontWeight: FontWeight.w600,
-            fontSize: 16,
-          ),
-        ),
+        child: _busy
+            ? const SizedBox(
+                width: 20,
+                height: 20,
+                child: CircularProgressIndicator(strokeWidth: 2, color: Colors.black),
+              )
+            : Text(
+                text,
+                style: const TextStyle(
+                  color: Colors.black,
+                  fontWeight: FontWeight.w600,
+                  fontSize: 16,
+                ),
+              ),
       ),
     );
   }
@@ -178,13 +290,8 @@ class _ForgotPasswordScreenState extends State<ForgotPasswordScreen> {
           decoration: _fieldDecoration('กรอก Email'),
         ),
         const SizedBox(height: 28),
-        _actionButton(
-          text: 'ส่ง OTP ไปที่ Email',
-          onPressed: () {
-            // โค้ดส่ง OTP จริงใส่ตรงนี้
-            setState(() => _currentStep = 2);
-          },
-        ),
+        _actionButton(text: 'ส่ง OTP ไปที่ Email', onPressed: _sendCode),
+        _errorBox(),
       ],
     );
   }
@@ -232,12 +339,13 @@ class _ForgotPasswordScreenState extends State<ForgotPasswordScreen> {
           decoration: _fieldDecoration('กรอกรหัสยืนยัน'),
         ),
         const SizedBox(height: 28),
-        _actionButton(
-          text: 'ยืนยัน',
-          onPressed: () {
-            // โค้ดตรวจ OTP จริงใส่ตรงนี้
-            setState(() => _currentStep = 3);
-          },
+        _actionButton(text: 'ยืนยัน', onPressed: _verifyCode),
+        _errorBox(),
+        Center(
+          child: TextButton(
+            onPressed: _busy ? null : _sendCode,
+            child: const Text('ไม่ได้รับรหัส? ส่งใหม่', style: TextStyle(color: _kHint, fontSize: 13)),
+          ),
         ),
       ],
     );
@@ -295,13 +403,8 @@ class _ForgotPasswordScreenState extends State<ForgotPasswordScreen> {
           ),
         ),
         const SizedBox(height: 28),
-        _actionButton(
-          text: 'ยืนยันการเปลี่ยนรหัส',
-          onPressed: () {
-            // โค้ดส่งข้อมูลบันทึกรหัสผ่านใหม่
-            context.go('/login'); // เสร็จสิ้นย้อนไปหน้าล็อกอิน[cite: 2]
-          },
-        ),
+        _actionButton(text: 'ยืนยันการเปลี่ยนรหัส', onPressed: _submitNewPassword),
+        _errorBox(),
       ],
     );
   }

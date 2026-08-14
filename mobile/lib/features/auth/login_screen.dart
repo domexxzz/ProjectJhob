@@ -166,6 +166,17 @@ class _LoginScreenState extends ConsumerState<LoginScreen> {
                 ],
               ),
 
+              // ทางเลือกสำหรับคนที่จำรหัสผ่านไม่ได้ — ขอรหัส 6 หลักทางอีเมลแทน
+              Center(
+                child: TextButton(
+                  onPressed: () => context.go('/otp-login'),
+                  child: const Text(
+                    'เข้าสู่ระบบด้วยรหัส OTP ทางอีเมล',
+                    style: TextStyle(color: _kGreen, fontSize: 13),
+                  ),
+                ),
+              ),
+
               if (auth.error != null) ...[
                 const SizedBox(height: 12),
                 Text(auth.error!, style: const TextStyle(color: AppColors.expense)),
