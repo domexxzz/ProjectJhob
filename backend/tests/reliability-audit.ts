@@ -4,6 +4,7 @@
  *   npm run test:reliability              ทดสอบ production
  *   npm run test:reliability -- --local   ทดสอบเครื่องตัวเอง
  *   npm run test:reliability -- --no-ai   ข้ามหมวดที่เรียก AI (เร็วขึ้น/ไม่เปลืองโควต้า)
+ *   npm run test:reliability -- --offline  เฉพาะหมวดที่ตรวจในเครื่องได้ (ใช้ใน CI ทุก push)
  *
  * ความปลอดภัยตอบคำถามว่า "ข้อมูลรั่วไหม" · ชุดนี้ตอบคำถามว่า "ตัวเลขเชื่อได้ไหม"
  * ซึ่งสำหรับระบบการเงินสำคัญไม่แพ้กัน — ระบบที่ปลอดภัยแต่คำนวณผิดก็ใช้ไม่ได้
@@ -15,6 +16,12 @@ import { detectGoalIntent } from '../src/modules/chat/goal_intent';
 
 const LOCAL = process.argv.includes('--local');
 const SKIP_AI = process.argv.includes('--no-ai');
+/**
+ * โหมดไม่ต่อเซิร์ฟเวอร์ — รันเฉพาะหมวดที่ตรวจได้ในเครื่อง (1-3)
+ * ใช้ใน CI ที่รันทุก push: ผลคงที่ ไม่สร้างบัญชีทดสอบบน production
+ * และไม่ไปกินโควต้า rate limit ของผู้ใช้จริง
+ */
+const OFFLINE = process.argv.includes('--offline');
 const BASE = LOCAL ? 'http://localhost:4000' : 'https://phee-ngern.onrender.com';
 const API = `${BASE}/api/v1`;
 
@@ -468,6 +475,11 @@ async function main(): Promise<void> {
   testSlipParsing();
   testGoalDetector();
 
+  if (OFFLINE) {
+    summarize();
+    return;
+  }
+
   // หมวดที่ต้องใช้ API จริง
   const stamp = `${Date.now().toString(36)}${Math.random().toString(36).slice(2, 7)}`;
   const EMAIL = `reltest-${stamp}@example.invalid`;
@@ -498,6 +510,10 @@ async function main(): Promise<void> {
     console.log(`  ${C.yellow}!${C.reset} ลบไม่สำเร็จ (HTTP ${del.status}) — ลบเองที่ฐานข้อมูล: ${EMAIL}`);
   }
 
+  summarize();
+}
+
+function summarize(): never {
   const total = passed + failed;
   console.log(`\n${C.bold}${'─'.repeat(58)}${C.reset}`);
   console.log(

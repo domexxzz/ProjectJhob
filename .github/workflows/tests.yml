@@ -1,0 +1,117 @@
+name: ทดสอบความปลอดภัย + ความน่าเชื่อถือ
+
+# แบ่งเป็น 2 ระดับ เพราะชุดทดสอบสองแบบมีข้อจำกัดต่างกัน
+#
+#  1. ทุก push/PR → รันเฉพาะหมวดที่ตรวจในเครื่องได้ (เร็ว ผลคงที่ ไม่แตะ production)
+#     คณิตศาสตร์การเงิน · ความแม่นยำการอ่านสลิป · ตัวตรวจจับเป้าหมายออม
+#
+#  2. วันละครั้ง + สั่งเองได้ → ยิง production จริงทั้ง 2 ชุดเต็มรูปแบบ
+#     ไม่รันทุก push เพราะสร้างบัญชีทดสอบจริงและกินโควต้า rate limit
+#     ที่ผู้ใช้จริงต้องใช้ (ล็อกอิน 10 ครั้ง/5 นาที · แชท 30 ครั้ง/นาที)
+on:
+  push:
+    branches: [deploy/cloud, main]
+  pull_request:
+    branches: [deploy/cloud, main]
+  schedule:
+    - cron: '0 1 * * *' # 08:00 น. เวลาไทย ทุกวัน
+  workflow_dispatch:
+
+concurrency:
+  group: tests-${{ github.ref }}
+  cancel-in-progress: true
+
+jobs:
+  # ── ระดับ 1: รันทุก push — ไม่ต้องมีเซิร์ฟเวอร์ ────────────────────────────
+  offline:
+    name: ตรวจในเครื่อง (ทุก push)
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 22
+          cache: npm
+          cache-dependency-path: backend/package-lock.json
+
+      # postinstall รัน prisma generate ให้เอง — ต้องมีเพราะ parser.ts import prisma client
+      - name: ติดตั้ง dependencies
+        working-directory: backend
+        run: npm ci
+
+      - name: ตรวจชนิดข้อมูล (typecheck)
+        working-directory: backend
+        run: npm run typecheck
+
+      - name: ทดสอบความน่าเชื่อถือ (เฉพาะหมวดที่ตรวจในเครื่องได้)
+        working-directory: backend
+        run: npm run test:reliability -- --offline
+
+  # ── ระดับ 2: ยิง production จริง — วันละครั้ง หรือสั่งเอง ──────────────────
+  production:
+    name: ทดสอบ production จริง (รายวัน)
+    if: github.event_name == 'schedule' || github.event_name == 'workflow_dispatch'
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 22
+          cache: npm
+          cache-dependency-path: backend/package-lock.json
+
+      - name: ติดตั้ง dependencies
+        working-directory: backend
+        run: npm ci
+
+      # ปลุกเซิร์ฟเวอร์ก่อน — Render พักเครื่องเมื่อไม่มีคนใช้ ครั้งแรกจะช้ามาก
+      # ถ้าไม่ปลุกก่อน ข้อวัดความเร็วจะเห็นเป็นหลักสิบวินาทีทั้งที่ปกติ ~60ms
+      - name: ปลุกเซิร์ฟเวอร์
+        run: |
+          for i in $(seq 1 20); do
+            code=$(curl -s -o /dev/null -w "%{http_code}" https://phee-ngern.onrender.com/health || true)
+            if [ "$code" = "200" ]; then echo "เซิร์ฟเวอร์พร้อม"; exit 0; fi
+            echo "รอเซิร์ฟเวอร์ตื่น... ($i/20)"
+            sleep 15
+          done
+          echo "::warning::เซิร์ฟเวอร์ไม่ตอบใน 5 นาที — ทดสอบต่อไปแต่ผลอาจเพี้ยน"
+
+      # ⚠️ ลำดับสำคัญ: ต้องรันความน่าเชื่อถือ "ก่อน" ความปลอดภัย
+      # เพราะชุดความปลอดภัยมีข้อทดสอบยิงล็อกอินผิดรัว 25 ครั้งเพื่อพิสูจน์ rate limit
+      # ซึ่งจะกินโควต้าจนชุดที่รันทีหลังสมัครบัญชีทดสอบไม่ได้ (HTTP 429)
+      - name: ทดสอบความน่าเชื่อถือ (เต็มรูปแบบ)
+        working-directory: backend
+        run: npm run test:reliability
+
+      - name: ทดสอบความปลอดภัย (เต็มรูปแบบ)
+        working-directory: backend
+        run: npm run test:security
+
+      # แจ้งเตือนเฉพาะตอนพัง — ถ้าแจ้งทุกครั้งจะกลายเป็นเสียงรบกวนจนไม่มีใครอ่าน
+      - name: แจ้งเตือน Telegram เมื่อทดสอบไม่ผ่าน
+        if: failure()
+        env:
+          TOKEN: ${{ secrets.TELEGRAM_BOT_TOKEN }}
+          CHAT: ${{ secrets.TELEGRAM_CHAT_ID }}
+          RUN_URL: ${{ github.server_url }}/${{ github.repository }}/actions/runs/${{ github.run_id }}
+        run: |
+          if [ -z "$TOKEN" ] || [ -z "$CHAT" ]; then
+            echo "ยังไม่ได้ตั้ง secret Telegram — ข้ามการแจ้งเตือน"
+            exit 0
+          fi
+          # เขียน payload ลงไฟล์แล้วส่งด้วย --data-binary
+          # ส่งภาษาไทยผ่าน argument ตรง ๆ แล้วตัวอักษรเพี้ยน (Telegram ตอบ "must be encoded in UTF-8")
+          python3 - <<'PY' > /tmp/tg.json
+          import json, os
+          print(json.dumps({
+              "chat_id": os.environ["CHAT"],
+              "parse_mode": "HTML",
+              "text": "🔴 <b>ทดสอบ production ไม่ผ่าน</b>\n\nระบบพี่เงินมีบางอย่างผิดปกติ\nดูรายละเอียด: " + os.environ["RUN_URL"],
+          }, ensure_ascii=False))
+          PY
+          curl -sS -X POST "https://api.telegram.org/bot$TOKEN/sendMessage" \
+            -H "Content-Type: application/json; charset=utf-8" \
+            --data-binary @/tmp/tg.json > /dev/null
+          echo "แจ้งเตือน Telegram แล้ว"
