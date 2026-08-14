@@ -4,6 +4,7 @@ import { asyncHandler } from '../../lib/http';
 import { HttpError } from '../../lib/http';
 import { requireAuth } from '../../lib/auth';
 import { authLimiter } from '../../middleware/rate_limit';
+import { mailerStatus, lastMailResult } from '../../lib/mailer';
 import {
   requestOtp,
   verifyEmailOtp,
@@ -197,6 +198,25 @@ authRouter.get(
     } catch (e) {
       return fail(e instanceof HttpError ? e.message : 'ล็อกอิน Facebook ไม่สำเร็จ');
     }
+  }),
+);
+
+/**
+ * GET /api/v1/auth/mail-status — ดูว่าการส่งอีเมลครั้งล่าสุดสำเร็จไหม
+ *
+ * จำเป็นเพราะการส่งทำแบบไม่รอผล ข้อผิดพลาดจึงไม่โผล่ที่คำตอบของ API
+ * และคนที่ไม่มีสิทธิ์เข้า dashboard ของผู้ให้บริการก็อ่าน log ไม่ได้
+ * ต้องล็อกอินก่อน — ไม่เปิดสาธารณะเพราะข้อความ error บอกรายละเอียดระบบภายใน
+ */
+authRouter.get(
+  '/mail-status',
+  requireAuth,
+  asyncHandler(async (_req, res) => {
+    res.json({
+      configured: mailerStatus() !== 'ยังไม่ได้ตั้งค่า',
+      provider: mailerStatus(),
+      last: lastMailResult(),
+    });
   }),
 );
 

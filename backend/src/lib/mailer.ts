@@ -60,8 +60,26 @@ async function sendViaSmtp(to: string, subject: string, html: string): Promise<M
   return { ok: true, detail: `smtp:${process.env.SMTP_HOST}` };
 }
 
+/**
+ * ผลการส่งครั้งล่าสุด — ไว้วินิจฉัยตอนผู้ใช้บอกว่า "ไม่ได้รับอีเมล"
+ *
+ * จำเป็นเพราะการส่งทำแบบไม่รอผล (ดูเหตุผลใน otp.service.ts) ข้อผิดพลาดจึงไม่
+ * ไปโผล่ที่คำตอบของ API และคนที่ไม่มีสิทธิ์เข้า dashboard ก็อ่าน log ไม่ได้
+ */
+let lastResult: (MailResult & { at: string }) | null = null;
+
+export function lastMailResult(): (MailResult & { at: string }) | null {
+  return lastResult;
+}
+
 /** ส่งอีเมล — ไม่เคย throw ผู้เรียกดูค่า ok เอง */
 export async function sendEmail(to: string, subject: string, html: string): Promise<MailResult> {
+  const result = await _send(to, subject, html);
+  lastResult = { ...result, at: new Date().toISOString() };
+  return result;
+}
+
+async function _send(to: string, subject: string, html: string): Promise<MailResult> {
   try {
     if (process.env.RESEND_API_KEY) return await sendViaResend(to, subject, html);
     if (process.env.SMTP_HOST && process.env.SMTP_USER && process.env.SMTP_PASS) {
