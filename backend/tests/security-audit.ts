@@ -87,6 +87,12 @@ async function main(): Promise<void> {
   const tokenB: string | undefined = regB.body?.token ?? regB.body?.accessToken;
 
   if (!tokenA || !tokenB) {
+    if (regA.status === 429 || regB.status === 429) {
+      console.log(`  ${C.yellow}!${C.reset} โดน rate limit ของระบบเราเอง — รอ ~5 นาทีแล้วรันใหม่`);
+      console.log(`  ${C.gray}  (นี่คือข้อ 8 ที่กำลังทำงานอยู่จริง ๆ: สมัคร/ล็อกอินรัวเกิน 10 ครั้งใน 5 นาที)${C.reset}
+`);
+      process.exit(1);
+    }
     console.log(`  ${C.red}✘ สร้างบัญชีทดสอบไม่สำเร็จ${C.reset}`);
     console.log(`    ก: HTTP ${regA.status} ${JSON.stringify(regA.body)?.slice(0, 160)}`);
     console.log(`    ข: HTTP ${regB.status} ${JSON.stringify(regB.body)?.slice(0, 160)}`);
@@ -234,20 +240,6 @@ async function main(): Promise<void> {
     head.headers.get('x-powered-by') ? `เผยว่า: ${head.headers.get('x-powered-by')}` : 'ซ่อนแล้ว',
   );
 
-  // ── 8. จำกัดจำนวนครั้งที่ยิงได้ ──────────────────────────────────────────
-  section('8. จำกัดการยิงรัว (กันเดารหัสผ่าน / กันเผาโควต้า AI)');
-  const burst = await Promise.all(
-    Array.from({ length: 25 }, () =>
-      call('POST', '/auth/login', { body: { email: EMAIL_A, password: 'เดารหัสไปเรื่อย' } }),
-    ),
-  );
-  const blocked = burst.filter((r) => r.status === 429).length;
-  check(
-    'ยิงล็อกอินผิด 25 ครั้งรวด ต้องโดนบล็อก',
-    blocked > 0,
-    blocked > 0 ? `โดนบล็อก ${blocked}/25 ครั้ง (HTTP 429)` : 'ไม่โดนบล็อกเลย — เดารหัสผ่านได้ไม่จำกัด',
-  );
-
   // ── เก็บกวาด ─────────────────────────────────────────────────────────────
   section('เก็บกวาด — ลบบัญชีทดสอบทิ้ง');
   const delA = await call('DELETE', '/auth/me', { token: tokenA });
@@ -263,6 +255,20 @@ async function main(): Promise<void> {
     console.log(`  ${C.yellow}!${C.reset} ลบไม่สำเร็จ (ก:${delA.status} ข:${delB.status}) — ลบเองที่ฐานข้อมูล:`);
     console.log(`  ${C.gray}  ${EMAIL_A}, ${EMAIL_B}${C.reset}`);
   }
+
+  // ── 8. จำกัดจำนวนครั้งที่ยิงได้ ──────────────────────────────────────────
+  section('8. จำกัดการยิงรัว (กันเดารหัสผ่าน / กันเผาโควต้า AI)');
+  const burst = await Promise.all(
+    Array.from({ length: 25 }, () =>
+      call('POST', '/auth/login', { body: { email: EMAIL_A, password: 'เดารหัสไปเรื่อย' } }),
+    ),
+  );
+  const blocked = burst.filter((r) => r.status === 429).length;
+  check(
+    'ยิงล็อกอินผิด 25 ครั้งรวด ต้องโดนบล็อก',
+    blocked > 0,
+    blocked > 0 ? `โดนบล็อก ${blocked}/25 ครั้ง (HTTP 429)` : 'ไม่โดนบล็อกเลย — เดารหัสผ่านได้ไม่จำกัด',
+  );
 
   // ── สรุป ─────────────────────────────────────────────────────────────────
   const total = passed + failed;

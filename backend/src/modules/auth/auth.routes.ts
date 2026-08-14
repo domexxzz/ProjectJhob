@@ -3,6 +3,7 @@ import { z } from 'zod';
 import { asyncHandler } from '../../lib/http';
 import { HttpError } from '../../lib/http';
 import { requireAuth } from '../../lib/auth';
+import { authLimiter } from '../../middleware/rate_limit';
 import { registerSchema, loginSchema } from '../../lib/validate';
 import { registerUser, loginUser } from './auth.service';
 import { verifyGoogleIdToken, verifyGoogleAccessToken, verifyFacebookToken, oauthLogin } from './oauth.service';
@@ -45,6 +46,7 @@ const profileSelect = {
 
 authRouter.post(
   '/register',
+  authLimiter, // กันเดารหัสผ่าน/สมัครรัว — เฉพาะประตูที่รับ credential
   asyncHandler(async (req, res) => {
     const data = registerSchema.parse(req.body);
     res.status(201).json(await registerUser(data));
@@ -53,6 +55,7 @@ authRouter.post(
 
 authRouter.post(
   '/login',
+  authLimiter, // กันเดารหัสผ่าน/สมัครรัว — เฉพาะประตูที่รับ credential
   asyncHandler(async (req, res) => {
     const data = loginSchema.parse(req.body);
     res.json(await loginUser(data));
@@ -62,6 +65,7 @@ authRouter.post(
 // POST /api/v1/auth/google — ล็อกอินด้วย Google (ส่ง idToken จาก google_sign_in)
 authRouter.post(
   '/google',
+  authLimiter, // กันเดารหัสผ่าน/สมัครรัว — เฉพาะประตูที่รับ credential
   asyncHandler(async (req, res) => {
     const { idToken, accessToken } = googleSchema.parse(req.body);
     const profile = idToken ? await verifyGoogleIdToken(idToken) : await verifyGoogleAccessToken(accessToken!);
@@ -72,6 +76,7 @@ authRouter.post(
 // POST /api/v1/auth/facebook — ล็อกอินด้วย Facebook (ส่ง accessToken จาก flutter_facebook_auth)
 authRouter.post(
   '/facebook',
+  authLimiter, // กันเดารหัสผ่าน/สมัครรัว — เฉพาะประตูที่รับ credential
   asyncHandler(async (req, res) => {
     const { accessToken } = facebookSchema.parse(req.body);
     const profile = await verifyFacebookToken(accessToken);

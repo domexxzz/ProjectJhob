@@ -18,7 +18,7 @@ import { exportRouter } from "./modules/export/export.routes";
 import { currencyRouter } from "./modules/currency/currency.routes";
 import { notFound, errorHandler } from "./middleware/error";
 import helmet from "helmet";
-import { authLimiter, aiLimiter, apiLimiter } from "./middleware/rate_limit";
+import { aiLimiter, apiLimiter } from "./middleware/rate_limit";
 
 export function createApp() {
   const app = express();
@@ -38,7 +38,7 @@ export function createApp() {
 
   app.use("/health", healthRouter);
   app.use("/api/v1", apiLimiter); // เพดานรวมทุก endpoint
-  app.use("/api/v1/auth", authLimiter, authRouter); // เข้มเป็นพิเศษ — กันเดารหัสผ่าน
+  app.use("/api/v1/auth", authRouter); // limiter ใส่เฉพาะ endpoint ที่รับรหัสผ่าน
   app.use("/api/v1/chat", aiLimiter); // กันยิงรัวจนเผาโควต้า LLM (เสียเงินจริง)
   app.use("/api/v1/transactions", transactionsRouter);
   app.use("/api/v1/categories", categoriesRouter);
