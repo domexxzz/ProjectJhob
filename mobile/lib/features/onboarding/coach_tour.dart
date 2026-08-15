@@ -47,14 +47,18 @@ class _CoachTourOverlayState extends State<_CoachTourOverlay> {
   int _i = 0;
 
   void _next() {
+    if (!mounted) return;
     if (_i >= widget.steps.length - 1) {
-      Navigator.of(context).pop();
+      Navigator.of(context, rootNavigator: true).pop();
     } else {
       setState(() => _i++);
     }
   }
 
-  void _skip() => Navigator.of(context).pop();
+  void _skip() {
+    if (!mounted) return;
+    Navigator.of(context, rootNavigator: true).pop();
+  }
 
   /// หาตำแหน่งจริงของ widget เป้าหมายบนหน้าจอ
   Rect? _targetRect(CoachStep step) {
@@ -98,33 +102,33 @@ class _CoachTourOverlayState extends State<_CoachTourOverlay> {
 
     return Material(
       type: MaterialType.transparency,
-      child: GestureDetector(
-        behavior: HitTestBehavior.opaque,
-        onTap: _next, // แตะตรงไหนก็ไปขั้นถัดไป
-        child: Stack(
-          children: [
-            // ฉากมืด + เจาะรูตรงปุ่มที่กำลังอธิบาย
-            Positioned.fill(
-              child: IgnorePointer(
-                child: CustomPaint(
-                  painter: _SpotlightPainter(hole: hole, circle: step.circle),
-                ),
+      child: Stack(
+        children: [
+          // ฉากมืด — แตะฉากเพื่อไปขั้นถัดไป (IgnorePointer ถูกนำออก
+          // เพราะ CustomPaint ไม่ต้องการ hit-test จริง ๆ)
+          Positioned.fill(
+            child: GestureDetector(
+              behavior: HitTestBehavior.opaque,
+              onTap: _next,
+              child: CustomPaint(
+                painter: _SpotlightPainter(hole: hole, circle: step.circle),
               ),
             ),
-            Positioned(
-              left: 20,
-              right: 20,
-              top: cardTop,
-              child: _StepCard(
-                step: step,
-                index: _i,
-                total: widget.steps.length,
-                onNext: _next,
-                onSkip: _skip,
-              ),
+          ),
+          // การ์ดคำอธิบาย — อยู่เหนือ GestureDetector จึงรับ event ของตัวเอง
+          Positioned(
+            left: 20,
+            right: 20,
+            top: cardTop,
+            child: _StepCard(
+              step: step,
+              index: _i,
+              total: widget.steps.length,
+              onNext: _next,
+              onSkip: _skip,
             ),
-          ],
-        ),
+          ),
+        ],
       ),
     );
   }

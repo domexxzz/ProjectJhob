@@ -41,6 +41,47 @@ export function parseAmount(text: string): number | null {
   return candidates.length > 0 ? Math.max(...candidates) : null;
 }
 
+/**
+ * ตรวจหาสกุลเงินจาก OCR text ของสลิป
+ * คืน 'USD' | 'THB' | null (null = ตรวจไม่เจอ ให้ใช้ค่าจาก app settings)
+ */
+export function parseCurrency(text: string): 'USD' | 'THB' | null {
+  const t = text.toUpperCase();
+
+  // USD indicators
+  const usdPatterns = [
+    /\bUSD\b/,
+    /\bUS\s*DOLLAR/,
+    /UNITED\s*STATES\s*DOLLAR/,
+    /\$\s*[\d,]+/,            // $12.34
+    /[\d,]+\s*\bUSD\b/,       // 12.34 USD
+    /PAYPAL/i,
+    /STRIPE/i,
+    /WISE/i,
+    /INTERNATIONAL\s*TRANSFER/i,
+  ];
+  for (const re of usdPatterns) {
+    if (re.test(t)) return 'USD';
+  }
+
+  // THB indicators — ถ้าเจอสัญลักษณ์/คำไทยชัดเจน ให้เป็น THB
+  const thbPatterns = [
+    /บาท/,
+    /฿/,
+    /\bTHB\b/,
+    /THAI\s*BAHT/i,
+    /BAHT/i,
+    /ธนาคาร/,
+    /PROMPTPAY/i,
+    /พร้อมเพย์/,
+  ];
+  for (const re of thbPatterns) {
+    if (re.test(text)) return 'THB'; // ใช้ text ดั้งเดิม (ไม่ uppercase) เพราะมีภาษาไทย
+  }
+
+  return null;
+}
+
 export function parseDate(text: string): Date | null {
   const monthsPattern = Object.keys(THAI_MONTHS).map(k => k.replace(/\./g, "\\.")).join("|");
   const m1 = text.match(new RegExp(`(\\d{1,2})\\s*(${monthsPattern})\\s*(\\d{2,4})`));

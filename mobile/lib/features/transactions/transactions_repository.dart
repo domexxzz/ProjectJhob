@@ -10,12 +10,14 @@ typedef DashboardData = ({List<Txn> items, TxnSummary summary});
 
 class AnalyzedSlip {
   AnalyzedSlip(
-      {this.amount, this.date, this.ref, this.merchant, this.categoryId});
+      {this.amount, this.date, this.ref, this.merchant, this.categoryId, this.currency});
   final int? amount;
   final String? date;
   final String? ref;
   final String? merchant;
   final String? categoryId;
+  /// สกุลเงินที่ตรวจเจอจากสลิป: 'USD' | 'THB' | null
+  final String? currency;
 
   factory AnalyzedSlip.fromJson(Map<String, dynamic> j) => AnalyzedSlip(
         amount: j['amount'] as int?,
@@ -23,6 +25,7 @@ class AnalyzedSlip {
         ref: j['ref'] as String?,
         merchant: j['merchant'] as String?,
         categoryId: j['categoryId'] as String?,
+        currency: j['currency'] as String?,
       );
 }
 

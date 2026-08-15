@@ -12,6 +12,7 @@ import 'transaction.dart';
 import 'transactions_repository.dart';
 import '../notifications/notifications_repository.dart';
 import '../auth/auth_controller.dart';
+import '../settings/settings_screen.dart';
 
 const _thMonths = [
   '',
@@ -56,10 +57,14 @@ class _SlipScreenState extends ConsumerState<SlipScreen> {
   String? _fileName;
   bool _analyzing = false;
   bool _saving = false;
+  /// สกุลเงินของสลิป: 'THB' | 'USD' (อ่านจาก OCR หรือผู้ใช้เลือก)
+  /// null ก่อน OCR — ตอน _confirm() จะ fallback ไปใช้ app currency
+  String? _slipCurrency;
 
   @override
   void initState() {
     super.initState();
+    _date = DateTime.now();
     _amount.addListener(_onAmountChanged);
   }
 
@@ -88,6 +93,8 @@ class _SlipScreenState extends ConsumerState<SlipScreen> {
       final dataUrl = 'data:image/jpeg;base64,${base64Encode(bytes)}';
       final a = await ref.read(transactionsRepoProvider).parseSlip(dataUrl);
       if (!mounted) return;
+      // ดึง app currency เป็น fallback เมื่อ OCR ตรวจไม่เจอสกุลเงิน
+      final appCurrency = ref.read(appSettingsProvider).currency;
       setState(() {
         _type = 'expense';
         // a.amount เป็น satang → แปลงเป็นบาทก่อน set ลง field
@@ -97,12 +104,15 @@ class _SlipScreenState extends ConsumerState<SlipScreen> {
         _categoryId = a.categoryId;
         if ((a.merchant?.trim().isNotEmpty ?? false))
           _desc.text = a.merchant!.trim();
+        // ตั้งสกุลเงินจากสลิป — ถ้า OCR ตรวจไม่เจอ ใช้ค่าจากการตั้งค่า
+        _slipCurrency = a.currency ?? appCurrency;
         _analyzing = false;
       });
       final ok = (a.amount ?? 0) > 0;
+      final currencyLabel = _slipCurrency == 'USD' ? '🇺🇸 USD' : '🇹🇭 THB';
       ScaffoldMessenger.of(context).showSnackBar(SnackBar(
         content: Text(ok
-            ? 'อ่านสลิปสำเร็จ! ตรวจสอบแล้วกดยืนยัน ✅'
+            ? 'อ่านสลิปสำเร็จ! สกุลเงิน: $currencyLabel ✅'
             : 'อ่านยอดไม่เจอ กรอกเองได้เลย'),
       ));
     } catch (e) {
@@ -631,30 +641,53 @@ class _SlipScreenState extends ConsumerState<SlipScreen> {
   }
 
   Future<void> _confirm() async {
-    final baht = double.tryParse(_amount.text.replaceAll(',', '').trim());
-    if (baht == null || baht <= 0) {
+    final settings = ref.read(appSettingsProvider);
+    final appCurrency = settings.currency;                    // สกุลที่ผู้ใช้ตั้งไว้
+    final slipCurrency = _slipCurrency ?? appCurrency;        // สกุลของสลิป
+
+    // parse ยอดจาก text field (user input ไม่มีหน่วย — เป็นตัวเลขล้วน)
+    final rawAmount = double.tryParse(_amount.text.replaceAll(',', '').trim());
+    if (rawAmount == null || rawAmount <= 0) {
       ScaffoldMessenger.of(context).showSnackBar(
           const SnackBar(content: Text('กรอกจำนวนเงินให้ถูกต้อง')));
       return;
     }
+
+    // ── แปลงค่าเป็น satang (THB × 100) เสมอ ──────────────────────────────
+    // กรณีที่ app ตั้งไว้ USD แต่สลิปเป็น THB (หรือกลับกัน) ต้องแปลงให้ถูก
+    // Money.toSatang() ใช้ Money._currency (== appCurrency) เป็น reference
+    // → ถ้า slipCurrency != appCurrency ต้องแปลงก่อน
+    int amountSatang;
+    if (slipCurrency == 'USD' && appCurrency == 'THB') {
+      // สลิปเป็น USD แต่ app เป็น THB
+      // rawAmount = USD → แปลงเป็น THB แล้ว × 100 เป็น satang
+      final thbPerUsd = settings.usdRate > 0 ? (1.0 / settings.usdRate) : 33.5;
+      amountSatang = (rawAmount * thbPerUsd * 100).round();
+    } else if (slipCurrency == 'THB' && appCurrency == 'USD') {
+      // สลิปเป็น THB แต่ app เป็น USD
+      // rawAmount = USD (ที่ user เห็น) จริง ๆ ค่าในสลิปเป็น THB
+      // → rawAmount (THB บาท) × 100 = satang  (Money.toSatang แบบ THB)
+      amountSatang = (rawAmount * 100).round();
+    } else {
+      // สลิปและ app เป็นสกุลเดียวกัน — ใช้ Money.toSatang() ตามปกติ
+      amountSatang = Money.toSatang(rawAmount);
+    }
+
     setState(() => _saving = true);
     try {
       final alert = await ref.read(transactionsRepoProvider).create(
             type: _type,
-            amount: Money.toSatang(baht),
+            amount: amountSatang,
             categoryId: _selectedBudget?.categoryId ?? _categoryId,
             budgetId: _selectedBudget?.id,
             note: _desc.text.trim(),
             source: _fileName != null ? 'ocr' : 'manual',
             occurredAt: _date,
           );
-      ref.invalidate(dashboardProvider);
-      ref.invalidate(
-          notificationsProvider); // รีเฟรชการแจ้งเตือนการทำนาย/งบประมาณล่วงหน้า
-      ref.read(authControllerProvider.notifier).refreshProfile();
-      await ref
-          .read(dashboardProvider.future); // รอให้ดึงข้อมูลเสร็จก่อนเด้งกลับ
+
       if (!mounted) return;
+
+      // แสดง dialog แจ้งเตือนก่อน (ถ้ามี) แล้ว pop กลับ dashboard
       if (alert != null) {
         await showDialog(
           context: context,
@@ -673,7 +706,17 @@ class _SlipScreenState extends ConsumerState<SlipScreen> {
           ),
         );
       }
-      if (mounted) context.pop();
+
+      if (!mounted) return;
+      // Pop กลับ dashboard ก่อน — ให้ user เห็นผลทันที
+      context.pop();
+
+      // Invalidate หลัง pop: dashboard screen ที่กลับมา
+      // จะ watch dashboardProvider ใหม่ → refetch โดยอัตโนมัติ
+      ref.invalidate(dashboardProvider);
+      ref.invalidate(budgetsListProvider);
+      ref.invalidate(notificationsProvider);
+      ref.read(authControllerProvider.notifier).refreshProfile();
     } catch (e) {
       if (mounted) {
         setState(() => _saving = false);
@@ -798,6 +841,48 @@ class _SlipScreenState extends ConsumerState<SlipScreen> {
                           ),
                         ]),
                   ),
+                  const SizedBox(height: 8),
+
+                  // ── สกุลเงิน (อ่านจากสลิป / เลือกเอง) ──
+                  Consumer(builder: (ctx, r, _) {
+                    final appCurr = r.watch(
+                        appSettingsProvider.select((s) => s.currency));
+                    // ถ้ายังไม่ได้ OCR ใช้ค่าจาก settings เป็น default
+                    final current = _slipCurrency ?? appCurr;
+                    return Row(children: [
+                      const Text('สกุลเงิน:',
+                          style: TextStyle(
+                              color: AppColors.textMuted, fontSize: 12)),
+                      const SizedBox(width: 8),
+                      _CurrencyChip(
+                        label: '🇹🇭 THB',
+                        selected: current == 'THB',
+                        onTap: () => setState(() => _slipCurrency = 'THB'),
+                      ),
+                      const SizedBox(width: 6),
+                      _CurrencyChip(
+                        label: '🇺🇸 USD',
+                        selected: current == 'USD',
+                        onTap: () => setState(() => _slipCurrency = 'USD'),
+                      ),
+                      if (_slipCurrency != null && _slipCurrency != appCurr) ...[
+                        const SizedBox(width: 6),
+                        Container(
+                          padding: const EdgeInsets.symmetric(
+                              horizontal: 7, vertical: 3),
+                          decoration: BoxDecoration(
+                            color: const Color(0xFFF5A623).withValues(alpha: 0.15),
+                            borderRadius: BorderRadius.circular(8),
+                            border: Border.all(
+                                color: const Color(0xFFF5A623).withValues(alpha: 0.5)),
+                          ),
+                          child: const Text('จะแปลงอัตโนมัติ',
+                              style: TextStyle(
+                                  color: Color(0xFFF5A623), fontSize: 10)),
+                        ),
+                      ],
+                    ]);
+                  }),
                   const SizedBox(height: 12),
 
                   // ── วันที่ ──
@@ -1205,6 +1290,48 @@ class _TypePill extends StatelessWidget {
                 color: selected ? Colors.white : AppColors.textMuted,
                 fontWeight: FontWeight.bold,
                 fontSize: 13)),
+      ),
+    );
+  }
+}
+
+/// Chip เลือกสกุลเงินในหน้าสลิป
+class _CurrencyChip extends StatelessWidget {
+  const _CurrencyChip({
+    required this.label,
+    required this.selected,
+    required this.onTap,
+  });
+
+  final String label;
+  final bool selected;
+  final VoidCallback onTap;
+
+  @override
+  Widget build(BuildContext context) {
+    return GestureDetector(
+      onTap: onTap,
+      child: AnimatedContainer(
+        duration: const Duration(milliseconds: 140),
+        padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 5),
+        decoration: BoxDecoration(
+          color: selected
+              ? AppColors.primary.withValues(alpha: 0.2)
+              : const Color(0xFF1A2820),
+          borderRadius: BorderRadius.circular(20),
+          border: Border.all(
+            color: selected ? AppColors.primary : const Color(0xFF2C4636),
+            width: selected ? 1.5 : 1,
+          ),
+        ),
+        child: Text(
+          label,
+          style: TextStyle(
+            color: selected ? AppColors.primary : AppColors.textMuted,
+            fontWeight: selected ? FontWeight.bold : FontWeight.normal,
+            fontSize: 12,
+          ),
+        ),
       ),
     );
   }

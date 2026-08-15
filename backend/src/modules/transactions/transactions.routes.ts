@@ -5,7 +5,8 @@ import { requireAuth } from '../../lib/auth';
 import { createTransactionSchema, updateTransactionSchema } from '../../lib/validate';
 import { prisma } from '../../lib/prisma';
 import { awardPoints } from '../auth/auth.service';
-import { parseAmount, parseDate, parseRef, parseMerchant, autoCategorize } from './parser';
+import { parseAmount, parseDate, parseRef, parseMerchant, parseCurrency, autoCategorize } from './parser';
+
 import { cache } from '../../lib/cache';
 import { ocrImage } from '../chat/coach';
 import { runBudgetTriggers } from '../notifications/triggers';
@@ -91,7 +92,7 @@ transactionsRouter.get(
       summary: { ...summary, balance: summary.income - summary.expense },
     };
 
-    await cache.set(cacheKey, result, 300);
+    await cache.set(cacheKey, result, 30); // TTL 30s — ลดจาก 300s เพื่อให้ข้อมูลสดเสมอ
     res.json(result);
   }),
 );
@@ -255,6 +256,7 @@ transactionsRouter.post(
     const date = parseDate(text);
     const ref = parseRef(text);
     const merchant = parseMerchant(text);
+    const currency = parseCurrency(text);   // detect สกุลเงินจากสลิป (null = ไม่เจอ)
     const categoryId = await autoCategorize(text, merchant || '', 'expense', req.userId);
 
     res.json({
@@ -263,6 +265,7 @@ transactionsRouter.post(
       ref,
       merchant,
       categoryId,
+      currency,             // 'USD' | 'THB' | null
       rawText: text,
     });
   }),
