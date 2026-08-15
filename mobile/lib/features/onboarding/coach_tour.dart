@@ -229,6 +229,7 @@ class _StepCard extends StatelessWidget {
                 style: ElevatedButton.styleFrom(
                   backgroundColor: const Color(0xFF3CAE63),
                   foregroundColor: Colors.white,
+                  minimumSize: const Size(0, 40),
                   padding:
                       const EdgeInsets.symmetric(horizontal: 20, vertical: 10),
                   shape: RoundedRectangleBorder(
