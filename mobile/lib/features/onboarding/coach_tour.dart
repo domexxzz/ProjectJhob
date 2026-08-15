@@ -61,9 +61,13 @@ class _CoachTourOverlayState extends State<_CoachTourOverlay> {
     final ctx = step.targetKey?.currentContext;
     if (ctx == null) return null;
     final box = ctx.findRenderObject();
-    if (box is! RenderBox || !box.hasSize) return null;
-    final origin = box.localToGlobal(Offset.zero);
-    return origin & box.size;
+    if (box is! RenderBox || !box.hasSize || box.debugNeedsLayout) return null;
+    try {
+      final origin = box.localToGlobal(Offset.zero);
+      return origin & box.size;
+    } catch (_) {
+      return null;
+    }
   }
 
   @override
@@ -101,8 +105,10 @@ class _CoachTourOverlayState extends State<_CoachTourOverlay> {
           children: [
             // ฉากมืด + เจาะรูตรงปุ่มที่กำลังอธิบาย
             Positioned.fill(
-              child: CustomPaint(
-                painter: _SpotlightPainter(hole: hole, circle: step.circle),
+              child: IgnorePointer(
+                child: CustomPaint(
+                  painter: _SpotlightPainter(hole: hole, circle: step.circle),
+                ),
               ),
             ),
             Positioned(
