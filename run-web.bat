@@ -11,10 +11,10 @@ cd /d "%~dp0mobile"
 
 set "FLUTTER="
 for /f "delims=" %%i in ('where flutter 2^>nul') do set "FLUTTER=%%i"
-if not exist "%FLUTTER%" if exist "C:\Users\ta100\Downloads\flutter\bin\flutter.bat" set "FLUTTER=C:\Users\ta100\Downloads\flutter\bin\flutter.bat"
-if not exist "%FLUTTER%" if exist "C:\flutter\bin\flutter.bat" set "FLUTTER=C:\flutter\bin\flutter.bat"
-if not exist "%FLUTTER%" if exist "C:\src\flutter\bin\flutter.bat" set "FLUTTER=C:\src\flutter\bin\flutter.bat"
-if not exist "%FLUTTER%" set "FLUTTER=flutter"
+if "%FLUTTER%"=="" if exist "C:\Users\ta100\Downloads\flutter\bin\flutter.bat" set "FLUTTER=C:\Users\ta100\Downloads\flutter\bin\flutter.bat"
+if "%FLUTTER%"=="" if exist "C:\flutter\bin\flutter.bat" set "FLUTTER=C:\flutter\bin\flutter.bat"
+if "%FLUTTER%"=="" if exist "C:\src\flutter\bin\flutter.bat" set "FLUTTER=C:\src\flutter\bin\flutter.bat"
+if "%FLUTTER%"=="" set "FLUTTER=flutter"
 
 REM Verify Flutter is available
 call "%FLUTTER%" --version >nul 2>&1
@@ -28,8 +28,8 @@ if errorlevel 1 (
 echo === Getting Flutter packages ===
 call "%FLUTTER%" pub get
 
-echo === Launching app in Chrome (web) on http://localhost:5000 - API http://localhost:4000 ===
+echo === Launching app in Chrome (web debug) on http://localhost:5000 - API http://localhost:4000 ===
 echo     First build takes ~40s; Chrome opens by itself. Please wait.
 REM --web-port/--web-hostname must be fixed to localhost:5000 so the origin
 REM matches the "Authorized JavaScript origins" in Google Cloud (Google Sign-In).
-call "%FLUTTER%" run -d chrome --release --web-hostname=localhost --web-port=5000 --dart-define=API_BASE_URL=http://localhost:4000
+call "%FLUTTER%" run -d chrome --web-hostname=localhost --web-port=5000 --dart-define=API_BASE_URL=http://localhost:4000

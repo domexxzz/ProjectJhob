@@ -22,6 +22,9 @@ if not exist node_modules (
   call npm install
 )
 
+echo === Checking database provider configurations ===
+node scripts/sync-db-provider.js
+
 echo === Syncing database schema ===
 call npm run db:push
 
