@@ -372,7 +372,7 @@ And here is the part I want you to remember. **The first time we ran them, we di
 
 Let me give you the most surprising one.
 
-When a user forgets their password, our system sends a code to their email. There is a security rule here: the system must reply with the **same message** whether or not that email exists in our database. If it replied differently, anyone could use our website to discover who has an account.
+When a user forgets their password, we send a code to their email. The security rule is that the system must reply with the **same message** whether or not that email exists — otherwise anyone could use our website to discover who has an account.
 
 So we built that, and we wrote a test to confirm both replies were identical. The test passed.
 
@@ -387,19 +387,19 @@ The messages were identical. But the timing was seven hundred times different. A
 
 **I'd like to stress that** information can leak through time, not only through content. A test that only reads the reply will never find this.
 
-I should also be honest about our limits. We tested our slip reading with ten sample formats, not fifty real bank slips. And we have not measured our forecast accuracy yet, because that needs months of real user data. Both are written in our documentation.
+I should also be honest about our limits. We tested our slip reading with ten sample formats, not fifty real bank slips, and we have not measured our forecast accuracy yet. Both are written in our documentation.
 
 ### ▸ SUMMARY
 
 **To summarise,** I have covered three things.
 
-First, we tested whether one user can reach another user's data, and today that passes completely.
+First, we tested whether one user can reach another user's data.
 Second, we tested whether the numbers are exactly correct, not approximately correct.
-And third, these tests found six real problems — and there are still two things we cannot prove yet.
+And third, these tests found six real problems — and two things we still cannot prove.
 
 ### ▸ CONCLUSION
 
-**In conclusion,** we are not asking users to trust us because we say the system is safe. We are asking them to trust us because we tested it, we published the results, we found six problems, and we fixed them.
+**In conclusion,** we are not asking users to trust us because we say the system is safe. We are asking them to trust us because we tested it, we found six problems, and we fixed them.
 
 For a financial product, that is not extra work. That is the product.
 
