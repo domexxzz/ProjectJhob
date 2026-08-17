@@ -324,11 +324,11 @@ Thank you very much.
 
 Good morning everyone. My name is Dome.
 
-You have now seen the problem, and you have seen the product. **I'd like to talk to you about** the part that decides whether this becomes a real business or only a class project — trust.
+You have seen the problem, and you have seen the product. **I'd like to talk to you about** the part that decides whether this becomes a real business or only a class project — trust.
 
-If a user gives us their income, their spending, and their savings goals, we are asking for something very private. So the question is not "does the application work". The question is **"why should anyone believe it"**.
+If a user gives us their income and their savings goals, we are asking for something very private. So the question is not "does the application work". The question is **"why should anyone believe it"**.
 
-**Before I start, let me clarify one point.** Trust has two separate parts, and people often mix them together. The first is: can my data leak? The second is: are the numbers correct? These are completely different problems, so we tested them separately.
+**Before I start, let me clarify one point.** Trust has two separate parts. The first is: can my data leak? The second is: are the numbers correct? These are completely different problems, so we tested them separately.
 
 **I've divided my talk into three parts.** First, how we tested for data leaks. Second, how we tested for correct numbers. And third, what we found — including what we still cannot prove.
 
@@ -342,7 +342,7 @@ To test this, we wrote a program that behaves like a real attacker. It creates t
 
 The system must refuse every single time.
 
-**For example,** even if User A knows the exact reference number of User B's transaction, the system must still answer "not found" — not "you are not allowed". Because saying "you are not allowed" would confirm that the record exists, and that is already a small leak.
+**For example,** even if User A knows the exact reference number of User B's transaction, the system must answer "not found" — not "you are not allowed". Saying "you are not allowed" would confirm the record exists, and that is already a small leak.
 
 **So, we can see that** security is not only about blocking attacks. It is also about not confirming information by accident.
 
@@ -385,7 +385,7 @@ The messages were identical. But the timing was seven hundred times different. A
 
 **I'd like to stress that** information can leak through time, not only through content. A test that only reads the reply will never find this.
 
-I also want to be honest about what we still cannot prove. We measured our slip-reading accuracy using ten sample formats, not fifty real slips from real banks. And we have not yet measured how accurate our spending forecast is, because that needs several months of real user data. Both limitations are written in our documentation.
+I should also be honest about our limits. We tested our slip reading with ten sample formats, not fifty real bank slips. And we have not measured our forecast accuracy yet, because that needs months of real user data. Both are written in our documentation.
 
 ### ▸ SUMMARY
 
