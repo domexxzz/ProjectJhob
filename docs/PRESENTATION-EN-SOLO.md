@@ -56,8 +56,8 @@ Introduction  →  Body                          →  Conclusion
 
 | ผู้นำเสนอ | หัวข้อ | ลำดับการเล่า (Sequence) |
 |---|---|---|
-| **ต้า** | Why People Fail to Manage Their Money | Cause / Effect |
-| **แตงกวา** | How Phee Ngern Removes the Effort | Process |
+| **แตงกวา** | Why People Fail to Manage Their Money | Cause / Effect |
+| **ต้า** | How Phee Ngern Removes the Effort | Process |
 | **โดม** | How We Prove the System Can Be Trusted | Problem / Solution |
 
 ### ตารางกันเนื้อหาซ้ำ — สำคัญที่สุด
@@ -66,8 +66,8 @@ Introduction  →  Body                          →  Conclusion
 
 | หัวข้อ | **พูดได้** | **ห้ามพูด** |
 |---|---|---|
-| ต้า | ปัญหา ผู้ใช้เป้าหมาย คู่แข่ง | ฟีเจอร์ของแอป ผลการทดสอบ |
-| แตงกวา | แอปทำงานยังไง 3 วิธีใช้งาน | ปัญหาเชิงตลาด ตัวเลขการทดสอบ |
+| แตงกวา | ปัญหา ผู้ใช้เป้าหมาย Persona คู่แข่ง | ฟีเจอร์ของแอป ผลการทดสอบ |
+| ต้า | แอปทำงานยังไง 3 วิธีใช้งาน | ปัญหาเชิงตลาด ตัวเลขการทดสอบ |
 | โดม | วิธีพิสูจน์ว่าเชื่อถือได้ ผลทดสอบ ข้อจำกัด | อธิบายฟีเจอร์ซ้ำ ปัญหาเชิงตลาด |
 
 **บทเกริ่นโปรเจกต์ 2–3 ประโยคที่ทุกคนต้องมี — เขียนคนละสำนวน ห้ามลอกกัน**
@@ -76,7 +76,7 @@ Introduction  →  Body                          →  Conclusion
 ---
 ---
 
-# 1 · ต้า
+# 1 · แตงกวา
 
 ## Why People Fail to Manage Their Money
 
@@ -87,7 +87,7 @@ Introduction  →  Body                          →  Conclusion
 | # | Sub topic | เวลา |
 |---|---|---|
 | 1 | The hidden cost of recording expenses | 1:30 |
-| 2 | The people who suffer the most | 1:30 |
+| 2 | Our target group and persona | 2:00 |
 | 3 | Why existing apps do not solve it | 1:30 |
 
 ### จับเวลารวม
@@ -104,13 +104,13 @@ Introduction  →  Body                          →  Conclusion
 
 ### ▸ INTRODUCTION
 
-Good morning everyone.
+Good morning everyone. My name is Taengkwa.
 
 **I'd like to talk to you about** a problem that almost every student in this room has, but very few people talk about — managing your own money.
 
 Our team built a mobile application called Phee Ngern, which means "Brother Money" in Thai. It is an AI assistant that helps people track their spending. But before we talk about the application, we must understand the problem it solves.
 
-**I've divided my talk into three parts.** First, I will explain why recording expenses is so difficult. Second, I will show you who suffers the most from this problem. And third, I will explain why the applications we already have do not solve it.
+**I've divided my talk into three parts.** First, I will explain why recording expenses is so difficult. Second, I will introduce our target group and our main persona. And third, I will explain why the applications we already have do not solve it.
 
 **There will be time for questions at the end of my talk.**
 
@@ -130,17 +130,25 @@ When you buy a coffee for fifty baht, and you want to record it, what do you hav
 
 ### ▸ BODY — Sub topic 2
 
-**That brings me to my second point:** who suffers the most from this problem.
+**That brings me to my second point:** who suffers the most from this problem — in other words, our target group.
 
-Our target users are Thai university students and people in their first job.
+Our target users are Thai university students and people in their first job, roughly eighteen to twenty-five years old.
 
-**For example,** think about a student, twenty-one years old. She receives money from her parents every month. She wants to save for a new laptop. But at the end of the month, the money is gone, and she cannot explain where it went.
+We chose this group for three reasons. First, this is the age when financial habits are formed. Second, their income is small, so every mistake hurts more. And third, they already live on their phone — so a financial tool must feel like chatting, not like accounting.
 
-She is not careless. She simply has no easy way to see the pattern.
+**Let me give you our main persona.**
 
-**This is especially important because** this is the age when financial habits are formed. If she learns to track her money now, she keeps that skill for life. If she gives up now, she may never start again.
+Her name is Ploy. She is twenty-one, a third-year university student in Bangkok. Her parents send her eight thousand baht every month, and she also earns some money from a part-time job at weekends.
 
-**So much for** who has the problem. **Let's leave that there.**
+Her goal is to save for a new laptop.
+Her problem is that by the twenty-fifth of every month, the money is gone — and she cannot explain where it went.
+Her behaviour is important too: she checks her phone more than a hundred times a day, but she has never opened a spreadsheet in her life.
+
+**This is especially important because** Ploy is not careless and she is not bad with money. She simply has no easy way to see the pattern.
+
+**So, we can see that** our user does not need more financial knowledge. She needs less work.
+
+**Let's leave that there.**
 
 ### ▸ BODY — Sub topic 3
 
@@ -161,7 +169,7 @@ Some applications try to fix this by reading your bank SMS messages. But in Thai
 **To summarise,** I have made three points today.
 
 First, recording expenses has a hidden cost, and that cost is repeated every day.
-Second, the people who need this most are young people who are just starting their financial life.
+Second, our target group is young Thai people starting their financial life — people like Ploy, who need less work, not more knowledge.
 And third, existing applications do not remove that daily cost.
 
 ### ▸ CONCLUSION
@@ -187,7 +195,7 @@ Thank you for listening. I am happy to take your questions.
 ---
 ---
 
-# 2 · แตงกวา
+# 2 · ต้า
 
 ## How Phee Ngern Removes the Effort
 
@@ -215,7 +223,7 @@ Thank you for listening. I am happy to take your questions.
 
 ### ▸ INTRODUCTION
 
-Good morning everyone. My name is Taengkwa.
+Good morning everyone. My name is Ta.
 
 Our team built a mobile application called Phee Ngern, which means "Brother Money" in Thai. It is an AI assistant that helps young people track their spending. Most people give up on expense tracking because writing everything down every day is simply too much work.
 
@@ -465,7 +473,7 @@ Thank you very much. I am happy to take your questions.
 
 ### สไลด์ที่แนะนำ (คนละ 6 แผ่น — ตามโครง Introduction / 3 Sub topics / Summary)
 
-| แผ่น | ต้า | แตงกวา | โดม |
+| แผ่น | แตงกวา | ต้า | โดม |
 |---|---|---|---|
 | 1 · Title | Why People Fail to Manage Their Money | How Phee Ngern Removes the Effort | How We Prove the System Can Be Trusted |
 | 2 · Outline | 3 หัวข้อย่อย | 3 หัวข้อย่อย | 3 หัวข้อย่อย |
