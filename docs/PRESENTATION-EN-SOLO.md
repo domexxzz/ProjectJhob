@@ -354,11 +354,11 @@ Today this test passes thirty-three out of thirty-three cases.
 
 A system can be perfectly secure and still calculate the wrong balance. For a financial application, that is just as serious.
 
-Our method here is simple. We give the system data where we already know the correct answer, and then we check what it reports back.
+Our method here is simple. We give the system data where we already know the correct answer, and we check what it reports back.
 
 **For example,** we record eight transactions that add up to a known total, and we verify that the system reports exactly that total — not approximately, exactly.
 
-We also test the mathematics itself. Our system never stores money as a decimal number. It stores satang as whole numbers. **This is especially important because** decimals in computers are not perfectly accurate. In our test, adding ten satang ten thousand times gives exactly one thousand baht — but the same calculation using decimals produces a small error.
+We also test the mathematics itself. Our system never stores money as a decimal number. **This is especially important because** decimals in computers are not perfectly accurate. Adding ten satang ten thousand times gives us exactly one thousand baht — but the same calculation with decimals produces a small error.
 
 **It's evident that** in a financial system, "almost correct" is not correct.
 
@@ -377,6 +377,8 @@ When a user forgets their password, our system sends a code to their email. Ther
 So we built that, and we wrote a test to confirm both replies were identical. The test passed.
 
 Then we connected a real email service and measured the response **time**.
+
+*(หยุด 2 วินาที ก่อนอ่านตัวเลข)*
 
 For an email that does not exist, the reply came back in zero point one six seconds.
 For an email that does exist, it took one hundred and twenty seconds.
