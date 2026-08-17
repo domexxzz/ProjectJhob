@@ -95,10 +95,10 @@ Introduction  →  Body                          →  Conclusion
 | ช่วง | เวลา | |
 |---|---|---|
 | Introduction | 0:00–1:00 | ทักทาย + บอกว่าแบ่ง 3 ส่วน |
-| Sub topic 1 | 1:00–2:30 | |
-| Sub topic 2 | 2:30–4:00 | |
-| Sub topic 3 | 4:00–5:30 | |
-| Summary + Conclusion | 5:30–6:30 | |
+| Sub topic 1 | 1:00–2:30 | ต้นทุนแฝงของการจด |
+| Sub topic 2 | 2:30–4:30 | กลุ่มเป้าหมาย + Persona |
+| Sub topic 3 | 4:30–6:00 | ทำไมแอปเดิมไม่ช่วย |
+| Summary + Conclusion | 6:00–6:45 | |
 
 ---
 
