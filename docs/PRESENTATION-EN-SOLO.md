@@ -1,313 +1,409 @@
 # English for Business Presentation — สคริปต์นำเสนอเดี่ยว 3 คน
 
-> **คนละ 7 นาที · หัวข้อห้ามซ้ำกัน · ใช้เนื้อหาจากโปรเจกต์พี่เงิน**
->
-> คนละงานกับ [PRESENTATION_PLAN.md](PRESENTATION_PLAN.md) ซึ่งเป็นแผนนำเสนอ
-> Senior Project ต่อกรรมการแบบทีม 15–20 นาที ภาษาไทย
-
-| ผู้นำเสนอ | หัวข้อ | มุมมองทางธุรกิจ |
-|---|---|---|
-| **ต้า** | The Problem and the Opportunity | ตลาดและผู้ใช้ |
-| **แตงกวา** | The Product — Removing the Friction | ตัวสินค้าและประสบการณ์ผู้ใช้ |
-| **โดม** | Earning Trust — Proving the System Works | ความน่าเชื่อถือและแผนต่อไป |
-
-> **สลับกันได้** แต่แนะนำให้โดมเอาหัวข้อที่ 3 เพราะเป็นคนทำการทดสอบเอง จะตอบคำถามได้ลึกกว่า
+> **หัวข้อใหญ่เดียวกัน: แอปพี่เงิน (Phee Ngern) — แต่เนื้อหาข้างในคนละเรื่อง**
+> คนละไม่เกิน 7 นาที · ทำตามรูปแบบในสไลด์ *Body of a Presentation*
 
 ---
 
-## กติกาที่ต้องยึด — ห้ามพูดข้ามหัวข้อกัน
+## รูปแบบที่ต้องทำตาม (จากสไลด์อาจารย์)
 
-ส่วนนี้สำคัญที่สุด เพราะอาจารย์จับได้ทันทีถ้าเนื้อหาซ้ำ
+### โครงสร้าง
+
+```
+Introduction  →  Body                          →  Conclusion
+                 Sub topic 1  (signpost)
+                 Sub topic 2  (signpost)
+                 Sub topic 3  (signpost)
+                 Summary
+```
+
+### หลักที่ใช้
+
+| หลัก | ทำยังไงในสคริปต์นี้ |
+|---|---|
+| **Rule of three** | ทุกคนแบ่งเนื้อหาเป็น **3 หัวข้อย่อยเป๊ะ** ผู้ฟังจำได้แค่ 3 อย่าง |
+| **Signposting** | บอกว่าตอนนี้อยู่ตรงไหน และเชื่อมแต่ละส่วนเข้าด้วยกัน |
+| **Sequencing** | แต่ละคนเลือกลำดับการเล่าที่เหมาะกับเนื้อหาตัวเอง (ระบุไว้ในแต่ละพาร์ท) |
+| **Less is more** | ตัดให้เหลือเท่าที่จำเป็น ไม่ยัดทุกอย่าง |
+
+### คลังวลี Signpost ที่ใช้ในสคริปต์นี้
+
+| หน้าที่ | วลีที่ใช้ |
+|---|---|
+| เปิดหัวข้อ | *I'd like to talk to you about…* |
+| บอกว่าแบ่งกี่ส่วน | *I've divided my talk into three parts…* |
+| เปิดโอกาสถาม | *There will be time for questions at the end of my talk.* |
+| เริ่ม Body | *So, let's start with…* / *The first point I would like to address is…* |
+| ขยายความ | *For example…* / *This is especially important because…* |
+| สรุปหัวข้อย่อย | *So, we can see that…* / *So much for…* |
+| ขึ้นหัวข้อ 2 | *That brings me to my second point…* / *Secondly, I'd like to turn to…* |
+| ขึ้นหัวข้อ 3 | *Finally, we need to look at…* / *…and turn to…* |
+| ปิดหัวข้อย่อย | *Let's leave that there.* / *Thus, the result is…* |
+| สรุป Body | *To summarise…* / *To sum up…* |
+| ปิดท้าย | *In conclusion…* |
+
+---
+
+## หัวข้อของแต่ละคน
+
+| ผู้นำเสนอ | หัวข้อ | ลำดับการเล่า (Sequence) |
+|---|---|---|
+| **ต้า** | Why People Fail to Manage Their Money | Cause / Effect |
+| **แตงกวา** | How Phee Ngern Removes the Effort | Process |
+| **โดม** | How We Prove the System Can Be Trusted | Problem / Solution |
+
+### ตารางกันเนื้อหาซ้ำ — สำคัญที่สุด
 
 | หัวข้อ | **พูดได้** | **ห้ามพูด** |
 |---|---|---|
 | ต้า | ปัญหา ผู้ใช้เป้าหมาย คู่แข่ง | ฟีเจอร์ของแอป ผลการทดสอบ |
-| แตงกวา | แอปทำงานยังไง ผู้ใช้ได้อะไร จุดต่าง | ปัญหาเชิงตลาด ตัวเลขการทดสอบ |
-| โดม | ทำไมต้องเชื่อถือได้ วิธีพิสูจน์ แผนต่อไป | อธิบายฟีเจอร์ซ้ำ ปัญหาเชิงตลาด |
+| แตงกวา | แอปทำงานยังไง 3 วิธีใช้งาน | ปัญหาเชิงตลาด ตัวเลขการทดสอบ |
+| โดม | วิธีพิสูจน์ว่าเชื่อถือได้ ผลทดสอบ ข้อจำกัด | อธิบายฟีเจอร์ซ้ำ ปัญหาเชิงตลาด |
 
-**ประโยคเชื่อมระหว่างคน** (ถ้านำเสนอต่อกันในคาบเดียว)
+---
+---
 
-- ต้า จบด้วย: *"So that is the problem. Now Taengkwa will show you how we solved it."*
-- แตงกวา จบด้วย: *"That is what the product does. But can you trust it with your money? Dome will answer that."*
-- โดม จบด้วย: *"Thank you. I am happy to take your questions."*
+# 1 · ต้า
+
+## Why People Fail to Manage Their Money
+
+**Sequence: Cause / Effect** — เริ่มจากสาเหตุ ไปหาผลที่ตามมา
+
+### หัวข้อย่อย 3 ข้อ
+
+| # | Sub topic | เวลา |
+|---|---|---|
+| 1 | The hidden cost of recording expenses | 1:30 |
+| 2 | The people who suffer the most | 1:30 |
+| 3 | Why existing apps do not solve it | 1:30 |
+
+### จับเวลารวม
+
+| ช่วง | เวลา | |
+|---|---|---|
+| Introduction | 0:00–1:00 | ทักทาย + บอกว่าแบ่ง 3 ส่วน |
+| Sub topic 1 | 1:00–2:30 | |
+| Sub topic 2 | 2:30–4:00 | |
+| Sub topic 3 | 4:00–5:30 | |
+| Summary + Conclusion | 5:30–6:30 | |
 
 ---
 
-# 1 · ต้า — The Problem and the Opportunity
+### ▸ INTRODUCTION
 
-**เป้าหมาย:** ทำให้ผู้ฟังรู้สึกว่าปัญหานี้จริงและใหญ่พอที่จะแก้
+Good morning everyone.
 
-### จับเวลา
+**I'd like to talk to you about** a problem that almost every student in this room has, but very few people talk about — managing your own money.
 
-| ช่วง | เวลา | เนื้อหา |
-|---|---|---|
-| Hook | 0:00–0:45 | คำถามเปิด |
-| Problem | 0:45–3:00 | ทำไมคนไม่จดรายจ่าย |
-| Target user | 3:00–4:30 | ใครคือผู้ใช้ของเรา |
-| Competitors | 4:30–6:00 | ทำไมแอปเดิมไม่ตอบโจทย์ |
-| Close | 6:00–6:45 | สรุป + ส่งต่อ |
+Our team built a mobile application called Phee Ngern, which means "Brother Money" in Thai. It is an AI assistant that helps people track their spending. But before we talk about the application, we must understand the problem it solves.
 
-### สคริปต์
+**I've divided my talk into three parts.** First, I will explain why recording expenses is so difficult. Second, I will show you who suffers the most from this problem. And third, I will explain why the applications we already have do not solve it.
 
-**Hook**
+**There will be time for questions at the end of my talk.**
 
-Good morning everyone. Let me start with a simple question.
+So, if you are ready, shall we start?
 
-Do you know how much money you spent last week?
+### ▸ BODY — Sub topic 1
 
-*(หยุด 2 วินาที มองผู้ฟัง)*
+**So, let's start with** the first point: the hidden cost of recording expenses.
 
-Most people cannot answer this. I could not answer it either. And this is the problem our team decided to solve.
+When you buy a coffee for fifty baht, and you want to record it, what do you have to do? You open the app, you choose a category, you type the amount, and you press save. That takes about twenty seconds.
 
-My name is Ta, and today I will talk about the problem behind our project, Phee Ngern — an AI financial assistant for Thai students and young workers.
+**For example,** imagine you spend money six times a day. Twenty seconds each time. That is two minutes every day. Fourteen minutes every week. More than twelve hours every year — just to write down numbers.
 
-**The Problem**
+**This is especially important because** people do not fail from one big mistake. They fail from a very small cost, repeated every single day.
 
-Here is what we found. Almost everyone wants to save money. Very few people actually track where their money goes.
+**So, we can see that** the real cost of tracking money is not difficulty. It is repetition.
 
-The reason is simple. Tracking money is boring, and it takes effort every single day.
+### ▸ BODY — Sub topic 2
 
-Think about a normal expense-tracking app. You buy a coffee for fifty baht. Then you must open the app, choose a category, type the amount, and press save. That takes maybe twenty seconds.
-
-Twenty seconds does not sound like much. But you spend money five or six times a day. That is two minutes every day, every week, forever.
-
-So what happens? People start with good intentions. They track everything for one week. Then they miss a day. Then two days. And after two weeks, they stop completely.
-
-The app is not broken. The habit is broken. And this is a design problem, not a discipline problem.
-
-**Target User**
+**That brings me to my second point:** who suffers the most from this problem.
 
 Our target users are Thai university students and people in their first job.
 
-Why this group? Three reasons.
+**For example,** think about a student, twenty-one years old. She receives money from her parents every month. She wants to save for a new laptop. But at the end of the month, the money is gone, and she cannot explain where it went.
 
-First, this is the age when financial habits are formed. What you learn now, you keep for life.
+She is not careless. She simply has no easy way to see the pattern.
 
-Second, this group has limited income. When your budget is small, every mistake hurts more.
+**This is especially important because** this is the age when financial habits are formed. If she learns to track her money now, she keeps that skill for life. If she gives up now, she may never start again.
 
-Third, and most important, this group already lives on their phone. They chat all day. So if a financial tool feels like chatting, they will actually use it.
+**So much for** who has the problem. **Let's leave that there.**
 
-Let me describe one real user. A university student, twenty-one years old. She receives money from her parents every month. She wants to save for a new laptop. But at the end of the month, the money is gone, and she does not know where it went. She is not careless. She simply has no easy way to see the pattern.
+### ▸ BODY — Sub topic 3
 
-She is the person we built this for.
+**Finally, we need to look at** the applications that already exist.
 
-**Existing Solutions**
+Of course, expense-tracking apps are not new. There are many of them, and some are very well designed.
 
-Of course, expense-tracking apps already exist. So why build another one?
+But we found the same weakness in all of them. They are very good at **storing** your data. But they still ask **you** to enter every single number by hand.
 
-We looked at the popular apps, and we found the same weakness in all of them. They are very good at **storing** data, but they ask the user to **enter** all of that data manually.
+In other words, they solve the easy half of the problem, and they leave the hard half to the user.
 
-In other words, existing apps solve the easy half of the problem. The hard half — actually getting the data in — is still the user's job.
+Some applications try to fix this by reading your bank SMS messages. But in Thailand, most people now pay by scanning a QR code, so very often no SMS arrives at all.
 
-Some apps try to solve this by reading your bank SMS. But in Thailand, many people pay through mobile banking apps and scan QR codes, so an SMS does not always arrive.
+**Thus, the result is** a market full of tools that only work for people who are already disciplined — and those people did not need help in the first place.
 
-This is the gap we saw. Not "how do we store expenses better", but **"how do we remove the work of recording them"**.
+### ▸ SUMMARY
 
-**Close**
+**To summarise,** I have made three points today.
 
-So to summarise. The problem is not that people do not want to save money. The problem is that recording expenses takes daily effort, and daily effort does not survive.
+First, recording expenses has a hidden cost, and that cost is repeated every day.
+Second, the people who need this most are young people who are just starting their financial life.
+And third, existing applications do not remove that daily cost.
 
-Our opportunity is to remove that effort completely.
+### ▸ CONCLUSION
 
-So that is the problem. Now Taengkwa will show you how we solved it.
+**In conclusion,** the problem is not that people do not want to save money. The problem is that recording money takes daily effort, and daily effort does not survive.
 
-*(ประมาณ 780 คำ ≈ 6 นาที 30 วินาที)*
+So the real opportunity is not to build a better place to store expenses. It is to remove the work of recording them completely.
 
-### คำศัพท์ที่ควรออกเสียงให้ชัด
+Thank you for listening. My colleague will now show you how we did that.
 
-| คำ | ออกเสียง | ความหมาย |
-|---|---|---|
-| financial | fai-NAN-shal | เกี่ยวกับการเงิน |
-| habit | HAB-it | นิสัย |
-| discipline | DIS-si-plin | วินัย |
-| manually | MAN-yu-a-li | ด้วยมือ ทำเอง |
-| opportunity | op-por-TU-ni-ti | โอกาส |
-
----
-
-# 2 · แตงกวา — The Product: Removing the Friction
-
-**เป้าหมาย:** ทำให้ผู้ฟังเห็นภาพว่าใช้จริงเป็นยังไง และต่างจากของเดิมตรงไหน
-
-### จับเวลา
-
-| ช่วง | เวลา | เนื้อหา |
-|---|---|---|
-| Hook | 0:00–0:40 | เปิดด้วยประโยคสั้น |
-| Core idea | 0:40–2:00 | แนวคิดหลัก: คุยแทนการกรอก |
-| Three ways | 2:00–4:30 | 3 วิธีบันทึกรายจ่าย |
-| Beyond recording | 4:30–5:45 | ไม่ใช่แค่จด แต่ช่วยวางแผน |
-| Close | 5:45–6:45 | สรุป + ส่งต่อ |
-
-### สคริปต์
-
-**Hook**
-
-Thank you, Ta.
-
-You just heard that the real problem is effort. So our solution is simple to explain.
-
-We removed the form.
-
-Good morning, my name is Taengkwa, and I will show you how our product works.
-
-**The Core Idea**
-
-In most finance apps, when you spend money, you fill in a form. Amount, category, date, note.
-
-In our app, you do not fill in anything. You just say what happened, the same way you would tell a friend.
-
-For example, you type: *"coffee fifty baht"*.
-
-That is all. The system understands it, records it as an expense, chooses the category "cafe", and shows you a small card confirming what it saved. If it is wrong, you can fix it in one tap.
-
-We call our assistant "Phee Ngern", which means "Brother Money" in Thai. The name is important. It is not a database. It is someone you talk to.
-
-**Three Ways to Record**
-
-We support three ways to record an expense, from the fastest to the most detailed.
-
-**The first way is chatting.** As I just showed you, type it like a message. This is for daily small expenses.
-
-**The second way is sending a photo of a transfer slip.** In Thailand, almost every payment produces a slip. So instead of reading the slip and typing the number yourself, you send the picture to the chat, and the system reads it for you.
-
-This part was harder than it sounds. Different banks design slips differently. Some slips show three different numbers — the full price, a government subsidy, and the amount you actually paid. The system must choose the correct one, which is the amount that really left your pocket.
-
-**The third way is the traditional form.** We kept it, because sometimes people want full control. But now it is a choice, not a requirement.
-
-**More Than Recording**
-
-Recording is only the beginning. Because the assistant already knows your data, you can simply ask it questions.
-
-You can ask, *"How much did I spend this month?"* and get a real answer from your real data.
-
-You can say, *"I want to save thirty thousand baht for a laptop"*, and it creates a savings goal and tells you how much you need to save each month.
-
-And you can ask for a report, and it will generate a file — Excel or PDF — from the conversation you just had.
-
-This is the difference between a tool and an assistant. A tool waits for instructions. An assistant understands what you mean.
-
-**Close**
-
-So let me summarise the product in one sentence.
-
-Other apps ask you to do the work of recording. Our app does the recording, so the user only has to talk.
-
-That is what the product does. But can you trust it with your money? Dome will answer that.
-
-*(ประมาณ 700 คำ ≈ 6 นาที)*
-
-### คำแนะนำเฉพาะหัวข้อนี้
-
-- ถ้าสาธิตสดได้ **ให้พิมพ์ "coffee fifty baht" โชว์จริง** — มีพลังกว่าสไลด์มาก
-- ซ้อมประโยค *"the amount that really left your pocket"* ให้คล่อง
-  เป็นประโยคที่ทำให้ผู้ฟังเข้าใจทันทีว่าทำไมส่วนนี้ยาก
+*(ประมาณ 640 คำ ≈ 5 นาที 20 วินาที ที่ความเร็ว 120 คำ/นาที)*
 
 ### คำศัพท์
 
 | คำ | ออกเสียง | ความหมาย |
 |---|---|---|
-| friction | FRIK-shan | แรงเสียดทาน (ในที่นี้ = ความยุ่งยาก) |
-| assistant | a-SIS-tant | ผู้ช่วย |
-| subsidy | SUB-si-di | เงินอุดหนุน |
-| generate | JEN-e-rate | สร้าง (ไฟล์) |
-| requirement | ri-QUAIR-ment | สิ่งที่บังคับ |
+| repetition | re-pe-TI-shan | การทำซ้ำ |
+| discipline / disciplined | DIS-si-plin(d) | วินัย / มีวินัย |
+| financial habit | fai-NAN-shal HAB-it | นิสัยทางการเงิน |
+| pattern | PAT-tern | รูปแบบ แบบแผน |
+| weakness | WEEK-nes | จุดอ่อน |
+
+---
+---
+
+# 2 · แตงกวา
+
+## How Phee Ngern Removes the Effort
+
+**Sequence: Process** — เล่าเป็นขั้นตอนว่าใช้งานยังไง
+
+### หัวข้อย่อย 3 ข้อ
+
+| # | Sub topic | เวลา |
+|---|---|---|
+| 1 | Recording by chatting | 1:30 |
+| 2 | Recording by photo | 1:30 |
+| 3 | From recording to planning | 1:30 |
+
+### จับเวลารวม
+
+| ช่วง | เวลา | |
+|---|---|---|
+| Introduction | 0:00–1:00 | ทักทาย + บอกว่าแบ่ง 3 ส่วน |
+| Sub topic 1 | 1:00–2:30 | |
+| Sub topic 2 | 2:30–4:00 | |
+| Sub topic 3 | 4:00–5:30 | |
+| Summary + Conclusion | 5:30–6:30 | |
 
 ---
 
-# 3 · โดม — Earning Trust: Proving the System Works
+### ▸ INTRODUCTION
 
-**เป้าหมาย:** ทำให้ผู้ฟังเชื่อว่าระบบนี้ใช้กับเงินจริงได้ ด้วยหลักฐาน ไม่ใช่คำพูด
+Good morning everyone. My name is Taengkwa.
 
-### จับเวลา
+**I'd like to talk to you about** how our application, Phee Ngern, actually works — and more importantly, how it removes the daily effort of recording money.
 
-| ช่วง | เวลา | เนื้อหา |
+Our whole design follows one simple idea: **we removed the form.**
+
+In most finance applications, when you spend money, you fill in a form — amount, category, date, note. In our application, you fill in nothing. You just say what happened, the same way you would tell a friend.
+
+**I've divided my talk into three parts.** First, recording by chatting. Second, recording by sending a photo. And third, how the assistant helps you plan, not only record.
+
+**If you have any questions, please feel free to ask at the end.**
+
+So, let's begin.
+
+### ▸ BODY — Sub topic 1
+
+**The first point I would like to address is** the fastest way to record — chatting.
+
+You open the chat and you type three words: *"coffee fifty baht"*.
+
+That is all. The system reads your sentence, records it as an expense of fifty baht, chooses the category "cafe" for you, and shows a small card confirming what it saved. If the category is wrong, you can correct it with one tap.
+
+**This is especially important because** it takes about three seconds instead of twenty. And three seconds is short enough that people actually keep doing it.
+
+**So, we can see that** the fastest interface is not a better form. It is no form at all.
+
+### ▸ BODY — Sub topic 2
+
+**Secondly, I'd like to turn to** the second way of recording — sending a photo.
+
+In Thailand, almost every payment produces a transfer slip on your phone. So instead of reading that slip and typing the number yourself, you simply send the picture into the chat, and the system reads it for you.
+
+Now, this part was much harder than it sounds.
+
+**For example,** every bank designs its slip differently. And some slips contain three different numbers at the same time — the full price, a government subsidy, and the amount the customer actually paid.
+
+If the system chooses the wrong number, the user's balance becomes wrong, and they will never trust the app again. So the system must always choose the amount that really left your pocket.
+
+**It's evident that** reading a slip is not simply reading text. It is understanding which number matters.
+
+**Let's leave that there.**
+
+### ▸ BODY — Sub topic 3
+
+**Finally, we need to look at** what happens after the recording.
+
+Recording is only the beginning. Because the assistant already holds your data, you can simply ask it questions in normal language.
+
+You can ask, *"How much did I spend this month?"* and receive a real answer calculated from your real data.
+
+You can say, *"I want to save thirty thousand baht for a laptop"*, and the assistant creates a savings goal and tells you how much you need to save each month.
+
+And you can ask for a report, and it will produce a file — Excel or PDF — built from the conversation you just had.
+
+**Thus, the result is** a change of role. A normal application waits for instructions. An assistant understands what you mean.
+
+### ▸ SUMMARY
+
+**To summarise,** I have shown you three things today.
+
+First, you can record an expense by chatting, in about three seconds.
+Second, you can record it by sending a photo, and the system chooses the correct amount for you.
+And third, once your data is inside, the assistant helps you plan, not only store.
+
+### ▸ CONCLUSION
+
+**In conclusion,** other applications ask the user to do the work of recording. Our application does the recording, so the user only has to talk.
+
+That is what the product does. But of course, this application holds very private financial information. So the next question is: can you trust it? My colleague will answer that.
+
+Thank you very much.
+
+*(ประมาณ 660 คำ ≈ 5 นาที 30 วินาที)*
+
+### คำแนะนำเฉพาะพาร์ทนี้
+
+- ถ้าสาธิตสดได้ **ให้พิมพ์ `coffee fifty baht` โชว์จริงตอน Sub topic 1** มีพลังกว่าสไลด์มาก
+- ซ้อมประโยค *"the amount that really left your pocket"* ให้คล่อง เป็นประโยคที่ทำให้ผู้ฟังเข้าใจทันทีว่าทำไมส่วนนี้ยาก
+
+### คำศัพท์
+
+| คำ | ออกเสียง | ความหมาย |
 |---|---|---|
-| Hook | 0:00–0:45 | ความเชื่อใจคือเงื่อนไขทางธุรกิจ |
-| Two questions | 0:45–1:45 | แยกความปลอดภัยกับความถูกต้อง |
-| How we tested | 1:45–3:15 | วิธีทดสอบ + ตัวเลข |
-| The story | 3:15–5:15 | เรื่องช่องโหว่จับเวลา |
-| Limits | 5:15–6:15 | สิ่งที่ยังต้องทำ |
-| Close | 6:15–6:45 | สรุป |
+| effort | EF-fort | ความพยายาม ความยุ่งยาก |
+| interface | IN-ter-face | หน้าจอที่ผู้ใช้ใช้งาน |
+| subsidy | SUB-si-di | เงินอุดหนุน |
+| confirm | con-FIRM | ยืนยัน |
+| produce | pro-DUCE | ผลิต สร้าง |
 
-### สคริปต์
+---
+---
 
-**Hook**
+# 3 · โดม
 
-Thank you, Taengkwa.
+## How We Prove the System Can Be Trusted
 
-You have seen the problem, and you have seen the product. Now I want to talk about the part that decides whether this becomes a real business or just a class project.
+**Sequence: Problem / Solution** — ตั้งปัญหาแล้วแสดงวิธีแก้และผลลัพธ์
 
-Trust.
+### หัวข้อย่อย 3 ข้อ
 
-My name is Dome. If a user gives us their income, their spending, and their savings goals, we are asking for something very private. So the question is not "does the app work". The question is **"why should anyone believe it"**.
+| # | Sub topic | เวลา |
+|---|---|---|
+| 1 | Testing whether data can leak | 1:30 |
+| 2 | Testing whether the numbers are correct | 1:30 |
+| 3 | What we found, and what we still cannot prove | 2:00 |
 
-**Two Different Questions**
+### จับเวลารวม
 
-When we studied this, we realised that trust has two separate parts, and people often confuse them.
+| ช่วง | เวลา | |
+|---|---|---|
+| Introduction | 0:00–1:00 | ทักทาย + แยก 2 คำถามของความเชื่อใจ |
+| Sub topic 1 | 1:00–2:30 | |
+| Sub topic 2 | 2:30–4:00 | |
+| Sub topic 3 | 4:00–6:00 | |
+| Summary + Conclusion | 6:00–6:45 | |
 
-The first question is: **can my data leak?** That is security.
+---
 
-The second question is: **are the numbers correct?** That is reliability.
+### ▸ INTRODUCTION
 
-These are different. A system can be perfectly secure and still calculate the wrong balance. And a system with perfect calculations is useless if everyone can read everyone else's data.
+Good morning everyone. My name is Dome.
 
-So we built two separate test suites, one for each question.
+You have now seen the problem, and you have seen the product. **I'd like to talk to you about** the part that decides whether this becomes a real business or only a class project — trust.
 
-**How We Tested**
+If a user gives us their income, their spending, and their savings goals, we are asking for something very private. So the question is not "does the application work". The question is **"why should anyone believe it"**.
 
-For security, we wrote a test that behaves like a real attacker. It creates two users, User A and User B. User B saves some private financial data. Then User A tries to read it, change it, and delete it, using every method we could think of.
+**Before I start, let me clarify one point.** Trust has two separate parts, and people often mix them together. The first is: can my data leak? The second is: are the numbers correct? These are completely different problems, so we tested them separately.
 
-The system must refuse every time. Today it passes thirty-three out of thirty-three tests.
+**I've divided my talk into three parts.** First, how we tested for data leaks. Second, how we tested for correct numbers. And third, what we found — including what we still cannot prove.
 
-For reliability, we use a different method. We feed the system data where we already know the correct answer, and then we check what it reports back.
+**There will be time for questions at the end of my talk.**
 
-For example, we record eight transactions that add up to a known total, and we verify that the system reports exactly that total — not approximately, exactly.
+### ▸ BODY — Sub topic 1
 
-But here is the part I want you to remember. **The first time we ran these tests, we did not pass.** We passed twenty-seven out of thirty-three. We found six real problems in our own system.
+**So, let's start with** the first question: can one user read another user's data?
 
-I think that is the most valuable result of the whole project. A test that always passes tells you nothing.
+To test this, we wrote a program that behaves like a real attacker. It creates two users — User A and User B. User B saves some private financial information. Then User A tries to read it, change it, and delete it, using every method we could think of.
 
-**The Story**
+The system must refuse every single time.
 
-Let me give you one example, because it changed how I think about testing.
+**For example,** even if User A knows the exact reference number of User B's transaction, the system must still answer "not found" — not "you are not allowed". Because saying "you are not allowed" would confirm that the record exists, and that is already a small leak.
 
-When a user asks to reset their password, our system sends a code to their email. Now, there is a security rule here. The system must reply with the **same message** whether or not that email exists in our database. If it replied differently, anyone could use our website to check who has an account with us.
+**So, we can see that** security is not only about blocking attacks. It is also about not confirming information by accident.
 
-So we did that. We wrote the code, and we wrote a test to confirm that both replies were identical. The test passed.
+Today this test passes thirty-three out of thirty-three cases.
 
-Then we connected a real email service, and we measured the response time.
+### ▸ BODY — Sub topic 2
 
-For an email that does not exist, the reply came back in **zero point one six seconds**.
-For an email that does exist, it took **one hundred and twenty seconds**.
+**Secondly, I'd like to turn to** a completely different question: are the numbers correct?
 
-The messages were identical. But the timing was seven hundred times different. Anyone with a stopwatch could tell which emails had accounts. Our protection was useless.
+A system can be perfectly secure and still calculate the wrong balance. For a financial application, that is just as serious.
 
-The lesson is this: **information can leak through time, not only through content.** A test that only checks the reply will never catch this.
+Our method here is simple. We give the system data where we already know the correct answer, and then we check what it reports back.
 
-We fixed it, and we added a test that measures time, not just text.
+**For example,** we record eight transactions that add up to a known total, and we verify that the system reports exactly that total — not approximately, exactly.
 
-**What We Still Need to Do**
+We also test the mathematics itself. Our system never stores money as a decimal number. It stores satang as whole numbers. **This is especially important because** decimals in computers are not perfectly accurate. In our test, adding ten satang ten thousand times gives exactly one thousand baht — but the same calculation using decimals produces a small error.
 
-I also want to be honest about our limits, because a real business report should include them.
+**It's evident that** in a financial system, "almost correct" is not correct.
 
-We measured our slip-reading accuracy using ten sample formats, not fifty real slips from real banks. So our accuracy number proves that old bugs do not return, but it does not prove the system reads every slip in Thailand.
+**Let's leave that there.**
 
-We also have not measured how accurate our spending forecast is yet, because that requires several months of real user data, and our system is new.
+### ▸ BODY — Sub topic 3
 
-Both of these are written in our documentation as known limitations.
+**Finally, we need to look at** what these tests actually found.
 
-**Close**
+And here is the part I want you to remember. **The first time we ran them, we did not pass.** We passed twenty-seven out of thirty-three. We found six real problems inside our own system.
 
-So, to close.
+Let me give you the most surprising one.
 
-We are not asking users to trust us because we say the system is safe. We are asking them to trust us because we tested it, we published the results, we found six problems, and we fixed them.
+When a user forgets their password, our system sends a code to their email. There is a security rule here: the system must reply with the **same message** whether or not that email exists in our database. If it replied differently, anyone could use our website to discover who has an account.
+
+So we built that, and we wrote a test to confirm both replies were identical. The test passed.
+
+Then we connected a real email service and measured the response **time**.
+
+For an email that does not exist, the reply came back in zero point one six seconds.
+For an email that does exist, it took one hundred and twenty seconds.
+
+The messages were identical. But the timing was seven hundred times different. Anyone with a stopwatch could tell which emails had accounts.
+
+**I'd like to stress that** information can leak through time, not only through content. A test that only reads the reply will never find this.
+
+I also want to be honest about what we still cannot prove. We measured our slip-reading accuracy using ten sample formats, not fifty real slips from real banks. And we have not yet measured how accurate our spending forecast is, because that needs several months of real user data. Both limitations are written in our documentation.
+
+### ▸ SUMMARY
+
+**To summarise,** I have covered three things.
+
+First, we tested whether one user can reach another user's data, and today that passes completely.
+Second, we tested whether the numbers are exactly correct, not approximately correct.
+And third, these tests found six real problems — and there are still two things we cannot prove yet.
+
+### ▸ CONCLUSION
+
+**In conclusion,** we are not asking users to trust us because we say the system is safe. We are asking them to trust us because we tested it, we published the results, we found six problems, and we fixed them.
 
 For a financial product, that is not extra work. That is the product.
 
-Thank you. I am happy to take your questions.
+Thank you very much. I am happy to take your questions.
 
-*(ประมาณ 830 คำ ≈ 6 นาที 45 วินาที — ใกล้เพดาน ถ้าพูดช้าให้ย่อหัวข้อ "What We Still Need to Do" เหลือ 2 ประโยค)*
+*(ประมาณ 800 คำ ≈ 6 นาที 40 วินาที — ใกล้เพดาน ถ้าซ้อมแล้วเกิน ให้ตัดย่อหน้า "I also want to be honest…" เหลือ 1 ประโยค)*
 
 ### ตัวเลขที่ต้องท่องให้แม่น
 
@@ -317,18 +413,19 @@ Thank you. I am happy to take your questions.
 | 27/33 | twenty-seven out of thirty-three |
 | 0.16 วินาที | zero point one six seconds |
 | 120 วินาที | one hundred and twenty seconds |
-| 750 เท่า | seven hundred times |
+| 700 เท่า | seven hundred times |
 
 ### คำศัพท์
 
 | คำ | ออกเสียง | ความหมาย |
 |---|---|---|
-| reliability | ri-lai-a-BIL-i-ti | ความน่าเชื่อถือ |
-| vulnerability | vul-ne-ra-BIL-i-ti | ช่องโหว่ |
+| leak | LEEK | รั่วไหล |
 | identical | ai-DEN-ti-cal | เหมือนกันทุกประการ |
+| approximately | a-PROK-si-mat-li | โดยประมาณ |
 | accuracy | AK-yu-ra-si | ความแม่นยำ |
 | limitation | li-mi-TEI-shan | ข้อจำกัด |
 
+---
 ---
 
 ## คำแนะนำรวมสำหรับทั้ง 3 คน
@@ -336,24 +433,26 @@ Thank you. I am happy to take your questions.
 ### ก่อนวันนำเสนอ
 
 1. **จับเวลาซ้อมจริงอย่างน้อย 3 รอบ** — คนไทยพูดอังกฤษมักช้ากว่าที่คิด 20–30%
-   ถ้าซ้อมแล้วเกิน 7 นาที ให้**ตัดย่อหน้าออก อย่าพูดเร็วขึ้น** เพราะจะฟังไม่รู้เรื่อง
-2. **ท่องแค่ประโยคเปิดกับประโยคปิด** ตรงกลางให้เข้าใจแล้วพูดด้วยคำตัวเอง
-   ถ้าท่องทั้งหมดแล้วลืมกลางทางจะหยุดชะงัก
-3. **ซ้อมประโยคส่งต่อ** ให้ทั้งสามคนพูดตรงกัน จะดูเป็นทีมเดียวกัน
+   ถ้าเกิน 7 นาที ให้**ตัดย่อหน้าออก อย่าพูดเร็วขึ้น** เพราะจะฟังไม่รู้เรื่อง
+2. **ท่องเฉพาะวลี signpost กับประโยคเปิด-ปิด** ส่วนเนื้อหาตรงกลางให้เข้าใจแล้วพูดด้วยคำตัวเอง
+   วลี signpost คือสิ่งที่อาจารย์ให้คะแนน ต้องออกมาชัดและถูกจังหวะ
+3. **ซ้อมประโยคส่งต่อระหว่างคน** ให้ตรงกัน จะดูเป็นทีมเดียวกัน
 
 ### ระหว่างนำเสนอ
 
-- **หยุด 2 วินาทีหลังคำถามหรือตัวเลขสำคัญ** — การเว้นจังหวะทำให้ดูมั่นใจกว่าการพูดรวด
+- **หยุด 2 วินาทีก่อนพูด signpost ทุกครั้ง** เช่นก่อน *"That brings me to my second point"*
+  การเว้นจังหวะทำให้ผู้ฟังรู้ตัวว่ากำลังเปลี่ยนหัวข้อ และทำให้เราดูมั่นใจ
 - ถ้าลืมคำศัพท์ ให้พูดอ้อม เช่น ลืมคำว่า *vulnerability* ใช้ *"a security problem"* แทน
   **ห้ามหยุดนิ่งเพื่อนึกคำ**
 - อย่าอ่านสไลด์ ให้สไลด์มีแค่ตัวเลขหรือรูป ส่วนคำอธิบายอยู่ที่ปาก
 
-### สไลด์ที่แนะนำ (คนละ 5 แผ่นพอ)
+### สไลด์ที่แนะนำ (คนละ 6 แผ่น — ตามโครง Introduction / 3 Sub topics / Summary)
 
-| ต้า | แตงกวา | โดม |
-|---|---|---|
-| คำถามเปิด | ภาพหน้าจอแชท | คำว่า TRUST คำเดียว |
-| ทำไมคนเลิกใช้แอป | 3 วิธีบันทึก | 2 คำถาม (security / reliability) |
-| ภาพผู้ใช้เป้าหมาย | ภาพสลิปที่มี 3 ตัวเลข | **27/33** ตัวใหญ่กลางจอ |
-| ตารางเทียบคู่แข่ง | ภาพเป้าหมายการออม | ตาราง 0.16 วิ กับ 120 วิ |
-| สรุป 1 ประโยค | สรุป 1 ประโยค | ข้อจำกัดที่ยอมรับ |
+| แผ่น | ต้า | แตงกวา | โดม |
+|---|---|---|---|
+| 1 · Title | Why People Fail to Manage Their Money | How Phee Ngern Removes the Effort | How We Prove the System Can Be Trusted |
+| 2 · Outline | 3 หัวข้อย่อย | 3 หัวข้อย่อย | 3 หัวข้อย่อย |
+| 3 · Sub 1 | 20 วินาที × 6 ครั้ง/วัน | ภาพหน้าจอแชท | User A → User B (ลูกศรถูกกากบาท) |
+| 4 · Sub 2 | ภาพผู้ใช้เป้าหมาย | ภาพสลิปที่มี 3 ตัวเลข | 1,000.00 กับ 1,000.0000000001 |
+| 5 · Sub 3 | ตารางเทียบคู่แข่ง | ภาพเป้าหมายการออม | **27/33** ตัวใหญ่กลางจอ |
+| 6 · Summary | 3 บรรทัด | 3 บรรทัด | 3 บรรทัด |
