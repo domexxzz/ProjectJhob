@@ -3,6 +3,14 @@
 > **หัวข้อใหญ่เดียวกัน: แอปพี่เงิน (Phee Ngern) — แต่เนื้อหาข้างในคนละเรื่อง**
 > คนละไม่เกิน 7 นาที · ทำตามรูปแบบในสไลด์ *Body of a Presentation*
 
+> ### ⚠️ แต่ละคนพูดคนละรอบ ไม่ได้พูดต่อกัน
+>
+> ทุกสคริปต์จึง **ยืนได้ด้วยตัวเอง** — มีบทเกริ่นแนะนำโปรเจกต์ของตัวเอง
+> และ **ห้ามมีประโยคอ้างถึงคนอื่น** เช่น *"Thank you, Ta"* หรือ
+> *"my colleague will explain"* เพราะผู้ฟังไม่ได้ฟังคนก่อนหน้า จะงงทันที
+>
+> แต่ละคนต้องเกริ่นสั้น ๆ ว่าพี่เงินคืออะไร (2–3 ประโยค) ก่อนเข้าเนื้อหาของตัวเอง
+
 ---
 
 ## รูปแบบที่ต้องทำตาม (จากสไลด์อาจารย์)
@@ -54,11 +62,16 @@ Introduction  →  Body                          →  Conclusion
 
 ### ตารางกันเนื้อหาซ้ำ — สำคัญที่สุด
 
+ถึงจะพูดคนละรอบ แต่**อาจารย์เป็นคนเดียวกันและจำได้** ถ้าเนื้อหาซ้ำจะโดนหักแน่นอน
+
 | หัวข้อ | **พูดได้** | **ห้ามพูด** |
 |---|---|---|
 | ต้า | ปัญหา ผู้ใช้เป้าหมาย คู่แข่ง | ฟีเจอร์ของแอป ผลการทดสอบ |
 | แตงกวา | แอปทำงานยังไง 3 วิธีใช้งาน | ปัญหาเชิงตลาด ตัวเลขการทดสอบ |
 | โดม | วิธีพิสูจน์ว่าเชื่อถือได้ ผลทดสอบ ข้อจำกัด | อธิบายฟีเจอร์ซ้ำ ปัญหาเชิงตลาด |
+
+**บทเกริ่นโปรเจกต์ 2–3 ประโยคที่ทุกคนต้องมี — เขียนคนละสำนวน ห้ามลอกกัน**
+ใช้เท่าที่จำเป็นให้ผู้ฟังรู้ว่าพี่เงินคืออะไร แล้วรีบเข้าเนื้อหาของตัวเอง
 
 ---
 ---
@@ -155,9 +168,9 @@ And third, existing applications do not remove that daily cost.
 
 **In conclusion,** the problem is not that people do not want to save money. The problem is that recording money takes daily effort, and daily effort does not survive.
 
-So the real opportunity is not to build a better place to store expenses. It is to remove the work of recording them completely.
+So the real opportunity is not to build a better place to store expenses. It is to remove the work of recording them completely — and that is exactly the goal our team set for Phee Ngern.
 
-Thank you for listening. My colleague will now show you how we did that.
+Thank you for listening. I am happy to take your questions.
 
 *(ประมาณ 640 คำ ≈ 5 นาที 20 วินาที ที่ความเร็ว 120 คำ/นาที)*
 
@@ -204,7 +217,9 @@ Thank you for listening. My colleague will now show you how we did that.
 
 Good morning everyone. My name is Taengkwa.
 
-**I'd like to talk to you about** how our application, Phee Ngern, actually works — and more importantly, how it removes the daily effort of recording money.
+Our team built a mobile application called Phee Ngern, which means "Brother Money" in Thai. It is an AI assistant that helps young people track their spending. Most people give up on expense tracking because writing everything down every day is simply too much work.
+
+**I'd like to talk to you about** how our application solves that — and more importantly, how it removes the daily effort of recording money.
 
 Our whole design follows one simple idea: **we removed the form.**
 
@@ -270,9 +285,9 @@ And third, once your data is inside, the assistant helps you plan, not only stor
 
 **In conclusion,** other applications ask the user to do the work of recording. Our application does the recording, so the user only has to talk.
 
-That is what the product does. But of course, this application holds very private financial information. So the next question is: can you trust it? My colleague will answer that.
+And that single design decision is what makes the difference between an app people download and an app people actually keep using.
 
-Thank you very much.
+Thank you very much. I am happy to take your questions.
 
 *(ประมาณ 660 คำ ≈ 5 นาที 30 วินาที)*
 
@@ -324,9 +339,9 @@ Thank you very much.
 
 Good morning everyone. My name is Dome.
 
-You have seen the problem, and you have seen the product. **I'd like to talk to you about** the part that decides whether this becomes a real business or only a class project — trust.
+Our team built a mobile application called Phee Ngern — an AI assistant that records a user's income, spending, and savings goals.
 
-If a user gives us their income and their savings goals, we are asking for something very private. So the question is not "does the application work". The question is **"why should anyone believe it"**.
+**I'd like to talk to you about** the part that decides whether this becomes a real business or only a class project — trust. Because we are asking users for something very private. So the question is not "does the application work". The question is **"why should anyone believe it"**.
 
 **Before I start, let me clarify one point.** Trust has two separate parts. The first is: can my data leak? The second is: are the numbers correct? These are completely different problems, so we tested them separately.
 
