@@ -75,28 +75,25 @@ class _Welcome1ScreenState extends ConsumerState<Welcome1Screen>
               const Spacer(flex: 2),
 
               // ── โลโก้ขนาดใหญ่ 280x280 ตรงกลาง ──
-              ScaleTransition(
-                scale: _scaleAnim,
-                child: FadeTransition(
-                  opacity: _fadeAnim,
-                  child: Container(
-                    width: 280,
-                    height: 280,
-                    decoration: BoxDecoration(
-                      shape: BoxShape.circle,
-                      boxShadow: [
-                        BoxShadow(
-                          color: AppColors.primary.withOpacity(0.25),
-                          blurRadius: 50,
-                          spreadRadius: 6,
-                        ),
-                      ],
-                    ),
-                    child: ClipOval(
-                      child: Image.asset(
-                        'assets/images/logo.png',
-                        fit: BoxFit.cover,
+              Hero(
+                tag: 'welcome-logo-hero',
+                child: Container(
+                  width: 280,
+                  height: 280,
+                  decoration: BoxDecoration(
+                    shape: BoxShape.circle,
+                    boxShadow: [
+                      BoxShadow(
+                        color: AppColors.primary.withOpacity(0.25),
+                        blurRadius: 50,
+                        spreadRadius: 6,
                       ),
+                    ],
+                  ),
+                  child: ClipOval(
+                    child: Image.asset(
+                      'assets/images/logo.png',
+                      fit: BoxFit.cover,
                     ),
                   ),
                 ),

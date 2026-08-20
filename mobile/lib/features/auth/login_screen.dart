@@ -218,7 +218,13 @@ class _LoginScreenState extends ConsumerState<LoginScreen> {
               const SizedBox(height: 20),
 
               Center(
-                child: const SocialLoginButtons(),
+                child: Hero(
+                  tag: 'social-login-buttons',
+                  child: Material(
+                    type: MaterialType.transparency,
+                    child: const SocialLoginButtons(),
+                  ),
+                ),
               ),
 
               const SizedBox(height: 24),

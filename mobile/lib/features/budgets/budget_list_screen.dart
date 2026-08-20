@@ -9,6 +9,7 @@ import '../transactions/transactions_repository.dart';
 import '../auth/auth_controller.dart'; 
 import '../settings/settings_screen.dart';
 import '../profile/profile_avatar.dart';
+import '../notifications/notif_bell.dart';
 import '../../widgets/app_bottom_nav_bar.dart';
 
 class BudgetListScreen extends ConsumerWidget {
@@ -445,42 +446,34 @@ class _GreenHeader extends StatelessWidget {
                   ),
                 ),
                 const SizedBox(height: 6),
-                Row(
-                  children: [
-                    Container(
-                      padding:
-                          const EdgeInsets.symmetric(horizontal: 10, vertical: 4),
-                      decoration: BoxDecoration(
-                        color: rankColor.withOpacity(0.2),
-                        borderRadius: BorderRadius.circular(12),
-                        border: Border.all(color: rankColor.withOpacity(0.4)),
+                Container(
+                  padding:
+                      const EdgeInsets.symmetric(horizontal: 10, vertical: 3),
+                  decoration: BoxDecoration(
+                    color: rankColor.withOpacity(0.2),
+                    borderRadius: BorderRadius.circular(12),
+                    border: Border.all(color: rankColor.withOpacity(0.4)),
+                  ),
+                  child: Row(
+                    mainAxisSize: MainAxisSize.min,
+                    children: [
+                      Icon(Icons.emoji_events_rounded, color: rankColor, size: 12),
+                      const SizedBox(width: 4),
+                      Text(
+                        rankName,
+                        style: TextStyle(
+                          color: rankColor,
+                          fontSize: 10,
+                          fontWeight: FontWeight.bold,
+                        ),
                       ),
-                      child: Row(
-                        mainAxisSize: MainAxisSize.min,
-                        children: [
-                          Icon(Icons.emoji_events_rounded, color: rankColor, size: 12),
-                          const SizedBox(width: 4),
-                          Text(
-                            rankName,
-                            style: TextStyle(
-                              color: rankColor,
-                              fontSize: 11,
-                              fontWeight: FontWeight.bold,
-                            ),
-                          ),
-                        ],
-                      ),
-                    ),
-                  ],
+                    ],
+                  ),
                 ),
               ],
             ),
           ),
-          IconButton(
-            onPressed: () {},
-            icon: const Icon(Icons.notifications_none_rounded,
-                color: Colors.white, size: 28),
-          ),
+          const NotifBell(),
         ],
       ),
     );

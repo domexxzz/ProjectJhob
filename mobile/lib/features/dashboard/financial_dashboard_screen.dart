@@ -1151,9 +1151,9 @@ class _GreenHeader extends StatelessWidget {
                 Container(
                   padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 3),
                   decoration: BoxDecoration(
-                    color: rankColor.withValues(alpha: 0.2),
+                    color: rankColor.withOpacity(0.2),
                     borderRadius: BorderRadius.circular(12),
-                    border: Border.all(color: rankColor.withValues(alpha: 0.4)),
+                    border: Border.all(color: rankColor.withOpacity(0.4)),
                   ),
                   child: Row(
                     mainAxisSize: MainAxisSize.min,

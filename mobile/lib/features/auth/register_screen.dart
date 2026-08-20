@@ -177,7 +177,13 @@ class _RegisterScreenState extends ConsumerState<RegisterScreen> {
                 ),
               ),
               const SizedBox(height: 20),
-              const SocialLoginButtons(),
+              Hero(
+                tag: 'social-login-buttons',
+                child: Material(
+                  type: MaterialType.transparency,
+                  child: const SocialLoginButtons(),
+                ),
+              ),
             ],
           ),
         ),

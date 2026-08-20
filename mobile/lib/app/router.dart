@@ -1,3 +1,4 @@
+import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:go_router/go_router.dart';
 
@@ -5,7 +6,6 @@ import '../features/auth/auth_controller.dart';
 import '../features/auth/login_screen.dart';
 import '../features/auth/register_screen.dart';
 import '../features/auth/forgot_password_screen.dart'; // ➕ อิมพอร์ตหน้าลืมรหัสผ่านเข้ามาเพิ่ม
-import '../features/auth/otp_screen.dart'; // หน้ายืนยันอีเมลด้วยรหัส OTP
 import '../features/dashboard/dashboard_screen.dart';
 import '../features/dashboard/financial_dashboard_screen.dart';
 import '../features/transactions/slip_screen.dart';
@@ -20,6 +20,7 @@ import '../features/budgets/budget_list_screen.dart';
 import '../features/budgets/budget_edit_screen.dart';
 import '../features/budgets/budget_amount_screen.dart';
 import '../features/budgets/budget_duration_screen.dart';
+import '../features/onboarding/launch_screen.dart';
 import '../features/onboarding/welcome_1_screen.dart';
 import '../features/onboarding/welcome_2_screen.dart';
 import '../features/onboarding/welcome_3_screen.dart';
@@ -38,16 +39,19 @@ final onboardingDoneProvider = StateProvider<bool>((ref) => false);
 
 final routerProvider = Provider<GoRouter>((ref) {
   return GoRouter(
-    // ── เริ่มต้นที่ Welcome 1 เสมอ ──────────────────────────────────────
-    initialLocation: '/welcome1',
+    // ── เริ่มต้นที่ Launch เสมอ ──────────────────────────────────────
+    initialLocation: '/launch',
     redirect: (context, state) {
       final authed = ref.read(authControllerProvider).isAuthenticated;
       final onboardingDone = ref.read(onboardingDoneProvider);
       final loc = state.matchedLocation;
 
-      // หน้า onboarding — ไม่ต้องตรวจ auth
+      // หน้า Launch & onboarding — ไม่ต้องตรวจ auth
       final onOnboarding =
-          loc == '/welcome1' || loc == '/welcome2' || loc == '/welcome3';
+          loc == '/launch' ||
+          loc == '/welcome1' ||
+          loc == '/welcome2' ||
+          loc == '/welcome3';
       if (onOnboarding) return null;
 
       // หน้ารับ token จาก server-side OAuth (Facebook) — ปล่อยผ่าน
@@ -68,13 +72,46 @@ final routerProvider = Provider<GoRouter>((ref) {
       return null;
     },
     routes: [
+      // ── Launch ──────────────────────────────────────────────────────────
+      GoRoute(
+        path: '/launch',
+        pageBuilder: (context, state) => _fadeTransitionPage(
+          key: state.pageKey,
+          child: const LaunchScreen(),
+        ),
+      ),
+
       // ── Onboarding ──────────────────────────────────────────────────────
-      GoRoute(path: '/welcome1', builder: (_, __) => const Welcome1Screen()),
-      GoRoute(path: '/welcome2', builder: (_, __) => const Welcome2Screen()),
-      GoRoute(path: '/welcome3', builder: (_, __) => const Welcome3Screen()),
+      GoRoute(
+        path: '/welcome1',
+        pageBuilder: (context, state) => _fadeTransitionPage(
+          key: state.pageKey,
+          child: const Welcome1Screen(),
+        ),
+      ),
+      GoRoute(
+        path: '/welcome2',
+        pageBuilder: (context, state) => _fadeTransitionPage(
+          key: state.pageKey,
+          child: const Welcome2Screen(),
+        ),
+      ),
+      GoRoute(
+        path: '/welcome3',
+        pageBuilder: (context, state) => _fadeTransitionPage(
+          key: state.pageKey,
+          child: const Welcome3Screen(),
+        ),
+      ),
 
       // ── Auth ─────────────────────────────────────────────────────────────
-      GoRoute(path: '/login', builder: (_, __) => const LoginScreen()),
+      GoRoute(
+        path: '/login',
+        pageBuilder: (context, state) => _fadeTransitionPage(
+          key: state.pageKey,
+          child: const LoginScreen(),
+        ),
+      ),
       // กลับจาก Facebook server-side OAuth: /oauth?token=<JWT> (หรือ ?fb_error=...)
       GoRoute(
         path: '/oauth',
@@ -83,90 +120,229 @@ final routerProvider = Provider<GoRouter>((ref) {
           error: state.uri.queryParameters['fb_error'],
         ),
       ),
-      GoRoute(path: '/register', builder: (_, __) => const RegisterScreen()),
+      GoRoute(
+        path: '/register',
+        pageBuilder: (context, state) => _fadeTransitionPage(
+          key: state.pageKey,
+          child: const RegisterScreen(),
+        ),
+      ),
       // ➕ เพิ่มเส้นทางสำหรับหน้าลืมรหัสผ่าน (3 สเต็ปในหน้าเดียวที่เราทำไว้)
       GoRoute(
-          path: '/forgot-password',
-          builder: (_, __) => const ForgotPasswordScreen()),
-      // ยืนยันอีเมลหลังสมัคร — ส่งอีเมลมาทาง query ได้ เช่น /verify-email?email=a@b.co
-      GoRoute(
-        path: '/verify-email',
-        builder: (_, state) => OtpScreen(
-          presetEmail: state.uri.queryParameters['email'],
+        path: '/forgot-password',
+        pageBuilder: (context, state) => _fadeTransitionPage(
+          key: state.pageKey,
+          child: const ForgotPasswordScreen(),
         ),
       ),
 
       // ── App ──────────────────────────────────────────────────────────────
-      GoRoute(path: '/', builder: (_, __) => const DashboardScreen()),
+      GoRoute(
+        path: '/',
+        pageBuilder: (context, state) => _fadeTransitionPage(
+          key: state.pageKey,
+          child: const DashboardScreen(),
+        ),
+      ),
       GoRoute(
         path: '/financial-dashboard',
-        builder: (_, __) => const FinancialDashboardScreen(),
+        pageBuilder: (context, state) => _fadeTransitionPage(
+          key: state.pageKey,
+          child: const FinancialDashboardScreen(),
+        ),
       ),
       GoRoute(
         path: '/slip',
-        builder: (_, state) => SlipScreen(
-          startInManualMode: state.uri.queryParameters['mode'] == 'manual',
+        pageBuilder: (context, state) => _fadeTransitionPage(
+          key: state.pageKey,
+          child: SlipScreen(
+            startInManualMode: state.uri.queryParameters['mode'] == 'manual',
+          ),
         ),
       ),
       GoRoute(
         path: '/transactions/select-date',
-        builder: (_, state) => SelectDateScreen(
-          initialDate: state.extra as DateTime?,
+        pageBuilder: (context, state) => _fadeTransitionPage(
+          key: state.pageKey,
+          child: SelectDateScreen(
+            initialDate: state.extra as DateTime?,
+          ),
         ),
       ),
-      GoRoute(path: '/chat', builder: (_, __) => const ChatScreen()),
-      GoRoute(path: '/budgets', builder: (_, __) => const BudgetListScreen()),
       GoRoute(
-        path: '/budgets/edit',
-        builder: (context, state) =>
-            BudgetEditScreen(status: state.extra as BudgetStatus),
+        path: '/chat',
+        pageBuilder: (context, state) => _fadeTransitionPage(
+          key: state.pageKey,
+          child: const ChatScreen(),
+        ),
       ),
       GoRoute(
-          path: '/budgets/amount',
-          builder: (_, __) => const BudgetAmountScreen()),
+        path: '/budgets',
+        pageBuilder: (context, state) => _fadeTransitionPage(
+          key: state.pageKey,
+          child: const BudgetListScreen(),
+        ),
+      ),
       GoRoute(
-          path: '/budgets/duration',
-          builder: (_, __) => const BudgetDurationScreen()),
-      GoRoute(path: '/profile', builder: (_, __) => const ProfileScreen()),
+        path: '/budgets/edit',
+        pageBuilder: (context, state) => _fadeTransitionPage(
+          key: state.pageKey,
+          child: BudgetEditScreen(status: state.extra as BudgetStatus),
+        ),
+      ),
       GoRoute(
-          path: '/profile/edit', builder: (_, __) => const EditProfileScreen()),
-      GoRoute(path: '/menu', builder: (_, __) => const MenuScreen()),
-      GoRoute(path: '/privacy', builder: (_, __) => const PrivacyScreen()),
-      GoRoute(path: '/settings', builder: (_, __) => const SettingsScreen()),
+        path: '/budgets/amount',
+        pageBuilder: (context, state) => _fadeTransitionPage(
+          key: state.pageKey,
+          child: const BudgetAmountScreen(),
+        ),
+      ),
       GoRoute(
-          path: '/subscriptions',
-          builder: (_, __) => const SubscriptionsScreen()),
+        path: '/budgets/duration',
+        pageBuilder: (context, state) => _fadeTransitionPage(
+          key: state.pageKey,
+          child: const BudgetDurationScreen(),
+        ),
+      ),
       GoRoute(
-          path: '/notifications',
-          builder: (_, __) => const NotificationsScreen()),
+        path: '/profile',
+        pageBuilder: (context, state) => _fadeTransitionPage(
+          key: state.pageKey,
+          child: const ProfileScreen(),
+        ),
+      ),
       GoRoute(
-          path: '/predictions', builder: (_, __) => const PredictionsScreen()),
-      GoRoute(path: '/goals', builder: (_, __) => const GoalsScreen()),
-      GoRoute(path: '/goals/add', builder: (_, __) => const EditGoalScreen()),
+        path: '/profile/edit',
+        pageBuilder: (context, state) => _fadeTransitionPage(
+          key: state.pageKey,
+          child: const EditProfileScreen(),
+        ),
+      ),
+      GoRoute(
+        path: '/menu',
+        pageBuilder: (context, state) => _fadeTransitionPage(
+          key: state.pageKey,
+          child: const MenuScreen(),
+        ),
+      ),
+      GoRoute(
+        path: '/privacy',
+        pageBuilder: (context, state) => _fadeTransitionPage(
+          key: state.pageKey,
+          child: const PrivacyScreen(),
+        ),
+      ),
+      GoRoute(
+        path: '/settings',
+        pageBuilder: (context, state) => _fadeTransitionPage(
+          key: state.pageKey,
+          child: const SettingsScreen(),
+        ),
+      ),
+      GoRoute(
+        path: '/subscriptions',
+        pageBuilder: (context, state) => _fadeTransitionPage(
+          key: state.pageKey,
+          child: const SubscriptionsScreen(),
+        ),
+      ),
+      GoRoute(
+        path: '/notifications',
+        pageBuilder: (context, state) => _fadeTransitionPage(
+          key: state.pageKey,
+          child: const NotificationsScreen(),
+        ),
+      ),
+      GoRoute(
+        path: '/predictions',
+        pageBuilder: (context, state) => _fadeTransitionPage(
+          key: state.pageKey,
+          child: const PredictionsScreen(),
+        ),
+      ),
+      GoRoute(
+        path: '/goals',
+        pageBuilder: (context, state) => _fadeTransitionPage(
+          key: state.pageKey,
+          child: const GoalsScreen(),
+        ),
+      ),
+      GoRoute(
+        path: '/goals/add',
+        pageBuilder: (context, state) => _fadeTransitionPage(
+          key: state.pageKey,
+          child: const EditGoalScreen(),
+        ),
+      ),
       GoRoute(
         path: '/goals/edit',
-        builder: (context, state) {
+        pageBuilder: (context, state) {
           final id = state.uri.queryParameters['id'];
-          return EditGoalScreen(goalId: id);
+          return _fadeTransitionPage(
+            key: state.pageKey,
+            child: EditGoalScreen(goalId: id),
+          );
         },
       ),
       GoRoute(
         path: '/goals/deposit',
-        builder: (context, state) {
+        pageBuilder: (context, state) {
           final id = state.uri.queryParameters['id'];
-          return DepositGoalScreen(goalId: id ?? '');
+          return _fadeTransitionPage(
+            key: state.pageKey,
+            child: DepositGoalScreen(goalId: id ?? ''),
+          );
         },
       ),
       GoRoute(
         path: '/goals/duration',
-        builder: (context, state) {
+        pageBuilder: (context, state) {
           final extra = state.extra as Map<String, DateTime?>?;
-          return SetDeadlineScreen(
-            initialStartDate: extra?['startDate'],
-            initialEndDate: extra?['endDate'],
+          return _fadeTransitionPage(
+            key: state.pageKey,
+            child: SetDeadlineScreen(
+              initialStartDate: extra?['startDate'],
+              initialEndDate: extra?['endDate'],
+            ),
           );
         },
       ),
     ],
   );
 });
+
+CustomTransitionPage<void> _fadeTransitionPage({
+  required LocalKey key,
+  required Widget child,
+}) {
+  return CustomTransitionPage<void>(
+    key: key,
+    child: child,
+    transitionDuration: const Duration(milliseconds: 300),
+    reverseTransitionDuration: const Duration(milliseconds: 300),
+    transitionsBuilder: (
+      context,
+      animation,
+      secondaryAnimation,
+      child,
+    ) {
+      return FadeTransition(
+        opacity: CurvedAnimation(
+          parent: animation,
+          curve: Curves.easeOut,
+          reverseCurve: Curves.easeOut,
+        ),
+        child: FadeTransition(
+          opacity: Tween<double>(begin: 1.0, end: 0.0).animate(
+            CurvedAnimation(
+              parent: secondaryAnimation,
+              curve: Curves.easeOut,
+              reverseCurve: Curves.easeOut,
+            ),
+          ),
+          child: child,
+        ),
+      );
+    },
+  );
+}
