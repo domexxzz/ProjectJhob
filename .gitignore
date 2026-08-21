@@ -24,15 +24,15 @@ GoogleService-Info.plist
 backend/prisma/dev.db*
 
 # Flutter / Dart
-mobile/.dart_tool/
-mobile/build/
-mobile/android/build/
-mobile/.flutter-plugins
-mobile/.flutter-plugins-dependencies
-mobile/ios/Pods/
-mobile/ios/.symlinks/
-mobile/android/.gradle/
-mobile/android/local.properties
+**/.dart_tool/
+**/build/
+**/android/build/
+**/.flutter-plugins
+**/.flutter-plugins-dependencies
+**/ios/Pods/
+**/ios/.symlinks/
+**/android/.gradle/
+**/android/local.properties
 
 # Python
 __pycache__/
