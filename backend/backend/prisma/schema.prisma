@@ -1,0 +1,202 @@
+// AI Finance Coach — "พี่เงิน" · Prisma schema
+// DEV: sqlite (zero-setup). PROD: เปลี่ยน provider เป็น "postgresql" + ตั้ง DATABASE_URL (ดู .env.example)
+// 💡 จำนวนเงินทุกฟิลด์เก็บเป็น "สตางค์" (Int, 1 บาท = 100) เพื่อกัน floating-point error
+
+generator client {
+  provider = "prisma-client-js"
+}
+
+datasource db {
+  provider = "postgresql"
+  url      = env("DATABASE_URL")
+}
+
+model User {
+  id            String   @id @default(cuid())
+  email         String   @unique
+  phone         String?
+  passwordHash  String? // nullable — ผู้ใช้ที่ล็อกอินผ่าน OAuth ไม่มีรหัสผ่าน
+  provider      String   @default("local") // local | google | facebook
+  providerId    String? // sub/id จาก provider (Google sub / Facebook id)
+  avatarUrl     String?
+  displayName   String?
+  monthlyIncome Int      @default(0) // satang
+  level         Int      @default(1)
+  streak        Int      @default(0)
+  points        Int      @default(0)
+  lastLoginAt   DateTime?
+  lastChatPointsDate String?
+  emailVerifiedAt DateTime? // null = ยังไม่ได้ยืนยันอีเมล (ไม่บล็อกการใช้งาน — ผู้ใช้เดิมยังเข้าได้ปกติ)
+  deviceToken   String? // FCM device token (สำหรับ push)
+  notificationsEnabled Boolean @default(true)
+  budgetAlertsEnabled  Boolean @default(true)
+  createdAt     DateTime @default(now())
+  updatedAt     DateTime @updatedAt
+
+  transactions  Transaction[]
+  budgets       Budget[]
+  goals         Goal[]
+  chatMessages  ChatMessage[]
+  chatSessions  ChatSession[]
+  achievements  Achievement[]
+  notifications Notification[]
+  subscriptions Subscription[]
+  otpCodes      OtpCode[]
+}
+
+/// รหัส OTP ที่ส่งไปทางอีเมล
+///
+/// ⚠️ เก็บเป็น "ค่าที่เข้ารหัสแล้ว" (bcrypt) ไม่เก็บตัวเลข 6 หลักตรง ๆ
+/// เพราะถ้าฐานข้อมูลรั่ว คนที่เห็นจะเอารหัสไปใช้ยืนยันตัวตนแทนผู้ใช้ได้ทันที
+model OtpCode {
+  id         String    @id @default(cuid())
+  userId     String
+  purpose    String // reset (ลืมรหัสผ่าน) | verify (ยืนยันอีเมล) | login (ล็อกอินด้วย OTP)
+  codeHash   String // bcrypt ของรหัส 6 หลัก
+  expiresAt  DateTime // หมดอายุ 10 นาที
+  attempts   Int       @default(0) // กรอกผิดได้ไม่เกิน 5 ครั้ง กันเดารหัส
+  consumedAt DateTime? // ใช้แล้วใช้ซ้ำไม่ได้
+  createdAt  DateTime  @default(now())
+
+  user User @relation(fields: [userId], references: [id], onDelete: Cascade)
+
+  @@index([userId, purpose, createdAt])
+}
+
+model Category {
+  id        String   @id @default(cuid())
+  name      String // English key
+  nameTh    String // ชื่อไทยที่แสดงผล
+  icon      String // emoji
+  color     String // hex
+  type      String   @default("expense") // income | expense
+  isDefault Boolean  @default(true)
+  createdAt DateTime @default(now())
+
+  transactions Transaction[]
+  budgets      Budget[]
+
+  @@unique([name, type])
+}
+
+model Transaction {
+  id         String   @id @default(cuid())
+  userId     String
+  type       String // income | expense
+  amount     Int // satang
+  note       String?
+  source     String   @default("manual") // manual | ocr | sms
+  categoryId String?
+  budgetId   String?
+  occurredAt DateTime @default(now())
+  createdAt  DateTime @default(now())
+  updatedAt  DateTime @updatedAt
+
+  user     User      @relation(fields: [userId], references: [id], onDelete: Cascade)
+  category Category? @relation(fields: [categoryId], references: [id])
+  budget   Budget?   @relation(fields: [budgetId], references: [id])
+
+
+  @@index([userId, occurredAt])
+}
+
+model Budget {
+  id              String   @id @default(cuid())
+  userId          String
+  name            String?  // ชื่อหัวข้องบประมาณที่ผู้ใช้ตั้งเอง
+  categoryId      String?
+  amount          Int // satang
+  period          String   @default("monthly") // monthly | weekly
+  startDate       DateTime?
+  endDate         DateTime?
+  showOnDashboard Boolean  @default(true)
+  createdAt       DateTime @default(now())
+
+  user         User          @relation(fields: [userId], references: [id], onDelete: Cascade)
+  category     Category?     @relation(fields: [categoryId], references: [id])
+  transactions Transaction[]
+}
+
+model Goal {
+  id        String    @id @default(cuid())
+  userId    String
+  name      String
+  target    Int // satang
+  current   Int       @default(0) // satang
+  deadline  DateTime?
+  createdAt DateTime  @default(now())
+
+  user User @relation(fields: [userId], references: [id], onDelete: Cascade)
+}
+
+/// ห้องแชท 1 ห้อง = 1 บทสนทนา (ผู้ใช้สร้างใหม่ได้เรื่อย ๆ)
+model ChatSession {
+  id        String   @id @default(cuid())
+  userId    String
+  title       String  @default("แชทใหม่") // AI ตั้งให้จากเนื้อหาบทสนทนา แก้เองได้
+  titleLocked Boolean @default(false) // true = ผู้ใช้ตั้งชื่อเอง ห้าม AI ทับ
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt // ใช้เรียงห้องล่าสุดขึ้นก่อน
+
+  user     User          @relation(fields: [userId], references: [id], onDelete: Cascade)
+  messages ChatMessage[]
+
+  @@index([userId, updatedAt])
+}
+
+model ChatMessage {
+  id        String   @id @default(cuid())
+  userId    String
+  sessionId String? // null = ข้อความเก่าก่อนมีระบบห้อง (ระบบจะย้ายเข้าห้องให้อัตโนมัติ)
+  role      String // user | assistant
+  content   String
+  context   String? // JSON snapshot ของ context injection
+  /// รูปย่อ (data URL) ของภาพที่ผู้ใช้ส่ง — เก็บเฉพาะขนาดเล็กไว้โชว์ในแกลเลอรี
+  thumbnail String?
+  createdAt DateTime @default(now())
+
+  user    User         @relation(fields: [userId], references: [id], onDelete: Cascade)
+  session ChatSession? @relation(fields: [sessionId], references: [id], onDelete: Cascade)
+
+  @@index([userId, sessionId, createdAt])
+}
+
+model Achievement {
+  id         String   @id @default(cuid())
+  userId     String
+  type       String
+  unlockedAt DateTime @default(now())
+
+  user User @relation(fields: [userId], references: [id], onDelete: Cascade)
+}
+
+model Notification {
+  id        String   @id @default(cuid())
+  userId    String
+  type      String // budget_near | budget_over | daily_summary | goal | subscription
+  title     String
+  body      String
+  read      Boolean  @default(false)
+  data      String? // JSON meta (เช่น categoryId, goalId) — optional
+  createdAt DateTime @default(now())
+
+  user User @relation(fields: [userId], references: [id], onDelete: Cascade)
+
+  @@index([userId, createdAt])
+}
+
+model Subscription {
+  id          String   @id @default(cuid())
+  userId      String
+  name        String
+  amount      Int // satang ต่อรอบ
+  cycle       String   @default("monthly") // monthly | yearly
+  nextBilling DateTime
+  logo        String? // emoji หรือ url (optional)
+  createdAt   DateTime @default(now())
+  updatedAt   DateTime @updatedAt
+
+  user User @relation(fields: [userId], references: [id], onDelete: Cascade)
+
+  @@index([userId, nextBilling])
+}

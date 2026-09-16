@@ -1,0 +1,632 @@
+import { Router } from 'express';
+import { z } from 'zod';
+import { asyncHandler, HttpError } from '../../lib/http';
+import { requireAuth } from '../../lib/auth';
+import { prisma } from '../../lib/prisma';
+import { signExportToken } from '../export/export.service';
+import { cache } from '../../lib/cache';
+import { buildContext } from './context_builder';
+import { Timer, exposeTiming } from '../../lib/timing';
+import { generateReply, generateReplyWithTools, ChatTurn, ocrImage } from './coach';
+import { detectGoalIntent, deadlineFromMonths } from './goal_intent';
+import {
+  detectExportRequest,
+  buildExportReply,
+  buildDynamicExportReply,
+  ChatAttachment,
+} from './export_intent';
+import { checkFinanceScope, OUT_OF_SCOPE_REPLY } from './finance_scope';
+import { detectQuickLog, quickCreate, runTool, detectBudgetIntent } from './tools';
+import { extractReceiptItems, logReceiptItems, analyzeContract, logTransferSlip } from './receipt';
+import {
+  migrateLegacyMessages,
+  ensureSession,
+  assertOwnedSession,
+  touchSession,
+  autoTitleSession,
+} from './sessions';
+
+export const chatRouter = Router();
+chatRouter.use(requireAuth);
+
+// เผื่อข้อความยาวจาก OCR (สลิป/ตาราง) — ปกติผู้ใช้พิมพ์สั้น แต่แนบรูปแล้ววิเคราะห์อาจยาว
+const sendSchema = z.object({
+  message: z.string().min(1).max(8000),
+  imageBase64: z.string().optional(), // ➕ รองรับการส่งรูปแบบ Base64
+  thumbnail: z.string().max(400_000).optional(), // รูปย่อไว้โชว์ในแกลเลอรี (ฝั่งแอปย่อมาให้)
+  sessionId: z.string().optional(), // ห้องแชทที่ส่งเข้า — ไม่ระบุ = ห้องล่าสุด/สร้างใหม่
+  slipType: z.enum(['income', 'expense']).optional(), // ผู้ใช้เลือกตอนแนบสลิป: รายรับ/รายจ่าย
+  includeFinancialContext: z.boolean().default(true),
+  personalizedRecommendations: z.boolean().default(true),
+  storeConversationHistory: z.boolean().default(true),
+});
+
+// ── ห้องแชท (session) ────────────────────────────────────────────────────────
+
+// GET /api/v1/chat/sessions -> รายการห้องแชททั้งหมด (ล่าสุดขึ้นก่อน)
+chatRouter.get(
+  '/sessions',
+  asyncHandler(async (req, res) => {
+    const userId = req.userId!;
+    await migrateLegacyMessages(userId); // ย้ายข้อความเก่าเข้าห้องให้ครั้งแรก
+
+    const sessions = await prisma.chatSession.findMany({
+      where: { userId },
+      orderBy: { updatedAt: 'desc' },
+      take: 100,
+      select: {
+        id: true,
+        title: true,
+        createdAt: true,
+        updatedAt: true,
+        _count: { select: { messages: true } },
+      },
+    });
+    res.json({
+      sessions: sessions.map((s) => ({
+        id: s.id,
+        title: s.title,
+        createdAt: s.createdAt,
+        updatedAt: s.updatedAt,
+        messageCount: s._count.messages,
+      })),
+    });
+  }),
+);
+
+// POST /api/v1/chat/sessions -> สร้างห้องใหม่
+chatRouter.post(
+  '/sessions',
+  asyncHandler(async (req, res) => {
+    const { title } = z.object({ title: z.string().max(80).optional() }).parse(req.body ?? {});
+    const session = await prisma.chatSession.create({
+      data: { userId: req.userId!, title: title?.trim() || 'แชทใหม่' },
+    });
+    res.status(201).json({ session });
+  }),
+);
+
+// PATCH /api/v1/chat/sessions/:id -> เปลี่ยนชื่อห้อง
+chatRouter.patch(
+  '/sessions/:id',
+  asyncHandler(async (req, res) => {
+    const { title } = z.object({ title: z.string().min(1).max(80) }).parse(req.body);
+    if (!(await assertOwnedSession(req.userId!, req.params.id))) {
+      throw new HttpError(404, 'ไม่พบห้องแชทนี้');
+    }
+    const session = await prisma.chatSession.update({
+      where: { id: req.params.id },
+      data: { title: title.trim(), titleLocked: true }, // ผู้ใช้ตั้งเอง → AI ห้ามทับ
+    });
+    res.json({ session });
+  }),
+);
+
+// DELETE /api/v1/chat/sessions/:id -> ลบห้อง (ข้อความในห้องถูกลบตาม)
+chatRouter.delete(
+  '/sessions/:id',
+  asyncHandler(async (req, res) => {
+    if (!(await assertOwnedSession(req.userId!, req.params.id))) {
+      throw new HttpError(404, 'ไม่พบห้องแชทนี้');
+    }
+    await prisma.chatSession.delete({ where: { id: req.params.id } });
+    res.json({ ok: true });
+  }),
+);
+
+// ── แกลเลอรี: รูปที่ผู้ใช้เคยส่ง / ไฟล์ที่พี่เงินเคยสร้าง ─────────────────────
+
+// GET /api/v1/chat/media -> รูปที่ผู้ใช้เคยส่งเข้าแชท (เรียงใหม่→เก่า)
+chatRouter.get(
+  '/media',
+  asyncHandler(async (req, res) => {
+    const filterSession = typeof req.query.sessionId === 'string' ? req.query.sessionId : undefined;
+    const rows = await prisma.chatMessage.findMany({
+      where: {
+        userId: req.userId!,
+        role: 'user',
+        thumbnail: { not: null },
+        ...(filterSession ? { sessionId: filterSession } : {}),
+      },
+      orderBy: { createdAt: 'desc' },
+      take: 60,
+      select: {
+        id: true, sessionId: true, content: true, thumbnail: true, createdAt: true, context: true,
+        session: { select: { title: true } }, // ให้ UI รู้ว่ามาจากแชทไหน
+      },
+    });
+    res.json({
+      media: rows.map((m) => {
+        let ocrText: string | undefined;
+        try {
+          ocrText = m.context ? (JSON.parse(m.context).ocrText as string | undefined) : undefined;
+        } catch {
+          /* context ไม่ใช่ JSON — ข้าม */
+        }
+        return {
+          id: m.id,
+          sessionId: m.sessionId,
+          sessionTitle: m.session?.title,
+          caption: m.content,
+          thumbnail: m.thumbnail,
+          createdAt: m.createdAt,
+          ocrPreview: ocrText ? ocrText.slice(0, 120) : undefined,
+        };
+      }),
+    });
+  }),
+);
+
+// GET /api/v1/chat/files -> ไฟล์ที่พี่เงินสร้างให้ (Excel/PDF/CSV ฯลฯ)
+chatRouter.get(
+  '/files',
+  asyncHandler(async (req, res) => {
+    const filterSession = typeof req.query.sessionId === 'string' ? req.query.sessionId : undefined;
+    const rows = await prisma.chatMessage.findMany({
+      where: {
+        userId: req.userId!,
+        role: 'assistant',
+        context: { contains: '"attachment"' },
+        ...(filterSession ? { sessionId: filterSession } : {}),
+      },
+      orderBy: { createdAt: 'desc' },
+      take: 60,
+      select: {
+        id: true, sessionId: true, context: true, createdAt: true,
+        session: { select: { title: true } },
+      },
+    });
+    const files = [];
+    for (const r of rows) {
+      try {
+        const att = JSON.parse(r.context ?? '{}').attachment;
+        if (att?.token) {
+          files.push({
+            id: r.id,
+            sessionId: r.sessionId,
+            sessionTitle: r.session?.title,
+            createdAt: r.createdAt,
+            kind: att.kind,
+            format: att.format,
+            filename: att.filename,
+            label: att.label,
+            // ออก token ใหม่ทุกครั้งที่เปิดรายการ — token มีอายุ 15 นาที
+            // ถ้าใช้ตัวที่เก็บใน DB ไฟล์เก่าจะหมดอายุแล้วกดโหลดได้หน้าขาว
+            token: att.cacheId
+              ? signExportToken(req.userId!, att.cacheId)
+              : signExportToken(req.userId!),
+            // ไฟล์ชนิดมาตรฐานสร้างใหม่จากข้อมูลสดได้เสมอ ส่วนไฟล์ที่ LLM จัดเอง (custom)
+            // ต้องมี payload เก็บไว้ถึงจะโหลดซ้ำได้ (ไฟล์ที่สร้างก่อนอัปเดตจะไม่มี)
+            downloadable: att.kind !== 'custom' || !!att.payload,
+          });
+        }
+      } catch {
+        /* context พัง — ข้ามรายการนี้ */
+      }
+    }
+    res.json({ files });
+  }),
+);
+
+// GET /api/v1/chat -> ประวัติแชท (ระบุ ?sessionId= เพื่อดูเฉพาะห้องนั้น)
+chatRouter.get(
+  '/',
+  asyncHandler(async (req, res) => {
+    const userId = req.userId!;
+    const sessionId = typeof req.query.sessionId === 'string' ? req.query.sessionId : undefined;
+    if (sessionId && !(await assertOwnedSession(userId, sessionId))) {
+      throw new HttpError(404, 'ไม่พบห้องแชทนี้');
+    }
+    // เอา 100 ข้อความ "ล่าสุด" (desc) แล้ว reverse ให้เรียงเก่า→ใหม่สำหรับแสดงผล
+    // (เดิม asc+take:100 = ได้เก่าสุด 100 → ผู้ใช้ที่แชทเกิน 100 ครั้งไม่เห็นข้อความล่าสุด)
+    const latest = await prisma.chatMessage.findMany({
+      where: { userId, ...(sessionId ? { sessionId } : {}) },
+      orderBy: { createdAt: 'desc' },
+      take: 100,
+    });
+    res.json({ messages: latest.reverse() });
+  }),
+);
+
+// POST /api/v1/chat -> ส่งข้อความ + รับคำตอบจากพี่เงิน
+chatRouter.post(
+  '/',
+  asyncHandler(async (req, res) => {
+    const {
+      message,
+      imageBase64,
+      thumbnail,
+      sessionId: reqSessionId,
+      slipType,
+      includeFinancialContext,
+      personalizedRecommendations,
+      storeConversationHistory,
+    } = sendSchema.parse(req.body);
+    const userId = req.userId!;
+    const timer = new Timer();
+
+    // หาห้องที่จะเก็บข้อความ — ระบุมาก็ใช้ตัวนั้น (ถ้าเป็นของเราจริง) ไม่งั้นใช้ห้องล่าสุด/สร้างใหม่
+    let sessionId: string | null = null;
+    if (storeConversationHistory) {
+      if (reqSessionId && (await assertOwnedSession(userId, reqSessionId))) {
+        sessionId = reqSessionId;
+      } else {
+        await migrateLegacyMessages(userId);
+        sessionId = await ensureSession(userId, message);
+      }
+    }
+
+    timer.mark('session');
+
+    const saveMessage = async (
+      role: 'user' | 'assistant',
+      content: string,
+      context: string | null,
+      thumb?: string | null,
+    ) => {
+      if (storeConversationHistory) {
+        return prisma.chatMessage.create({
+          data: { userId, sessionId, role, content, context, thumbnail: thumb ?? null },
+        });
+      }
+      return {
+        id: `private-${Date.now()}-${role}`,
+        userId,
+        role,
+        content,
+        context,
+        createdAt: new Date(),
+      };
+    };
+
+    // rate limit ง่ายๆ: 20 ข้อความ/นาที/คน
+    const rlKey = `chat_rl:${userId}`;
+    const count = (await cache.get<number>(rlKey)) ?? 0;
+    if (count >= 20) throw new HttpError(429, 'ส่งข้อความถี่เกินไป ลองใหม่อีกครั้งใน 1 นาที');
+    await cache.set(rlKey, count + 1, 60);
+    timer.mark('ratelimit');
+
+    // ทำ OCR ถ้าผู้ใช้ส่งรูปภาพมาด้วย
+    let ocrText: string | undefined;
+    if (imageBase64) {
+      try {
+        ocrText = await ocrImage(imageBase64);
+      } catch (e) {
+        console.error('[chat] OCR failed for message image attachment:', e);
+      }
+    }
+
+    // ตรวจขอบเขตก่อนเรียก LLM และก่อนสร้างไฟล์ เพื่อให้พี่เงินตอบเฉพาะเรื่องการเงิน
+    const priorMessagesDesc = await prisma.chatMessage.findMany({
+      // จำกัดเฉพาะห้องนี้ ไม่งั้นบริบทจากห้องอื่นจะปนเข้ามา
+      where: { userId, ...(sessionId ? { sessionId } : {}) },
+      orderBy: { createdAt: 'desc' },
+      take: 16,
+    });
+    const history: ChatTurn[] = [...priorMessagesDesc].reverse().filter((m) => {
+      if (m.role !== 'assistant' || !m.context) return true;
+      try {
+        const source = JSON.parse(m.context).source;
+        return source !== 'finance-scope-guard' && source !== 'export-format-unsupported';
+      } catch (_) {
+        return true;
+      }
+    }).map((m) => {
+      let content = m.content;
+      if (m.role === 'user' && m.context) {
+        try {
+          const parsed = JSON.parse(m.context);
+          if (parsed.ocrText) {
+            content = `${m.content}\n\n[ข้อมูลที่แอปตรวจพบในรูปภาพที่ผู้ใช้แนบ: ${parsed.ocrText}]`;
+          }
+        } catch (_) {}
+      }
+      return { role: m.role === 'assistant' ? 'assistant' : 'user', content };
+    });
+    timer.mark('history');
+    const scope = checkFinanceScope(message, history, ocrText);
+    timer.mark('scope');
+
+    // เก็บข้อความผู้ใช้ โดยเก็บ ocrText และ flag ว่ามีรูปไว้ใน context
+    await saveMessage(
+      'user',
+      message,
+      ocrText ? JSON.stringify({ hasImage: true, ocrText }) : null,
+      imageBase64 ? thumbnail ?? null : null, // เก็บรูปย่อไว้โชว์ในแกลเลอรี
+    );
+    // เลื่อนห้องขึ้นบนสุด + ตั้งชื่อห้องจากข้อความแรก
+    if (sessionId) await touchSession(sessionId, message);
+    timer.mark('saveUser');
+
+    if (!scope.allowed) {
+      const saved = await saveMessage(
+        'assistant',
+        OUT_OF_SCOPE_REPLY,
+        JSON.stringify({ source: 'finance-scope-guard', reason: scope.reason }),
+      );
+      res.status(201).json({ message: saved, source: 'finance-scope-guard' });
+      return;
+    }
+
+    // ── เอกสารสัญญา/ซื้อรถ (ไม่ใช่ใบเสร็จ) → ไม่แตกรายการ แต่แนะนำให้จดเป็นรายการเดียว ──
+    if (includeFinancialContext && ocrText) {
+      const contract = await analyzeContract(ocrText);
+      if (contract.isContract) {
+        const veh = contract.vehicle ? `ซื้อ${contract.vehicle}` : 'สัญญา/ซื้อรถ';
+        const amt = contract.downPaymentBaht;
+        const reply = amt
+          ? `📄 นี่เป็นเอกสาร${veh} ไม่ใช่ใบเสร็จซื้อของหลายรายการ พี่เงินเลยไม่จดแยกทั้งใบให้นะครับ (กันจดยอดสัญญาเป็นรายจ่ายผิด)\n\n` +
+            `พี่เงินอ่านคร่าว ๆ ว่าจ่ายวันนี้ประมาณ **${amt.toLocaleString('en-US')} บาท** — เป็นลายมือ OCR อาจคลาดเคลื่อน ถ้าจะบันทึกเป็นค่างวด/ดาวน์ พิมพ์ยืนยันได้เลย เช่น \`ดาวน์รถ ${amt}\` (ถ้าเลขไม่ตรง พิมพ์เลขที่ถูกแทนครับ) จะเข้าหมวด **ผ่อน/หนี้** ให้ 😊`
+          : `📄 นี่เป็นเอกสาร${veh} ไม่ใช่ใบเสร็จซื้อของ พี่เงินเลยไม่จดแยกให้นะครับ (กันจดยอดสัญญาผิด)\n\n` +
+            'ถ้าจะบันทึกเงินดาวน์หรือค่างวดที่จ่ายจริง พิมพ์สั้น ๆ ได้เลย เช่น `ดาวน์รถ 5000` หรือ `ค่างวดรถ 2500` จะเข้าหมวด **ผ่อน/หนี้** พร้อมการ์ดให้ตรวจครับ 😊';
+        const saved = await saveMessage('assistant', reply, JSON.stringify({ source: 'contract-doc' }));
+        res.status(201).json({ message: saved, source: 'contract-doc' });
+        return;
+      }
+    }
+
+    // ── สแกนใบเสร็จหลายรายการ → แยกสินค้า → จดหลายรายการ + การ์ดหลายใบ ──
+    if (includeFinancialContext && ocrText) {
+      const items = await extractReceiptItems(ocrText);
+      if (items.length >= 2) {
+        const cards = await logReceiptItems(userId, items);
+        if (cards.length) {
+          const total = cards.reduce((s, c) => s + Number(c.amountBaht), 0);
+          const reply =
+            `จดจากใบเสร็จให้แล้ว ${cards.length} รายการ รวม ${total.toLocaleString('en-US')} บาท ✅\n\n` +
+            'ตรวจแต่ละรายการที่การ์ดด้านล่างได้เลย ถ้าผิดกดแก้หรือลบได้ครับ 😊';
+          const saved = await saveMessage(
+            'assistant',
+            reply,
+            JSON.stringify({ source: 'receipt-scan', cards }),
+          );
+          res.status(201).json({ message: saved, source: 'receipt-scan', cards });
+          return;
+        }
+      }
+    }
+
+    // ── สลิปโอนเงิน/จ่ายบิล "ยอดเดียว" (ไม่ใช่ใบเสร็จหลายรายการ) → จด 1 รายการจากยอดในสลิป ──
+    // ใช้ parser เดียวกับ /parse-slip (deterministic) การ์ดขึ้นชัวร์ ไม่พึ่ง LLM เรียก tool
+    if (includeFinancialContext && ocrText) {
+      const card = await logTransferSlip(userId, ocrText, message, slipType);
+      if (card) {
+        const kind = card.type === 'income' ? 'รายรับ' : 'รายจ่าย';
+        const reply =
+          `จดจากสลิปให้แล้วครับ ✅ ${kind}: ${card.note} ${card.amountBaht.toLocaleString('en-US')} บาท (หมวด${card.category})\n\n` +
+          'ถ้าผิดกดแก้หรือลบที่การ์ดด้านล่างได้เลยครับ 😊';
+        const saved = await saveMessage(
+          'assistant',
+          reply,
+          JSON.stringify({ source: 'slip-log', cards: [card] }),
+        );
+        res.status(201).json({ message: saved, source: 'slip-log', cards: [card] });
+        return;
+      }
+    }
+
+    // ── การจดแบบสั้นสไตล์ป้านวล "ก๋วยเตี๋ยว 55" / "เงินเดือน 30000" → สร้างเองในโค้ด การ์ดขึ้นชัวร์ 100% ──
+    // (ไม่ต้องพึ่ง LLM เรียก tool ซึ่งบางโมเดลไม่นิ่ง โดยเฉพาะรายรับ)
+    if (includeFinancialContext && !imageBase64) {
+      const quick = detectQuickLog(message);
+      if (quick) {
+        const card = await quickCreate(userId, quick);
+        if (card) {
+          const kind = card.type === 'income' ? 'รายรับ' : 'รายจ่าย';
+          const reply =
+            `จดให้แล้วครับ ✅ ${kind}: ${card.note} ${card.amountBaht.toLocaleString('en-US')} บาท (หมวด${card.category})\n\n` +
+            'ถ้าผิดกดแก้หรือลบที่การ์ดด้านล่างได้เลยครับ 😊';
+          const saved = await saveMessage(
+            'assistant',
+            reply,
+            JSON.stringify({ source: 'quick-log', cards: [card] }),
+          );
+          res.status(201).json({ message: saved, source: 'quick-log', cards: [card] });
+          return;
+        }
+      }
+    }
+
+    // ── ตั้งเป้าหมายออม → สร้างเองในโค้ด ไม่พึ่ง LLM เรียก tool ──
+    // ทดสอบกับ production แล้วพบว่าโมเดลไม่เรียก create_goal เลยสักครั้ง
+    // แถมตอบว่า "ตั้งไว้ในระบบเรียบร้อยแล้ว" ทั้งที่ไม่มีเป้าหมายเกิดขึ้นจริง
+    // ใช้วิธีเดียวกับ quick-log ด้านบนเพื่อให้การกระทำเกิดขึ้นแน่นอน 100%
+    if (includeFinancialContext && !imageBase64) {
+      const goal = detectGoalIntent(message);
+      if (goal) {
+        const created = (await runTool(
+          'create_goal',
+          { name: goal.name, targetBaht: goal.targetBaht, deadline: deadlineFromMonths(goal.months) },
+          userId,
+        )) as Record<string, unknown>;
+        if (created?.ok) {
+          const perMonth = goal.months ? Math.ceil(goal.targetBaht / goal.months) : null;
+          const within = goal.months ? ` ภายใน ${goal.months} เดือน` : '';
+          const advice = perMonth
+            ? `ต้องเก็บเดือนละประมาณ **${perMonth.toLocaleString('en-US')} บาท** นะครับ`
+            : 'ลองกำหนดเวลาด้วยจะช่วยให้เห็นภาพว่าต้องเก็บเดือนละเท่าไหร่';
+          const reply = `ตั้งเป้าหมายให้แล้วครับ 🎯 **${goal.name}** ${goal.targetBaht.toLocaleString('en-US')} บาท${within}
+
+${advice}
+
+ดูความคืบหน้าได้ที่หน้า "เป้าหมาย" ถ้าอยากแก้ยอดหรือลบก็ทำได้ที่นั่นเลยครับ 😊`;
+          const saved = await saveMessage('assistant', reply, JSON.stringify({ source: 'quick-goal' }));
+          await awardChatPoints(userId);
+          res.status(201).json({ message: saved, source: 'quick-goal' });
+          return;
+        }
+        // สร้างไม่สำเร็จ → ไม่ตอบว่าสำเร็จ ปล่อยให้ LLM คุยต่อตามปกติ
+        console.error('[chat] สร้างเป้าหมายอัตโนมัติไม่สำเร็จ:', created?.error);
+      }
+    }
+
+    // ── ตั้งงบประมาณ → สร้างเองในโค้ด ไม่พึ่ง LLM เรียก tool ──
+    if (includeFinancialContext && !imageBase64) {
+      const budget = detectBudgetIntent(message);
+      if (budget) {
+        const created = (await runTool(
+          'create_budget',
+          { name: budget.name, amountBaht: budget.amountBaht, period: budget.period },
+          userId,
+        )) as Record<string, unknown>;
+        if (created?.ok) {
+          const pStr = budget.period === 'weekly' ? 'ต่อสัปดาห์' : 'ต่อเดือน';
+          const reply = `ตั้งงบประมาณให้แล้วครับ 📊 **${created.name}** ${budget.amountBaht.toLocaleString('en-US')} บาท (${pStr})\n\nระบบจะคอยติดตามและแจ้งเตือนเมื่อยอดใช้จ่ายเริ่มใกล้เกินงบครับ 😊`;
+          const saved = await saveMessage('assistant', reply, JSON.stringify({ source: 'quick-budget' }));
+          await awardChatPoints(userId);
+          res.status(201).json({ message: saved, source: 'quick-budget' });
+          return;
+        }
+      }
+    }
+
+    // ── คำถามแปลงสกุลเงินต่างประเทศ (เช่น "10ดอลล่ากี่บาท", "10 usd เป็นเงินไทยเท่าไหร่") ──
+    const fxMatch = message.match(/(?:(\d[\d,]*(?:\.\d{1,2})?)\s*(?:ดอลลาร์|ดอลล่า|ดอลลา|usd|\$)\s*(?:กี่บาท|เป็นเงินไทยเท่าไหร่|เท่าไหร่|เท่าไร|กี่บาทไทย)|(?:กี่บาท|เป็นเงินไทยเท่าไหร่)\s*(\d[\d,]*(?:\.\d{1,2})?)\s*(?:ดอลลาร์|ดอลล่า|usd|\$))/i);
+    if (fxMatch) {
+      const usd = Number((fxMatch[1] || fxMatch[2]).replace(/,/g, ''));
+      if (Number.isFinite(usd) && usd > 0) {
+        const thb = Math.round(usd * 34);
+        const reply = `💵 **${usd.toLocaleString('en-US')} ดอลลาร์ (USD)** มีค่าประมาณ **${thb.toLocaleString('en-US')} บาทไทย** ครับ\n\n*(ใช้อัตราแลกเปลี่ยนประมาณ 34.00 บาท/USD)*`;
+        const saved = await saveMessage('assistant', reply, JSON.stringify({ source: 'fx-converter' }));
+        await awardChatPoints(userId);
+        res.status(201).json({ message: saved, source: 'fx-converter' });
+        return;
+      }
+    }
+
+    // ── ถ้าเป็นคำขอ "ไฟล์การเงิน" → พี่เงินสร้างไฟล์ + แนบปุ่มดาวน์โหลด ──
+    const exp = detectExportRequest(message);
+    if (exp) {
+      let reply: string;
+      let attachment: ChatAttachment | null;
+      if (exp.kind === 'custom') {
+        // ข้อมูลจากบทสนทนา → ให้ LLM จัดเป็นตาราง
+        const ctx = await buildContext(userId);
+        ({ reply, attachment } = await buildDynamicExportReply(userId, exp.format, ctx, message, history));
+      } else {
+        ({ reply, attachment } = buildExportReply(userId, exp.kind, exp.format));
+      }
+      const saved = await saveMessage(
+        'assistant',
+        reply,
+        JSON.stringify({ source: 'export', attachment }),
+      );
+      await awardChatPoints(userId);
+      res.status(201).json({ message: saved, source: 'export', attachment });
+      return;
+    }
+
+    // ประกอบ context จริง โดยใช้เฉพาะบทสนทนาก่อนข้อความปัจจุบัน (ไม่ส่งคำถามซ้ำ)
+    const fullContext = includeFinancialContext
+      ? await buildContext(userId)
+      : {
+          displayName: null,
+          monthlyIncome: 0,
+          thisMonthSpent: 0,
+          thisMonthIncome: 0,
+          budgetRemaining: [],
+          topExpenses: [],
+          goals: [],
+          streakDays: 0,
+        };
+    const context = personalizedRecommendations
+      ? fullContext
+      : {
+          ...fullContext,
+          displayName: null,
+          goals: [],
+          streakDays: 0,
+        };
+
+    // ส่งข้อความปัจจุบันพร้อมแนบข้อมูล OCR ล่าสุดเข้าไปคุยกับ LLM
+    timer.mark('context');
+
+    let currentQuestion = message;
+    if (ocrText) {
+      currentQuestion = `${message}\n\n[ข้อมูลที่แอปตรวจพบในรูปภาพที่ส่งมาในข้อความนี้: ${ocrText}]`;
+    }
+
+    // เปิด function calling เมื่อผู้ใช้อนุญาตให้ใช้ context การเงิน (LLM query/บันทึกข้อมูลจริงได้)
+    // ถ้าปิด context ไว้ (โหมดไม่ผูกข้อมูล) ใช้เส้นทางเดิมที่ไม่มี tool
+    const result = includeFinancialContext
+      ? await generateReplyWithTools(context, currentQuestion, history, userId, timer)
+      : { ...(await generateReply(context, currentQuestion, history)), cards: [] };
+    const { reply, source, cards } = result;
+    timer.mark('aiTotal'); // ยอดรวมของ AI — llm:* / tool:* / llmfail:* คือรายละเอียดข้างใน อย่าบวกซ้ำ
+
+    // เก็บคำตอบ + การ์ดรายการที่ AI บันทึกให้ (mobile เอาไปวาดการ์ด "จดสำเร็จ" + ปุ่มลบ/แก้)
+    const saved = await saveMessage(
+      'assistant',
+      reply,
+      JSON.stringify(cards.length ? { source, cards } : { source }),
+    );
+    timer.mark('saveReply');
+
+    await awardChatPoints(userId);
+    timer.mark('points');
+    // ให้ AI ตั้งชื่อห้องจากเนื้อหาทั้งบทสนทนา — ทำเบื้องหลัง ไม่ให้ผู้ใช้รอ
+    if (sessionId) autoTitleSession(sessionId).catch(() => {});
+    console.log(timer.line('chat'));
+    res.status(201).json({
+      message: saved,
+      source,
+      ...(exposeTiming() ? { timing: timer.toJSON() } : {}),
+    });
+  }),
+);
+
+// POST /api/v1/chat/ocr -> อ่านข้อความจากรูป (สลิป/เอกสาร) ด้วย Typhoon OCR
+chatRouter.post(
+  '/ocr',
+  asyncHandler(async (req, res) => {
+    const { imageBase64 } = req.body as { imageBase64?: string };
+    if (!imageBase64) throw new HttpError(400, 'ต้องแนบรูป (imageBase64 เป็น data URL)');
+    try {
+      const text = await ocrImage(imageBase64);
+      res.json({ text, success: true });
+    } catch (e) {
+      console.warn('[chat/ocr] warning:', (e as Error).message);
+      res.json({ text: '', success: false, message: 'ไม่สามารถอ่านข้อความจากรูปได้' });
+    }
+  }),
+);
+
+async function awardChatPoints(userId: string) {
+  const user = await prisma.user.findUnique({
+    where: { id: userId },
+    select: { points: true, lastChatPointsDate: true },
+  });
+  if (!user) return;
+
+  const todayStr = new Date().toISOString().split('T')[0]; // YYYY-MM-DD
+  let pointsToday = 0;
+  let shouldUpdate = false;
+
+  if (user.lastChatPointsDate) {
+    const [datePart, countPart] = user.lastChatPointsDate.split(':');
+    if (datePart === todayStr) {
+      pointsToday = parseInt(countPart, 10) || 0;
+    }
+  }
+
+  if (pointsToday < 10) {
+    pointsToday += 2;
+    shouldUpdate = true;
+  }
+
+  if (shouldUpdate) {
+    const newPoints = user.points + 2;
+    let newLevel = 1;
+    if (newPoints >= 500) newLevel = 3;
+    else if (newPoints >= 100) newLevel = 2;
+
+    await prisma.user.update({
+      where: { id: userId },
+      data: {
+        points: newPoints,
+        level: newLevel,
+        lastChatPointsDate: `${todayStr}:${pointsToday}`,
+      },
+    });
+  }
+}

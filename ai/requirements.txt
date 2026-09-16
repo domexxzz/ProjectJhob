@@ -1,0 +1,10 @@
+# โค้ช "พี่เงิน" (coach/coach.py)
+openai>=1.40.0
+python-dotenv>=1.0.0
+# production จะห่อด้วย LangChain ตาม deck:
+# langchain>=0.2.0
+# langchain-openai>=0.1.0
+
+# OCR spike — เฉพาะตอนใช้ --image (parser ใช้ stdlib ล้วน รันได้เลย)
+pytesseract>=0.3.10
+pillow>=10.0.0

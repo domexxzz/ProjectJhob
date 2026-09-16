@@ -1,0 +1,10 @@
+<?xml version="1.0" encoding="utf-8"?>
+<resources>
+    <!-- ════════════════════════════════════════════════════════════════
+         Facebook Login — Facebook App "PheeNgern" (App ID: 1737272337424131)
+         ค่าจาก https://developers.facebook.com → การตั้งค่าแอพ
+         ════════════════════════════════════════════════════════════════ -->
+    <string name="facebook_app_id">1737272337424131</string>
+    <string name="facebook_client_token">31040f732f638e9782fc4ced10fe5bf0</string>
+    <string name="fb_login_protocol_scheme">fb1737272337424131</string>
+</resources>

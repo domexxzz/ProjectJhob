@@ -1,0 +1,443 @@
+import { Router } from 'express';
+import crypto from 'crypto';
+import { z } from 'zod';
+import { asyncHandler } from '../../lib/http';
+import { HttpError } from '../../lib/http';
+import { requireAuth } from '../../lib/auth';
+import { authLimiter } from '../../middleware/rate_limit';
+import { mailerStatus, lastMailResult } from '../../lib/mailer';
+import {
+  requestOtp,
+  verifyEmailOtp,
+  verifyResetOtp,
+  resetPassword,
+  OtpPurpose,
+} from './otp.service';
+import { registerSchema, loginSchema } from '../../lib/validate';
+import { registerUser, loginUser } from './auth.service';
+import { verifyGoogleIdToken, verifyGoogleAccessToken, verifyFacebookToken, oauthLogin } from './oauth.service';
+import { prisma } from '../../lib/prisma';
+import { env } from '../../config/env';
+import { cache } from '../../lib/cache';
+
+export const authRouter = Router();
+
+// รับได้ทั้ง idToken (มือถือ) และ accessToken (เว็บ) — อย่างน้อย 1 อย่าง
+const googleSchema = z
+  .object({ idToken: z.string().min(10).optional(), accessToken: z.string().min(10).optional() })
+  .refine((d) => d.idToken || d.accessToken, { message: 'ต้องมี idToken หรือ accessToken' });
+const facebookSchema = z.object({ accessToken: z.string().min(10) });
+const updateProfileSchema = z
+  .object({
+    displayName: z.string().trim().min(1).max(60).optional(),
+    email: z.string().trim().email().optional(),
+    phone: z.string().trim().max(30).nullable().optional(),
+    monthlyIncome: z.number().int().nonnegative().optional(),
+    avatarUrl: z.string().max(2_000_000).nullable().optional(),
+  })
+  .refine((data) => Object.keys(data).length > 0, {
+    message: 'ต้องมีข้อมูลที่ต้องการแก้ไขอย่างน้อย 1 รายการ',
+  });
+
+const profileSelect = {
+  id: true,
+  email: true,
+  phone: true,
+  displayName: true,
+  monthlyIncome: true,
+  level: true,
+  streak: true,
+  points: true,
+  avatarUrl: true,
+  provider: true,
+  createdAt: true,
+} as const;
+
+authRouter.post(
+  '/register',
+  authLimiter, // กันเดารหัสผ่าน/สมัครรัว — เฉพาะประตูที่รับ credential
+  asyncHandler(async (req, res) => {
+    const data = registerSchema.parse(req.body);
+    res.status(201).json(await registerUser(data));
+  }),
+);
+
+authRouter.post(
+  '/login',
+  authLimiter, // กันเดารหัสผ่าน/สมัครรัว — เฉพาะประตูที่รับ credential
+  asyncHandler(async (req, res) => {
+    const data = loginSchema.parse(req.body);
+    res.json(await loginUser(data));
+  }),
+);
+
+// POST /api/v1/auth/google — ล็อกอินด้วย Google (ส่ง idToken จาก google_sign_in)
+authRouter.post(
+  '/google',
+  authLimiter, // กันเดารหัสผ่าน/สมัครรัว — เฉพาะประตูที่รับ credential
+  asyncHandler(async (req, res) => {
+    const { idToken, accessToken } = googleSchema.parse(req.body);
+    const profile = idToken ? await verifyGoogleIdToken(idToken) : await verifyGoogleAccessToken(accessToken!);
+    res.json(await oauthLogin(profile));
+  }),
+);
+
+// POST /api/v1/auth/facebook — ล็อกอินด้วย Facebook (ส่ง accessToken จาก flutter_facebook_auth)
+authRouter.post(
+  '/facebook',
+  authLimiter, // กันเดารหัสผ่าน/สมัครรัว — เฉพาะประตูที่รับ credential
+  asyncHandler(async (req, res) => {
+    const { accessToken } = facebookSchema.parse(req.body);
+    const profile = await verifyFacebookToken(accessToken);
+    res.json(await oauthLogin(profile));
+  }),
+);
+
+// ── Facebook server-side OAuth (สำหรับเว็บ/PWA) ──────────────────────────────
+// iOS Safari (ITP) บล็อก connect.facebook.net → FB JS SDK โหลดไม่ได้ ("window.FB is undefined")
+// จึงต้อง redirect ไป facebook.com ตรง ๆ แทนการใช้ SDK ฝั่ง client
+const fbRedirectUri = () =>
+  process.env.FACEBOOK_REDIRECT_URI ??
+  `${(env.webAppUrl || '').replace(/\/$/, '')}/api/v1/auth/facebook/callback`;
+
+// GET /api/v1/auth/facebook/start — พาไปหน้า login ของ Facebook
+authRouter.get(
+  '/facebook/start',
+  asyncHandler(async (req, res) => {
+    if (!env.facebookAppId) throw new HttpError(503, 'backend ยังไม่ได้ตั้ง FACEBOOK_APP_ID');
+    // state: กัน CSRF + จำหน้าที่ผู้ใช้จะกลับไป (ส่งกลับมาใน callback)
+    const state = crypto.randomBytes(32).toString('base64url');
+    await cache.set(`fb_state:${state}`, '1', 600);
+    const url =
+      'https://www.facebook.com/v21.0/dialog/oauth' +
+      `?client_id=${encodeURIComponent(env.facebookAppId)}` +
+      `&redirect_uri=${encodeURIComponent(fbRedirectUri())}` +
+      `&state=${state}` +
+      '&scope=email,public_profile';
+    res.redirect(url);
+  }),
+);
+
+// GET /api/v1/auth/facebook/callback — Facebook ส่ง code กลับมา → แลก token → JWT → กลับเว็บ
+authRouter.get(
+  '/facebook/callback',
+  asyncHandler(async (req, res) => {
+    const web = (env.webAppUrl || '').replace(/\/$/, '');
+    const fail = (msg: string) =>
+      res.redirect(`${web}/#/login?fb_error=${encodeURIComponent(msg)}`);
+
+    const state = typeof req.query.state === 'string' ? req.query.state : '';
+    if (!state || !(await cache.get(`fb_state:${state}`))) {
+      return fail('State ไม่ถูกต้อง หรือหมดอายุ (Invalid CSRF state)');
+    }
+    await cache.del(`fb_state:${state}`);
+
+    const code = typeof req.query.code === 'string' ? req.query.code : '';
+    if (!code) return fail(typeof req.query.error_description === 'string' ? req.query.error_description : 'ยกเลิกการล็อกอิน Facebook');
+    if (!env.facebookAppId || !env.facebookAppSecret) return fail('backend ยังไม่ได้ตั้ง FACEBOOK_APP_ID/SECRET');
+
+    // iOS Safari prefetch ลิงก์ล่วงหน้า → callback ถูกยิง 2 ครั้งด้วย code เดียวกัน
+    // ครั้งแรกกิน code (สำเร็จแต่ผู้ใช้ไม่เห็น) ครั้งที่สอง FB ตอบ "authorization code has been used"
+    // จึง cache ผล code→JWT ไว้สั้น ๆ แล้วคืนตัวเดิมถ้า code ซ้ำ
+    const codeKey = `fb_code:${code.slice(0, 64)}`;
+    const lockKey = `fb_lock:${code.slice(0, 64)}`;
+    const ok = (t: string) => res.redirect(`${web}/#/oauth?token=${encodeURIComponent(t)}`);
+
+    const cachedToken = await cache.get<string>(codeKey);
+    if (cachedToken) return ok(cachedToken);
+
+    // ถ้าอีก request กำลังแลก code เดียวกันอยู่ (prefetch vs การกดจริง มาพร้อมกัน)
+    // → รอผลของตัวที่ทำอยู่ แทนที่จะยิงซ้ำแล้วโดน "authorization code has been used"
+    if (await cache.get<string>(lockKey)) {
+      for (let i = 0; i < 32; i++) {
+        await new Promise((r) => setTimeout(r, 250)); // รอสูงสุด ~8 วินาที
+        const t = await cache.get<string>(codeKey);
+        if (t) return ok(t);
+      }
+      return fail('ล็อกอินใช้เวลานานเกินไป กรุณาลองอีกครั้ง');
+    }
+    await cache.set(lockKey, '1', 60);
+
+    // แลก code → access token (ต้องใช้ app secret ฝั่ง server เท่านั้น)
+    const tokenUrl =
+      'https://graph.facebook.com/v21.0/oauth/access_token' +
+      `?client_id=${encodeURIComponent(env.facebookAppId)}` +
+      `&client_secret=${encodeURIComponent(env.facebookAppSecret)}` +
+      `&redirect_uri=${encodeURIComponent(fbRedirectUri())}` +
+      `&code=${encodeURIComponent(code)}`;
+    const tokenRes = await fetch(tokenUrl);
+    const tokenBody = await tokenRes.text();
+    if (!tokenRes.ok) {
+      // โชว์สาเหตุจริงจาก Facebook (เช่น secret ผิด / redirect_uri ไม่ตรง) แทนข้อความกว้าง ๆ
+      let reason = tokenBody.slice(0, 200);
+      try {
+        const e = JSON.parse(tokenBody) as { error?: { message?: string } };
+        if (e.error?.message) reason = e.error.message;
+      } catch {
+        /* ไม่ใช่ JSON → ใช้ text ดิบ */
+      }
+      // "code has been used" = request ซ้ำจาก prefetch ที่ชนกันพอดี — ไม่ใช่ความผิดพลาดจริง
+      // ลองรอผลจาก request ที่แลกสำเร็จอีกสักครู่ก่อนค่อยยอมแพ้
+      if (/has been used|expired/i.test(reason)) {
+        console.warn('[fb-oauth] duplicate callback (prefetch) — รอผลจาก request แรก');
+        for (let i = 0; i < 24; i++) {
+          await new Promise((r) => setTimeout(r, 250)); // รอสูงสุด ~6 วินาที
+          const t = await cache.get<string>(codeKey);
+          if (t) return ok(t);
+        }
+        return fail('ลิงก์ล็อกอินหมดอายุ กรุณากดเข้าสู่ระบบด้วย Facebook อีกครั้ง');
+      }
+      console.error('[fb-oauth] token exchange failed', tokenRes.status, tokenBody.slice(0, 400));
+      return fail(`FB: ${reason}`);
+    }
+    const tokenJson = JSON.parse(tokenBody) as { access_token?: string };
+    if (!tokenJson.access_token) return fail('Facebook ไม่ได้ส่ง access token กลับมา');
+
+    try {
+      const profile = await verifyFacebookToken(tokenJson.access_token);
+      const { token } = await oauthLogin(profile);
+      // เก็บไว้ 3 นาที เผื่อ callback ถูกยิงซ้ำด้วย code เดิม (Safari prefetch)
+      await cache.set(codeKey, token, 180);
+      // ส่ง JWT กลับหน้าเว็บผ่าน hash fragment (ไม่ติด log ของ server/proxy)
+      ok(token);
+    } catch (e) {
+      return fail(e instanceof HttpError ? e.message : 'ล็อกอิน Facebook ไม่สำเร็จ');
+    }
+  }),
+);
+
+/**
+ * GET /api/v1/auth/mail-status — ดูว่าการส่งอีเมลครั้งล่าสุดสำเร็จไหม
+ *
+ * จำเป็นเพราะการส่งทำแบบไม่รอผล ข้อผิดพลาดจึงไม่โผล่ที่คำตอบของ API
+ * และคนที่ไม่มีสิทธิ์เข้า dashboard ของผู้ให้บริการก็อ่าน log ไม่ได้
+ * ต้องล็อกอินก่อน — ไม่เปิดสาธารณะเพราะข้อความ error บอกรายละเอียดระบบภายใน
+ */
+authRouter.get(
+  '/mail-status',
+  requireAuth,
+  asyncHandler(async (_req, res) => {
+    res.json({
+      configured: mailerStatus() !== 'ยังไม่ได้ตั้งค่า',
+      provider: mailerStatus(),
+      last: lastMailResult(),
+    });
+  }),
+);
+
+/**
+ * GET /api/v1/auth/mail-events?email=... — ถาม Brevo ว่าอีเมลที่ส่งไปสถานะอะไร
+ *
+ * ระบบเราเรียก Brevo สำเร็จ (ok:true) แต่ผู้ใช้ไม่ได้รับอีเมล แปลว่าปัญหาอยู่
+ * ชั้นการนำส่งของ Brevo ซึ่งมองไม่เห็นจากฝั่งเรา endpoint นี้จึงถาม Brevo ตรง ๆ
+ * ว่าเกิดอะไรขึ้นกับแต่ละฉบับ (delivered / blocked / bounce พร้อมเหตุผล)
+ *
+ * ต้องล็อกอินก่อน และไม่ส่งค่า API key ออกมาในคำตอบ
+ */
+authRouter.get(
+  '/mail-events',
+  requireAuth,
+  asyncHandler(async (req, res) => {
+    const key = process.env.BREVO_API_KEY;
+    if (!key) {
+      res.json({ error: 'ใช้ได้เฉพาะตอนตั้งค่า Brevo' });
+      return;
+    }
+    const email = typeof req.query.email === 'string' ? req.query.email : undefined;
+    const url = new URL('https://api.brevo.com/v3/smtp/statistics/events');
+    url.searchParams.set('limit', '15');
+    if (email) url.searchParams.set('email', email);
+
+    const r = await fetch(url, { headers: { 'api-key': key, accept: 'application/json' } });
+    const body = await r.json().catch(() => null);
+    res.json({ status: r.status, events: body });
+  }),
+);
+
+// ── OTP ทางอีเมล ────────────────────────────────────────────────────────────
+// ทุก endpoint ใต้กลุ่มนี้ผ่าน authLimiter เพราะเป็นประตูรับข้อมูลยืนยันตัวตน
+// (10 ครั้ง/5 นาที — กันเดารหัส 6 หลักด้วยการยิงรัว)
+
+const otpRequestSchema = z.object({
+  email: z.string().email(),
+  purpose: z.enum(['reset', 'verify']),
+});
+const otpVerifySchema = z.object({
+  email: z.string().email(),
+  code: z.string().trim().length(6, 'รหัสต้องเป็นตัวเลข 6 หลัก'),
+});
+
+/**
+ * POST /api/v1/auth/otp/request — ขอรหัสทางอีเมล
+ *
+ * ⚠️ ตอบ 200 เสมอ ไม่ว่าอีเมลนั้นจะมีในระบบหรือไม่
+ * ถ้าตอบต่างกัน หน้านี้จะกลายเป็นเครื่องมือไล่เช็กว่าใครสมัครไว้บ้าง
+ */
+authRouter.post(
+  '/otp/request',
+  authLimiter,
+  asyncHandler(async (req, res) => {
+    const { email, purpose } = otpRequestSchema.parse(req.body);
+    await requestOtp(email, purpose as OtpPurpose);
+    res.json({ ok: true, message: 'ถ้าอีเมลนี้มีในระบบ เราส่งรหัสไปให้แล้ว กรุณาตรวจกล่องจดหมาย' });
+  }),
+);
+
+/** POST /api/v1/auth/otp/verify-email — ยืนยันอีเมลตอนสมัคร */
+authRouter.post(
+  '/otp/verify-email',
+  authLimiter,
+  asyncHandler(async (req, res) => {
+    const { email, code } = otpVerifySchema.parse(req.body);
+    res.json(await verifyEmailOtp(email, code));
+  }),
+);
+
+/** POST /api/v1/auth/otp/verify-reset — ลืมรหัสผ่าน ขั้น 1: ยืนยันรหัส → ได้ resetToken */
+authRouter.post(
+  '/otp/verify-reset',
+  authLimiter,
+  asyncHandler(async (req, res) => {
+    const { email, code } = otpVerifySchema.parse(req.body);
+    res.json(await verifyResetOtp(email, code));
+  }),
+);
+
+/** POST /api/v1/auth/password/reset — ลืมรหัสผ่าน ขั้น 2: ตั้งรหัสใหม่ */
+authRouter.post(
+  '/password/reset',
+  authLimiter,
+  asyncHandler(async (req, res) => {
+    const schema = z.object({
+      resetToken: z.string().min(10),
+      newPassword: z.string().min(6, 'รหัสผ่านต้องอย่างน้อย 6 ตัว'),
+    });
+    const { resetToken, newPassword } = schema.parse(req.body);
+    res.json(await resetPassword(resetToken, newPassword));
+  }),
+);
+
+/**
+ * DELETE /api/v1/auth/me — ลบบัญชีตัวเองพร้อมข้อมูลทั้งหมด
+ *
+ * สิทธิขอลบข้อมูลตาม PDPA · ลบ User แล้วรายการเงิน งบประมาณ เป้าหมาย แชท
+ * และการแจ้งเตือนถูกลบตามทั้งหมด (onDelete: Cascade ใน schema)
+ * ลบได้เฉพาะบัญชีของตัวเองเท่านั้น — ใช้ userId จาก token ไม่รับ id จากผู้ใช้
+ */
+authRouter.delete(
+  '/me',
+  requireAuth,
+  asyncHandler(async (req, res) => {
+    await prisma.user.delete({ where: { id: req.userId! } });
+    res.json({ ok: true });
+  }),
+);
+
+authRouter.get(
+  '/me',
+  requireAuth,
+  asyncHandler(async (req, res) => {
+    const user = await prisma.user.findUnique({
+      where: { id: req.userId! },
+    });
+    if (!user) throw new HttpError(404, 'ไม่พบผู้ใช้');
+
+    const now = new Date();
+    let pointsAwarded = false;
+    let newPoints = user.points;
+    let newStreak = user.streak;
+
+    if (!user.lastLoginAt) {
+      pointsAwarded = true;
+      newPoints += 10;
+      newStreak = 1;
+    } else {
+      const lastLoginDate = new Date(user.lastLoginAt);
+      const startOfLast = Date.UTC(lastLoginDate.getUTCFullYear(), lastLoginDate.getUTCMonth(), lastLoginDate.getUTCDate());
+      const startOfNow = Date.UTC(now.getUTCFullYear(), now.getUTCMonth(), now.getUTCDate());
+      const diffDays = Math.round((startOfNow - startOfLast) / (1000 * 60 * 60 * 24));
+
+      if (diffDays > 0) {
+        pointsAwarded = true;
+
+        if (diffDays === 1) {
+          newStreak = user.streak + 1;
+        } else {
+          newStreak = 0;
+        }
+
+        const diffMs = now.getTime() - lastLoginDate.getTime();
+        const hoursDiff = diffMs / (1000 * 60 * 60);
+        if (hoursDiff >= 24) {
+          const periodsMissed = Math.floor(hoursDiff / 24);
+          const penalty = periodsMissed * 2;
+          newPoints = Math.max(0, newPoints - penalty);
+        }
+
+        newPoints += 10;
+      }
+    }
+
+    let updatedUser = user;
+    if (pointsAwarded) {
+      let newLevel = 1;
+      if (newPoints >= 500) newLevel = 3;
+      else if (newPoints >= 100) newLevel = 2;
+
+      updatedUser = await prisma.user.update({
+        where: { id: req.userId! },
+        data: {
+          lastLoginAt: now,
+          points: newPoints,
+          level: newLevel,
+          streak: newStreak,
+        },
+      });
+    }
+
+    res.json({
+      user: {
+        id: updatedUser.id,
+        email: updatedUser.email,
+        phone: updatedUser.phone ?? null,
+        displayName: updatedUser.displayName,
+        monthlyIncome: updatedUser.monthlyIncome,
+        level: updatedUser.level,
+        streak: updatedUser.streak,
+        points: updatedUser.points,
+        avatarUrl: updatedUser.avatarUrl ?? null,
+        provider: updatedUser.provider,
+        createdAt: updatedUser.createdAt.toISOString(),
+      }
+    });
+  }),
+);
+
+authRouter.patch(
+  '/me',
+  requireAuth,
+  asyncHandler(async (req, res) => {
+    const data = updateProfileSchema.parse(req.body);
+
+    if (data.email) {
+      const duplicate = await prisma.user.findFirst({
+        where: { email: data.email, id: { not: req.userId! } },
+        select: { id: true },
+      });
+      if (duplicate) throw new HttpError(409, 'อีเมลนี้ถูกใช้งานแล้ว');
+    }
+
+    const user = await prisma.user.update({
+      where: { id: req.userId! },
+      data: {
+        ...data,
+        ...(data.email ? { emailVerifiedAt: null } : {}),
+        ...(data.phone !== undefined
+          ? { phone: data.phone?.trim() || null }
+          : {}),
+      },
+      select: profileSelect,
+    });
+    res.json({ user });
+  }),
+);

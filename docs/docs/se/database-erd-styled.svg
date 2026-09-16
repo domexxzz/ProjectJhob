@@ -1,0 +1,85 @@
+<svg width="100%" viewBox="0 0 680 450" role="img" xmlns="http://www.w3.org/2000/svg">
+<title>ERD schema การเงิน — สไตล์หัวตารางเขียว</title>
+<desc>users เชื่อมหนึ่งต่อกลุ่มไปยัง transactions, budgets, goals, chat_messages และ achievements ส่วน categories เชื่อมไปยัง transactions และ budgets</desc>
+
+<line x1="340" y1="94" x2="72" y2="190" stroke="#9AA39A" stroke-width="1.4"/>
+<line x1="340" y1="94" x2="204" y2="190" stroke="#9AA39A" stroke-width="1.4"/>
+<line x1="340" y1="94" x2="336" y2="190" stroke="#9AA39A" stroke-width="1.4"/>
+<line x1="340" y1="94" x2="472" y2="190" stroke="#9AA39A" stroke-width="1.4"/>
+<line x1="340" y1="94" x2="608" y2="190" stroke="#9AA39A" stroke-width="1.4"/>
+<line x1="110" y1="340" x2="72" y2="284" stroke="#9AA39A" stroke-width="1.4"/>
+<line x1="200" y1="340" x2="204" y2="284" stroke="#9AA39A" stroke-width="1.4"/>
+
+<g font-family="sans-serif" font-size="12" font-weight="500" fill="#6E5E2F">
+<text x="346" y="112">1</text>
+<text x="62" y="185">N</text>
+<text x="194" y="185">N</text>
+<text x="326" y="185">N</text>
+<text x="462" y="185">N</text>
+<text x="598" y="185">N</text>
+<text x="138" y="334">1</text>
+<text x="60" y="300">N</text>
+<text x="210" y="300">N</text>
+</g>
+
+<g>
+<rect x="240" y="20" width="200" height="74" fill="#FFFFFF" stroke="#1C7A4A" stroke-width="1.5"/>
+<rect x="240" y="20" width="200" height="24" fill="#1C7A4A"/>
+<text x="250" y="37" font-family="sans-serif" font-size="13" font-weight="500" fill="#FFFFFF">users</text>
+<text x="250" y="62" font-family="sans-serif" font-size="11" fill="#6B6333">id · email · phone</text>
+<text x="250" y="80" font-family="sans-serif" font-size="11" fill="#6B6333">income · level · streak</text>
+</g>
+
+<g>
+<rect x="10" y="190" width="124" height="94" fill="#FFFFFF" stroke="#1C7A4A" stroke-width="1.5"/>
+<rect x="10" y="190" width="124" height="24" fill="#1C7A4A"/>
+<text x="20" y="207" font-family="sans-serif" font-size="13" font-weight="500" fill="#FFFFFF">transactions</text>
+<text x="20" y="232" font-family="sans-serif" font-size="11" fill="#6B6333">id · user_id</text>
+<text x="20" y="251" font-family="sans-serif" font-size="11" fill="#6B6333">type · amount</text>
+<text x="20" y="270" font-family="sans-serif" font-size="11" fill="#6B6333">category · source</text>
+</g>
+
+<g>
+<rect x="142" y="190" width="124" height="94" fill="#FFFFFF" stroke="#1C7A4A" stroke-width="1.5"/>
+<rect x="142" y="190" width="124" height="24" fill="#1C7A4A"/>
+<text x="152" y="207" font-family="sans-serif" font-size="13" font-weight="500" fill="#FFFFFF">budgets</text>
+<text x="152" y="232" font-family="sans-serif" font-size="11" fill="#6B6333">id · user_id</text>
+<text x="152" y="251" font-family="sans-serif" font-size="11" fill="#6B6333">category_id</text>
+<text x="152" y="270" font-family="sans-serif" font-size="11" fill="#6B6333">amount · period</text>
+</g>
+
+<g>
+<rect x="274" y="190" width="124" height="94" fill="#FFFFFF" stroke="#1C7A4A" stroke-width="1.5"/>
+<rect x="274" y="190" width="124" height="24" fill="#1C7A4A"/>
+<text x="284" y="207" font-family="sans-serif" font-size="13" font-weight="500" fill="#FFFFFF">goals</text>
+<text x="284" y="232" font-family="sans-serif" font-size="11" fill="#6B6333">id · name</text>
+<text x="284" y="251" font-family="sans-serif" font-size="11" fill="#6B6333">target · current</text>
+<text x="284" y="270" font-family="sans-serif" font-size="11" fill="#6B6333">deadline</text>
+</g>
+
+<g>
+<rect x="406" y="190" width="132" height="94" fill="#FFFFFF" stroke="#1C7A4A" stroke-width="1.5"/>
+<rect x="406" y="190" width="132" height="24" fill="#1C7A4A"/>
+<text x="416" y="207" font-family="sans-serif" font-size="13" font-weight="500" fill="#FFFFFF">chat_messages</text>
+<text x="416" y="232" font-family="sans-serif" font-size="11" fill="#6B6333">id · user_id</text>
+<text x="416" y="251" font-family="sans-serif" font-size="11" fill="#6B6333">role · content</text>
+<text x="416" y="270" font-family="sans-serif" font-size="11" fill="#6B6333">context</text>
+</g>
+
+<g>
+<rect x="546" y="190" width="124" height="94" fill="#FFFFFF" stroke="#1C7A4A" stroke-width="1.5"/>
+<rect x="546" y="190" width="124" height="24" fill="#1C7A4A"/>
+<text x="556" y="207" font-family="sans-serif" font-size="13" font-weight="500" fill="#FFFFFF">achievements</text>
+<text x="556" y="232" font-family="sans-serif" font-size="11" fill="#6B6333">id · user_id</text>
+<text x="556" y="251" font-family="sans-serif" font-size="11" fill="#6B6333">type</text>
+<text x="556" y="270" font-family="sans-serif" font-size="11" fill="#6B6333">unlocked_at</text>
+</g>
+
+<g>
+<rect x="60" y="340" width="180" height="74" fill="#FFFFFF" stroke="#1C7A4A" stroke-width="1.5"/>
+<rect x="60" y="340" width="180" height="24" fill="#1C7A4A"/>
+<text x="70" y="357" font-family="sans-serif" font-size="13" font-weight="500" fill="#FFFFFF">categories</text>
+<text x="70" y="382" font-family="sans-serif" font-size="11" fill="#6B6333">id · name · type</text>
+<text x="70" y="400" font-family="sans-serif" font-size="11" fill="#6B6333">icon · color</text>
+</g>
+</svg>

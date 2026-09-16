@@ -1,0 +1,64 @@
+# Node
+node_modules/
+dist/
+*.log
+npm-debug.log*
+
+# Env / secrets
+.env
+.env.*
+!.env.example
+!**/.env.example
+.env.local
+.env.*.local
+*.pem
+*.key
+*service-account*.json
+google-services.json
+GoogleService-Info.plist
+
+# SQLite (dev)
+*.db
+*.db-journal
+*.sqlite
+backend/prisma/dev.db*
+
+# Flutter / Dart
+**/.dart_tool/
+**/build/
+**/android/build/
+**/.flutter-plugins
+**/.flutter-plugins-dependencies
+**/ios/Pods/
+**/ios/.symlinks/
+**/android/.gradle/
+**/android/local.properties
+
+# Python
+__pycache__/
+*.pyc
+.venv/
+venv/
+.pytest_cache/
+.mypy_cache/
+.ruff_cache/
+.coverage
+htmlcov/
+
+# OS / IDE
+.DS_Store
+Thumbs.db
+.idea/
+.vscode/
+*.swp
+*.tmp
+
+# local scratch (large/throwaway artifacts)
+scratch/
+
+# Flutter SDK must not live inside the repo (keep the SDK outside the project)
+/flutter/
+
+# Firebase Admin SDK private key (ห้าม commit เด็ดขาด)
+*firebase-adminsdk*.json
+*-adminsdk-*.json

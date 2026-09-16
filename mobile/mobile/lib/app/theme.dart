@@ -1,0 +1,140 @@
+import 'package:flutter/material.dart';
+
+class AppColors {
+  static const primary = Color(0xFF22C55E); // --green-primary
+  static const primaryDark = Color(0xFF15803D);
+  static const greenData = Color(0xFF4ADE80); // --green-data
+  static const accent = Color(0xFF22C55E);
+  static const income = Color(0xFF22C55E);
+  static const expense = Color(0xFFEF4444); // --danger
+  static const warning = Color(0xFFF59E0B);
+  static const bg = Color(0xFF0A0F0C); // --bg-base
+  static const surface = Color(0xFF10201A); // --bg-card
+  static const textDark = Color(0xFFFFFFFF);
+  static const textSecondary = Color(0xFF9CA3AF); // --text-secondary
+  static const textMuted = Color(0xFF9CA3AF);
+  static const chipBg = Color(0xFF10201A);
+}
+
+/// เงานุ่มสำหรับการ์ด — ให้ดู "ลอย" ไม่แบน
+const List<BoxShadow> kSoftShadow = [
+  BoxShadow(color: Color(0x1F000000), blurRadius: 20, offset: Offset(0, 8)),
+];
+const List<BoxShadow> kCardShadow = [
+  BoxShadow(color: Color(0x14000000), blurRadius: 12, offset: Offset(0, 4)),
+];
+
+/// gradient ส่วนหัวแบบ fintech
+const LinearGradient kHeaderGradient = LinearGradient(
+  colors: [Color(0xFF073820), Color(0xFF0D1117)],
+  begin: Alignment.topCenter,
+  end: Alignment.bottomCenter,
+);
+const LinearGradient kBalanceGradient = LinearGradient(
+  colors: [Color(0xFF00C850), Color(0xFF0D6E37)],
+  begin: Alignment.topLeft,
+  end: Alignment.bottomRight,
+);
+
+/// การ์ดดำมุมมน + เงานุ่ม (ใช้ซ้ำทั่วแอป)
+BoxDecoration softCard({double radius = 20, Color color = AppColors.surface}) =>
+    BoxDecoration(color: color, borderRadius: BorderRadius.circular(radius), boxShadow: kSoftShadow);
+
+ThemeData buildTheme() {
+  final base = ThemeData(
+    useMaterial3: true,
+    brightness: Brightness.dark,
+    colorScheme: const ColorScheme.dark(
+      primary: AppColors.primary,
+      secondary: AppColors.accent,
+      surface: AppColors.surface,
+    ),
+    scaffoldBackgroundColor: AppColors.bg,
+  );
+  return base.copyWith(
+    appBarTheme: const AppBarTheme(
+      backgroundColor: Colors.transparent,
+      surfaceTintColor: Colors.transparent,
+      elevation: 0,
+      foregroundColor: AppColors.textDark,
+      centerTitle: false,
+    ),
+    elevatedButtonTheme: ElevatedButtonThemeData(
+      style: ElevatedButton.styleFrom(
+        backgroundColor: AppColors.primary,
+        foregroundColor: Colors.white,
+        minimumSize: const Size.fromHeight(52),
+        elevation: 0,
+        shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(16)),
+        textStyle: const TextStyle(fontSize: 16, fontWeight: FontWeight.w700),
+      ),
+    ),
+    chipTheme: ChipThemeData(
+      backgroundColor: AppColors.chipBg,
+      labelStyle: const TextStyle(color: AppColors.primary, fontWeight: FontWeight.w600, fontSize: 13),
+      side: BorderSide.none,
+      shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(30)),
+      padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 6),
+    ),
+    segmentedButtonTheme: SegmentedButtonThemeData(
+      style: ButtonStyle(
+        backgroundColor: WidgetStateProperty.resolveWith(
+          (s) => s.contains(WidgetState.selected) ? AppColors.primary : AppColors.surface,
+        ),
+        foregroundColor: WidgetStateProperty.resolveWith(
+          (s) => s.contains(WidgetState.selected) ? Colors.white : AppColors.textMuted,
+        ),
+        side: WidgetStateProperty.all(const BorderSide(color: Color(0xFF1E293B))),
+        shape: WidgetStateProperty.all(RoundedRectangleBorder(borderRadius: BorderRadius.circular(30))),
+        textStyle: WidgetStateProperty.all(const TextStyle(fontWeight: FontWeight.w600)),
+      ),
+    ),
+    inputDecorationTheme: InputDecorationTheme(
+      filled: true,
+      fillColor: AppColors.surface,
+      contentPadding: const EdgeInsets.symmetric(horizontal: 16, vertical: 14),
+      border: OutlineInputBorder(
+        borderRadius: BorderRadius.circular(16),
+        borderSide: const BorderSide(color: Color(0xFF1E293B)),
+      ),
+      enabledBorder: OutlineInputBorder(
+        borderRadius: BorderRadius.circular(16),
+        borderSide: const BorderSide(color: Color(0xFF1E293B)),
+      ),
+      focusedBorder: OutlineInputBorder(
+        borderRadius: BorderRadius.circular(16),
+        borderSide: const BorderSide(color: AppColors.primary, width: 1.5),
+      ),
+      labelStyle: const TextStyle(color: AppColors.textMuted),
+      hintStyle: const TextStyle(color: AppColors.textMuted),
+    ),
+  );
+}
+
+/// "#FF6B6B" -> Color
+Color hexColor(String hex) {
+  var h = hex.replaceAll('#', '').trim();
+  if (h.length == 6) h = 'FF$h';
+  return Color(int.parse(h, radix: 16));
+}
+
+/// ➕ คลาสตำแหน่งปุ่มบวก (FAB) พิเศษสำหรับเดโม — ล็อกไม่ให้ปุ่มโดนดันขึ้นโดย SnackBar
+class FixedCenterDockedFabLocation extends FloatingActionButtonLocation {
+  const FixedCenterDockedFabLocation();
+
+  @override
+  Offset getOffset(ScaffoldPrelayoutGeometry geometry) {
+    final double buttonX = (geometry.scaffoldSize.width - geometry.floatingActionButtonSize.width) / 2.0;
+    
+    // contentBottom คือพิกัด Y ของจุดเริ่มต้นแถบเมนูด้านล่างพอดี (ไม่ได้รับผลกระทบจาก SnackBar)
+    final double contentBottom = geometry.contentBottom;
+    final double buttonHeight = geometry.floatingActionButtonSize.height;
+    
+    final double buttonY = contentBottom - (buttonHeight / 2.0);
+    return Offset(buttonX, buttonY);
+  }
+}
+
+const kFixedCenterDockedFabLocation = FixedCenterDockedFabLocation();
+
+

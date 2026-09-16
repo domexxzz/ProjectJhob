@@ -1,0 +1,1214 @@
+import 'dart:convert';
+
+import 'package:flutter/material.dart';
+import 'package:flutter/services.dart';
+import 'package:flutter_riverpod/flutter_riverpod.dart';
+import 'package:go_router/go_router.dart';
+import 'package:image_picker/image_picker.dart';
+
+import '../../app/theme.dart';
+import '../../core/money.dart';
+import 'transaction.dart';
+import 'transactions_repository.dart';
+import '../notifications/notifications_repository.dart';
+import '../auth/auth_controller.dart';
+
+const _thMonths = [
+  '',
+  'ม.ค.',
+  'ก.พ.',
+  'มี.ค.',
+  'เม.ย.',
+  'พ.ค.',
+  'มิ.ย.',
+  'ก.ค.',
+  'ส.ค.',
+  'ก.ย.',
+  'ต.ค.',
+  'พ.ย.',
+  'ธ.ค.'
+];
+String _fmtThaiDate(DateTime d) =>
+    '${d.day} ${_thMonths[d.month]} ${d.year + 543}';
+
+// เส้นขอบการ์ดเข้มอมเขียวตามดีไซน์
+const _boxBorder = Color(0xFF2C4636);
+
+/// หน้า "เลือกสลิป" — อัพสลิป (OCR อัตโนมัติ) หรือเขียนเอง → ยืนยันบันทึกรายการ
+class SlipScreen extends ConsumerStatefulWidget {
+  const SlipScreen({super.key, this.startInManualMode = false});
+
+  final bool startInManualMode;
+
+  @override
+  ConsumerState<SlipScreen> createState() => _SlipScreenState();
+}
+
+class _SlipScreenState extends ConsumerState<SlipScreen> {
+  final _picker = ImagePicker();
+  final _amount = TextEditingController();
+  final _desc = TextEditingController();
+
+  String _type = 'expense';
+  String? _categoryId;
+  Budget? _selectedBudget; // งบประมาณที่ผู้ใช้เลือกจาก slip screen
+  DateTime? _date;
+  String? _fileName;
+  bool _analyzing = false;
+  bool _saving = false;
+
+  @override
+  void initState() {
+    super.initState();
+    _amount.addListener(_onAmountChanged);
+  }
+
+  void _onAmountChanged() {
+    setState(() {});
+  }
+
+  @override
+  void dispose() {
+    _amount.removeListener(_onAmountChanged);
+    _amount.dispose();
+    _desc.dispose();
+    super.dispose();
+  }
+
+  Future<void> _pickSlip() async {
+    try {
+      final file = await _picker.pickImage(
+          source: ImageSource.gallery, imageQuality: 70, maxWidth: 1600);
+      if (file == null) return;
+      setState(() {
+        _analyzing = true;
+        _fileName = file.name;
+      });
+      final bytes = await file.readAsBytes();
+      final dataUrl = 'data:image/jpeg;base64,${base64Encode(bytes)}';
+      final a = await ref.read(transactionsRepoProvider).parseSlip(dataUrl);
+      if (!mounted) return;
+      setState(() {
+        _type = 'expense';
+        // a.amount เป็น satang → แปลงเป็นบาทก่อน set ลง field
+        // เพราะ _confirm() จะ toSatang() อีกครั้ง
+        if ((a.amount ?? 0) > 0) _amount.text = Money.format(a.amount!);
+        if (a.date != null) _date = DateTime.tryParse(a.date!);
+        _categoryId = a.categoryId;
+        if ((a.merchant?.trim().isNotEmpty ?? false))
+          _desc.text = a.merchant!.trim();
+        _analyzing = false;
+      });
+      final ok = (a.amount ?? 0) > 0;
+      if (!mounted) return;
+      ScaffoldMessenger.of(context).showSnackBar(SnackBar(
+        content: Text(ok
+            ? 'อ่านสลิปสำเร็จ! ตรวจสอบแล้วกดยืนยัน ✅'
+            : 'อ่านยอดไม่เจอ กรอกเองได้เลย'),
+      ));
+    } catch (e) {
+      if (!mounted) return;
+      setState(() => _analyzing = false);
+      if (!mounted) return;
+      ScaffoldMessenger.of(context)
+          .showSnackBar(SnackBar(content: Text('อ่านสลิปไม่สำเร็จ: $e')));
+    }
+  }
+
+  Future<void> _pickDate() async {
+    final picked = await context.push<DateTime>(
+      '/transactions/select-date',
+      extra: _date ?? DateTime.now(),
+    );
+    if (picked != null) setState(() => _date = picked);
+  }
+
+  void _pickBudget() {
+    showModalBottomSheet(
+      context: context,
+      isScrollControlled: true,
+      backgroundColor: AppColors.surface,
+      shape: const RoundedRectangleBorder(
+          borderRadius: BorderRadius.vertical(top: Radius.circular(20))),
+      builder: (_) => SafeArea(
+        child: ConstrainedBox(
+          constraints: BoxConstraints(maxHeight: MediaQuery.of(context).size.height * 0.7),
+          child: Consumer(builder: (ctx, ref2, __) {
+            final async = ref2.watch(budgetsListProvider);
+            return async.when(
+              loading: () => const SizedBox(
+                  height: 160,
+                  child: Center(
+                      child:
+                          CircularProgressIndicator(color: AppColors.primary))),
+              error: (e, _) => Padding(
+                padding: const EdgeInsets.all(20),
+                child: Text('โหลดงบไม่ได้: $e', style: const TextStyle(color: Colors.redAccent)),
+              ),
+              data: (budgets) {
+                
+                if (budgets.isEmpty) {
+                  return const Padding(
+                    padding: EdgeInsets.all(32),
+                    child: Column(
+                      mainAxisSize: MainAxisSize.min,
+                      children: [
+                        Icon(Icons.account_balance_wallet_outlined, color: Colors.white38, size: 48),
+                        SizedBox(height: 12),
+                        Text('ไม่มีงบประมาณในระบบ', style: TextStyle(color: Colors.white54, fontSize: 15)),
+                        SizedBox(height: 6),
+                        Text('คุณยังไม่ได้สร้างงบประมาณใดๆ', style: TextStyle(color: Colors.white38, fontSize: 13)),
+                      ],
+                    ),
+                  );
+                }
+                return Column(
+                  mainAxisSize: MainAxisSize.min,
+                  crossAxisAlignment: CrossAxisAlignment.start,
+                  children: [
+                    Padding(
+                      padding: const EdgeInsets.fromLTRB(18, 16, 18, 8),
+                      child: Row(
+                        children: [
+                          const Icon(Icons.account_balance_wallet_rounded, color: AppColors.primary, size: 20),
+                          const SizedBox(width: 8),
+                          Text('เลือกงบประมาณ',
+                              style: const TextStyle(color: Colors.white, fontSize: 16, fontWeight: FontWeight.bold)),
+                        ],
+                      ),
+                    ),
+                    GestureDetector(
+                      onTap: () {
+                        setState(() {
+                          _selectedBudget = null;
+                        });
+                        Navigator.pop(ctx);
+                        _pickCategory();
+                      },
+                      child: Container(
+                        margin: const EdgeInsets.fromLTRB(16, 0, 16, 12),
+                        padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 14),
+                        decoration: BoxDecoration(
+                          color: _selectedBudget == null ? const Color(0xFF0C2E1B) : AppColors.bg,
+                          borderRadius: BorderRadius.circular(14),
+                          border: Border.all(
+                            color: _selectedBudget == null ? AppColors.primary : const Color(0xFF1E293B),
+                            width: _selectedBudget == null ? 2 : 1,
+                          ),
+                        ),
+                        child: Row(
+                          children: [
+                            const Text('📁', style: TextStyle(fontSize: 22)),
+                            const SizedBox(width: 12),
+                            Text(
+                              'ไม่จัดเข้างบประมาณ (ระบุหมวดหมู่ทั่วไป)',
+                              style: TextStyle(
+                                color: _selectedBudget == null ? Colors.white : Colors.white70,
+                                fontWeight: _selectedBudget == null ? FontWeight.bold : FontWeight.normal,
+                              ),
+                            ),
+                          ],
+                        ),
+                      ),
+                    ),
+                    Flexible(
+                      child: ListView.separated(
+                        padding: const EdgeInsets.fromLTRB(16, 0, 16, 16),
+                        shrinkWrap: true,
+                        itemCount: budgets.length,
+                        separatorBuilder: (_, __) => const SizedBox(height: 8),
+                        itemBuilder: (ctx2, i) {
+                          final b = budgets[i];
+                          final sel = b.id == _selectedBudget?.id;
+                          return GestureDetector(
+                            onTap: () {
+                              setState(() {
+                                _selectedBudget = b;
+                                _categoryId = b.categoryId;
+                              });
+                              Navigator.pop(ctx);
+                            },
+                            child: Container(
+                              padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 14),
+                              decoration: BoxDecoration(
+                                color: sel ? const Color(0xFF0C2E1B) : AppColors.bg,
+                                borderRadius: BorderRadius.circular(14),
+                                border: Border.all(
+                                  color: sel ? AppColors.primary : const Color(0xFF1E293B),
+                                  width: sel ? 2 : 1,
+                                ),
+                              ),
+                              child: Row(
+                                children: [
+                                  Text(b.category?.icon ?? '📊', style: const TextStyle(fontSize: 22)),
+                                  const SizedBox(width: 12),
+                                  Expanded(
+                                    child: Column(
+                                      crossAxisAlignment: CrossAxisAlignment.start,
+                                      children: [
+                                        Text(
+                                          b.displayName,
+                                          style: TextStyle(
+                                            color: sel ? Colors.white : Colors.white70,
+                                            fontSize: 15,
+                                            fontWeight: sel ? FontWeight.bold : FontWeight.normal,
+                                          ),
+                                        ),
+                                      ],
+                                    ),
+                                  ),
+                                  if (sel)
+                                    const Icon(Icons.check_circle_rounded,
+                                        color: AppColors.primary, size: 20),
+                                ],
+                              ),
+                            ),
+                          );
+                        },
+                      ),
+                    ),
+                  ],
+                );
+              },
+            );
+          }),
+        ),
+      ),
+    );
+  }
+
+  void _pickCategory() {
+    showModalBottomSheet(
+      context: context,
+      isScrollControlled: true,
+      backgroundColor: const Color(0xFF111714),
+      shape: const RoundedRectangleBorder(
+        borderRadius: BorderRadius.vertical(top: Radius.circular(24)),
+      ),
+      builder: (_) => SafeArea(
+        child: ConstrainedBox(
+          constraints: BoxConstraints(
+            maxHeight: MediaQuery.of(context).size.height * 0.75,
+          ),
+          child: Consumer(builder: (ctx, ref2, __) {
+            final asyncVal = ref2.watch(categoriesProvider);
+            return asyncVal.when(
+              loading: () => const SizedBox(
+                height: 200,
+                child: Center(
+                  child: CircularProgressIndicator(color: AppColors.primary),
+                ),
+              ),
+              error: (e, _) => Padding(
+                padding: const EdgeInsets.all(24),
+                child: Text('โหลดหมวดหมู่ไม่ได้: $e',
+                    style: const TextStyle(color: Colors.redAccent)),
+              ),
+              data: (cats) {
+                return Column(
+                  mainAxisSize: MainAxisSize.min,
+                  crossAxisAlignment: CrossAxisAlignment.start,
+                  children: [
+                    // ── Drag Handle Bar ──
+                    Center(
+                      child: Container(
+                        margin: const EdgeInsets.only(top: 10, bottom: 6),
+                        width: 40,
+                        height: 4.5,
+                        decoration: BoxDecoration(
+                          color: Colors.white24,
+                          borderRadius: BorderRadius.circular(3),
+                        ),
+                      ),
+                    ),
+
+                    // ── Header Title & Add Button ──
+                    Padding(
+                      padding: const EdgeInsets.fromLTRB(20, 10, 20, 14),
+                      child: Row(
+                        mainAxisAlignment: MainAxisAlignment.spaceBetween,
+                        children: [
+                          const Row(
+                            children: [
+                              Icon(Icons.widgets_rounded,
+                                  color: AppColors.primary, size: 22),
+                              SizedBox(width: 10),
+                              Text(
+                                'เลือกหมวดหมู่',
+                                style: TextStyle(
+                                  color: Colors.white,
+                                  fontSize: 18,
+                                  fontWeight: FontWeight.bold,
+                                  letterSpacing: 0.3,
+                                ),
+                              ),
+                            ],
+                          ),
+                          GestureDetector(
+                            onTap: () {
+                              Navigator.pop(ctx);
+                              _showCreateCategoryDialog(context, ref2);
+                            },
+                            child: Container(
+                              padding: const EdgeInsets.symmetric(
+                                  horizontal: 12, vertical: 6),
+                              decoration: BoxDecoration(
+                                color: AppColors.primary.withOpacity(0.15),
+                                borderRadius: BorderRadius.circular(16),
+                                border: Border.all(
+                                    color: AppColors.primary.withOpacity(0.3)),
+                              ),
+                              child: const Row(
+                                children: [
+                                  Icon(Icons.add_rounded,
+                                      color: AppColors.primary, size: 16),
+                                  SizedBox(width: 4),
+                                  Text(
+                                    'เพิ่มใหม่',
+                                    style: TextStyle(
+                                      color: AppColors.primary,
+                                      fontSize: 12,
+                                      fontWeight: FontWeight.bold,
+                                    ),
+                                  ),
+                                ],
+                              ),
+                            ),
+                          ),
+                        ],
+                      ),
+                    ),
+
+                    if (cats.isEmpty)
+                      const Padding(
+                        padding: EdgeInsets.all(32),
+                        child: Center(
+                          child: Text('ยังไม่มีหมวดหมู่ในระบบ',
+                              style: TextStyle(color: Colors.white54)),
+                        ),
+                      )
+                    else
+                      Flexible(
+                        child: ListView.separated(
+                          padding: const EdgeInsets.fromLTRB(18, 0, 18, 16),
+                          shrinkWrap: true,
+                          itemCount: cats.length + 1,
+                          separatorBuilder: (_, __) =>
+                              const SizedBox(height: 10),
+                          itemBuilder: (ctx2, i) {
+                            // การ์ดปุ่ม "+ เพิ่มหมวดหมู่ใหม่ด้วยตัวเอง" ที่ด้านล่างสุด
+                            if (i == cats.length) {
+                              return GestureDetector(
+                                onTap: () {
+                                  Navigator.pop(ctx);
+                                  _showCreateCategoryDialog(context, ref2);
+                                },
+                                child: Container(
+                                  padding: const EdgeInsets.symmetric(
+                                      horizontal: 16, vertical: 15),
+                                  decoration: BoxDecoration(
+                                    color: const Color(0xFF172C20),
+                                    borderRadius: BorderRadius.circular(16),
+                                    border: Border.all(
+                                      color:
+                                          AppColors.primary.withOpacity(0.5),
+                                      width: 1.5,
+                                    ),
+                                  ),
+                                  child: const Row(
+                                    mainAxisAlignment: MainAxisAlignment.center,
+                                    children: [
+                                      Icon(Icons.add_circle_outline_rounded,
+                                          color: AppColors.primary, size: 20),
+                                      SizedBox(width: 8),
+                                      Text(
+                                        '+ เพิ่มหมวดหมู่ใหม่ด้วยตัวเอง',
+                                        style: TextStyle(
+                                          color: AppColors.primary,
+                                          fontWeight: FontWeight.bold,
+                                          fontSize: 14,
+                                        ),
+                                      ),
+                                    ],
+                                  ),
+                                ),
+                              );
+                            }
+
+                            final c = cats[i];
+                            final sel =
+                                c.id == _categoryId && _selectedBudget == null;
+
+                            return GestureDetector(
+                              onTap: () {
+                                setState(() {
+                                  _categoryId = c.id;
+                                  _selectedBudget = null;
+                                });
+                                Navigator.pop(ctx);
+                              },
+                              child: AnimatedContainer(
+                                duration: const Duration(milliseconds: 150),
+                                padding: const EdgeInsets.symmetric(
+                                    horizontal: 16, vertical: 14),
+                                decoration: BoxDecoration(
+                                  color: sel
+                                      ? const Color(0xFF143522)
+                                      : const Color(0xFF1A221E),
+                                  borderRadius: BorderRadius.circular(16),
+                                  border: Border.all(
+                                    color: sel
+                                        ? AppColors.primary
+                                        : Colors.white.withOpacity(0.08),
+                                    width: sel ? 2 : 1,
+                                  ),
+                                ),
+                                child: Row(
+                                  children: [
+                                    Container(
+                                      width: 40,
+                                      height: 40,
+                                      decoration: BoxDecoration(
+                                        color: sel
+                                            ? AppColors.primary.withOpacity(0.2)
+                                            : Colors.white.withOpacity(0.06),
+                                        borderRadius: BorderRadius.circular(12),
+                                      ),
+                                      child: Center(
+                                        child: Text(c.icon,
+                                            style:
+                                                const TextStyle(fontSize: 22)),
+                                      ),
+                                    ),
+                                    const SizedBox(width: 14),
+                                    Expanded(
+                                      child: Text(
+                                        c.nameTh,
+                                        style: TextStyle(
+                                          color: sel
+                                              ? Colors.white
+                                              : Colors.white70,
+                                          fontSize: 15,
+                                          fontWeight: sel
+                                              ? FontWeight.bold
+                                              : FontWeight.w500,
+                                        ),
+                                      ),
+                                    ),
+                                    if (sel)
+                                      const Icon(Icons.check_circle_rounded,
+                                          color: AppColors.primary, size: 22),
+                                  ],
+                                ),
+                              ),
+                            );
+                          },
+                        ),
+                      ),
+                  ],
+                );
+              },
+            );
+          }),
+        ),
+      ),
+    );
+  }
+
+  Future<void> _showCreateCategoryDialog(BuildContext context, WidgetRef ref) async {
+    final nameController = TextEditingController();
+    String selectedIcon = '📁';
+    final selectedType = _type;
+    
+    final icons = ['📁', '🍲', '☕', '🚗', '🛍️', '🏠', '🎮', '💊', '✈️', '🐾', '🎁', '🎓', '💰', '💸', '📱', '⚡'];
+
+    final newCategory = await showDialog<Category>(
+      context: context,
+      builder: (dlgCtx) => StatefulBuilder(
+        builder: (context, setDlgState) => AlertDialog(
+          backgroundColor: const Color(0xFF1A221E),
+          shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(20)),
+          title: const Row(
+            children: [
+              Icon(Icons.add_circle_outline_rounded, color: AppColors.primary),
+              SizedBox(width: 8),
+              Text('เพิ่มหมวดหมู่ใหม่', style: TextStyle(color: Colors.white, fontSize: 18, fontWeight: FontWeight.bold)),
+            ],
+          ),
+          content: SingleChildScrollView(
+            child: Column(
+              mainAxisSize: MainAxisSize.min,
+              crossAxisAlignment: CrossAxisAlignment.start,
+              children: [
+                const Text('ชื่อหมวดหมู่', style: TextStyle(color: Colors.white70, fontSize: 13)),
+                const SizedBox(height: 6),
+                TextField(
+                  controller: nameController,
+                  style: const TextStyle(color: Colors.white),
+                  autofocus: true,
+                  decoration: InputDecoration(
+                    hintText: 'เช่น ค่าน้ำผลไม้, ค่าสัตว์เลี้ยง',
+                    hintStyle: const TextStyle(color: Colors.white38, fontSize: 13),
+                    filled: true,
+                    fillColor: const Color(0xFF111714),
+                    contentPadding: const EdgeInsets.symmetric(horizontal: 14, vertical: 12),
+                    border: OutlineInputBorder(
+                      borderRadius: BorderRadius.circular(12),
+                      borderSide: const BorderSide(color: Colors.white12),
+                    ),
+                    focusedBorder: OutlineInputBorder(
+                      borderRadius: BorderRadius.circular(12),
+                      borderSide: const BorderSide(color: AppColors.primary),
+                    ),
+                  ),
+                ),
+                const SizedBox(height: 16),
+                const Text('เลือกไอคอน', style: TextStyle(color: Colors.white70, fontSize: 13)),
+                const SizedBox(height: 8),
+                Wrap(
+                  spacing: 8,
+                  runSpacing: 8,
+                  children: icons.map((ic) {
+                    final isSel = selectedIcon == ic;
+                    return InkWell(
+                      onTap: () => setDlgState(() => selectedIcon = ic),
+                      borderRadius: BorderRadius.circular(10),
+                      child: Container(
+                        padding: const EdgeInsets.all(8),
+                        decoration: BoxDecoration(
+                          color: isSel ? AppColors.primary.withOpacity(0.25) : const Color(0xFF111714),
+                          borderRadius: BorderRadius.circular(10),
+                          border: Border.all(color: isSel ? AppColors.primary : Colors.white10),
+                        ),
+                        child: Text(ic, style: const TextStyle(fontSize: 22)),
+                      ),
+                    );
+                  }).toList(),
+                ),
+              ],
+            ),
+          ),
+          actions: [
+            TextButton(
+              onPressed: () => Navigator.pop(dlgCtx),
+              child: const Text('ยกเลิก', style: TextStyle(color: Colors.white54)),
+            ),
+            FilledButton(
+              style: FilledButton.styleFrom(
+                backgroundColor: AppColors.primary,
+                shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(12)),
+              ),
+              onPressed: () async {
+                final name = nameController.text.trim();
+                if (name.isEmpty) return;
+                try {
+                  final cat = await ref.read(transactionsRepoProvider).createCategory(
+                    nameTh: name,
+                    icon: selectedIcon,
+                    type: selectedType,
+                  );
+                  if (dlgCtx.mounted) Navigator.pop(dlgCtx, cat);
+                } catch (e) {
+                  if (dlgCtx.mounted) {
+                    ScaffoldMessenger.of(dlgCtx).showSnackBar(
+                      SnackBar(content: Text('สร้างหมวดหมู่ไม่สำเร็จ: $e')),
+                    );
+                  }
+                }
+              },
+              child: const Text('สร้างหมวดหมู่', style: TextStyle(color: Colors.white, fontWeight: FontWeight.bold)),
+            ),
+          ],
+        ),
+      ),
+    );
+
+    if (newCategory != null) {
+      ref.invalidate(categoriesProvider);
+      setState(() {
+        _categoryId = newCategory.id;
+        _selectedBudget = null;
+      });
+    }
+  }
+
+  Future<void> _confirm() async {
+    final baht = double.tryParse(_amount.text.replaceAll(',', '').trim());
+    if (baht == null || baht <= 0) {
+      if (!mounted) return;
+      ScaffoldMessenger.of(context).showSnackBar(
+          const SnackBar(content: Text('กรอกจำนวนเงินให้ถูกต้อง')));
+      return;
+    }
+    setState(() => _saving = true);
+    try {
+      final alert = await ref.read(transactionsRepoProvider).create(
+            type: _type,
+            amount: Money.toSatang(baht),
+            categoryId: _selectedBudget?.categoryId ?? _categoryId,
+            budgetId: _selectedBudget?.id,
+            note: _desc.text.trim(),
+            source: _fileName != null ? 'ocr' : 'manual',
+            occurredAt: _date,
+          );
+      ref.invalidate(dashboardProvider);
+      ref.invalidate(
+          notificationsProvider); // รีเฟรชการแจ้งเตือนการทำนาย/งบประมาณล่วงหน้า
+      ref.read(authControllerProvider.notifier).refreshProfile();
+      await ref
+          .read(dashboardProvider.future); // รอให้ดึงข้อมูลเสร็จก่อนเด้งกลับ
+      if (!mounted) return;
+      if (alert != null) {
+        await showDialog(
+          context: context,
+          builder: (_) => AlertDialog(
+            title: const Row(children: [
+              Icon(Icons.warning, color: Colors.orange),
+              SizedBox(width: 8),
+              Text('แจ้งเตือน')
+            ]),
+            content: Text(alert),
+            actions: [
+              TextButton(
+                  onPressed: () => Navigator.pop(context),
+                  child: const Text('ตกลง'))
+            ],
+          ),
+        );
+      }
+      if (mounted) context.pop();
+    } catch (e) {
+      if (!mounted) return;
+      setState(() => _saving = false);
+      if (!mounted) return;
+      ScaffoldMessenger.of(context)
+          .showSnackBar(SnackBar(content: Text('บันทึกไม่สำเร็จ: $e')));
+    }
+  }
+
+  @override
+  Widget build(BuildContext context) {
+    // watch budgets เพื่อ "อุ่นเครื่อง" ให้โหลดล่วงหน้า
+    ref.watch(budgetsListProvider);
+    final budgetDisplayName = _selectedBudget?.displayName;
+
+    final categoriesAsync = ref.watch(categoriesProvider);
+    final categoryList = categoriesAsync.value ?? [];
+    final selectedCategory = categoryList.firstWhere(
+      (c) => c.id == _categoryId,
+      orElse: () => Category(
+        id: '',
+        nameTh: 'เลือกหมวดหมู่ทั่วไป',
+        icon: '📁',
+        color: '#FFFFFF',
+        type: 'expense',
+      ),
+    );
+    final categoryDisplayName = _categoryId != null
+        ? '${selectedCategory.icon} ${selectedCategory.nameTh}'
+        : 'เลือกหมวดหมู่ทั่วไป';
+
+    return Scaffold(
+      backgroundColor: AppColors.bg,
+      appBar: AppBar(
+        centerTitle: true,
+        leading: IconButton(
+          icon: const Icon(Icons.arrow_back, color: Colors.white, size: 24),
+          onPressed: () => context.pop(),
+        ),
+        title: const Text('เลือกสลิป',
+            style: TextStyle(fontWeight: FontWeight.bold, fontSize: 20)),
+      ),
+      body: _analyzing
+          ? const Center(
+              child: Column(
+                  mainAxisAlignment: MainAxisAlignment.center,
+                  children: [
+                    CircularProgressIndicator(color: AppColors.primary),
+                    SizedBox(height: 12),
+                    Text('กำลังอ่านสลิป...',
+                        style: TextStyle(color: AppColors.textMuted)),
+                  ]),
+            )
+          : SafeArea(
+              child: ListView(
+                padding: const EdgeInsets.fromLTRB(18, 8, 18, 24),
+                children: [
+                  // ── กล่องเลือกไฟล์ (เฉพาะโหมดรูป) ──
+                  GestureDetector(
+                    onTap: _pickSlip,
+                    child: Container(
+                      padding: const EdgeInsets.symmetric(
+                          horizontal: 16, vertical: 18),
+                      decoration: _boxDeco(),
+                      child: Row(children: [
+                        const Icon(Icons.cloud_upload_outlined,
+                            color: AppColors.primary, size: 26),
+                        const SizedBox(width: 14),
+                        Expanded(
+                          child: Text(
+                            _fileName ?? 'แตะเพื่อเลือกรูปสลิป',
+                            style: TextStyle(
+                                color: _fileName != null
+                                    ? Colors.white
+                                    : AppColors.textMuted,
+                                fontSize: 14),
+                            maxLines: 1,
+                            overflow: TextOverflow.ellipsis,
+                          ),
+                        ),
+                      ]),
+                    ),
+                  ),
+                  const SizedBox(height: 20),
+
+                  const Text('กรอกข้อมูลรายการ',
+                      style: TextStyle(
+                          color: Colors.white,
+                          fontSize: 15,
+                          fontWeight: FontWeight.w600)),
+                  const SizedBox(height: 12),
+
+                  // ── จำนวนเงิน ──
+                  Container(
+                    padding: const EdgeInsets.fromLTRB(16, 10, 16, 12),
+                    decoration: _boxDeco(),
+                    child: Column(
+                        crossAxisAlignment: CrossAxisAlignment.start,
+                        children: [
+                          const Text('จำนวนเงิน',
+                              style: TextStyle(
+                                  color: AppColors.textMuted, fontSize: 12)),
+                          TextField(
+                            controller: _amount,
+                            keyboardType: const TextInputType.numberWithOptions(
+                                decimal: true),
+                            inputFormatters: [
+                              FilteringTextInputFormatter.allow(
+                                  RegExp(r'[0-9.,]'))
+                            ],
+                            style: const TextStyle(
+                                color: AppColors.primary,
+                                fontSize: 26,
+                                fontWeight: FontWeight.bold),
+                            decoration: const InputDecoration(
+                              isDense: true,
+                              contentPadding: EdgeInsets.symmetric(vertical: 4),
+                              border: InputBorder.none,
+                              hintText: '0',
+                              hintStyle: TextStyle(color: Color(0xFF3A5546)),
+                            ),
+                          ),
+                        ]),
+                  ),
+                  const SizedBox(height: 12),
+
+                  // ── วันที่ ──
+                  GestureDetector(
+                    onTap: _pickDate,
+                    child: Container(
+                      padding: const EdgeInsets.fromLTRB(16, 10, 16, 14),
+                      decoration: _boxDeco(),
+                      child: Column(
+                          crossAxisAlignment: CrossAxisAlignment.start,
+                          children: [
+                            const Text('วันที่',
+                                style: TextStyle(
+                                    color: AppColors.textMuted, fontSize: 12)),
+                            const SizedBox(height: 4),
+                            Row(children: [
+                              Text(
+                                  _date != null
+                                      ? _fmtThaiDate(_date!)
+                                      : 'แตะเพื่อเลือกวันที่',
+                                  style: TextStyle(
+                                      color: _date != null
+                                          ? AppColors.primary
+                                          : AppColors.textMuted,
+                                      fontSize: 20,
+                                      fontWeight: FontWeight.bold)),
+                              const Spacer(),
+                              const Icon(Icons.calendar_today,
+                                  color: AppColors.textMuted, size: 18),
+                            ]),
+                          ]),
+                    ),
+                  ),
+                  const SizedBox(height: 18),
+
+                  // ── รายรับ / รายจ่าย ──
+                  Row(children: [
+                    _TypePill(label: 'รายรับ', selected: _type == 'income', color: AppColors.primary,
+                        onTap: () => setState(() { _type = 'income'; _selectedBudget = null; _categoryId = null; })),
+                    const SizedBox(width: 8),
+                    _TypePill(label: 'รายจ่าย', selected: _type == 'expense', color: AppColors.expense,
+                        onTap: () => setState(() { _type = 'expense'; _selectedBudget = null; _categoryId = null; })),
+                  ]),
+                  const SizedBox(height: 16),
+
+                  // ── งบประมาณ ──
+                  const Text('จัดไปที่งบประมาณ', style: TextStyle(color: Colors.white, fontSize: 14, fontWeight: FontWeight.w600)),
+                  const SizedBox(height: 8),
+                  GestureDetector(
+                    onTap: _pickBudget,
+                    child: Container(
+                      padding: const EdgeInsets.symmetric(
+                          horizontal: 16, vertical: 18),
+                      decoration: _boxDeco(),
+                      child: Row(children: [
+                        Expanded(
+                          child: Text(budgetDisplayName ?? 'ไม่จัดเข้างบประมาณ (ระบุหมวดหมู่ทั่วไป)',
+                              style: TextStyle(
+                                  color: budgetDisplayName != null ? Colors.white : AppColors.primary,
+                                  fontSize: 16, fontWeight: FontWeight.bold),
+                              maxLines: 1, overflow: TextOverflow.ellipsis),
+                        ),
+                        const Icon(Icons.keyboard_arrow_down,
+                            color: AppColors.textMuted),
+                      ]),
+                    ),
+                  ),
+                  const SizedBox(height: 16),
+
+                  // ── หมวดหมู่ธุรกรรม ──
+                  const Text('หมวดหมู่ธุรกรรม', style: TextStyle(color: Colors.white, fontSize: 14, fontWeight: FontWeight.w600)),
+                  const SizedBox(height: 8),
+                  GestureDetector(
+                    onTap: _selectedBudget != null
+                        ? () {
+                            ScaffoldMessenger.of(context).showSnackBar(
+                              const SnackBar(
+                                content: Text('หมวดหมู่จะอิงตามงบประมาณที่เลือก เปลี่ยนได้โดยกดไม่จัดเข้างบประมาณ'),
+                                duration: Duration(seconds: 2),
+                              ),
+                            );
+                          }
+                        : _pickCategory,
+                    child: Container(
+                      padding: const EdgeInsets.symmetric(
+                          horizontal: 16, vertical: 18),
+                      decoration: _boxDeco(),
+                      child: Row(children: [
+                        Expanded(
+                          child: Text(
+                              _selectedBudget != null
+                                  ? '${_selectedBudget!.category?.icon ?? '📊'} ${_selectedBudget!.category?.nameTh ?? 'งบประมาณ'}'
+                                  : categoryDisplayName,
+                              style: TextStyle(
+                                  color: (_selectedBudget != null || _categoryId != null) ? Colors.white : AppColors.primary,
+                                  fontSize: 16, fontWeight: FontWeight.bold),
+                              maxLines: 1, overflow: TextOverflow.ellipsis),
+                        ),
+                        if (_selectedBudget == null)
+                          const Icon(Icons.keyboard_arrow_down,
+                              color: AppColors.textMuted)
+                        else
+                          const Icon(Icons.lock_outline_rounded,
+                              color: AppColors.textMuted, size: 18),
+                      ]),
+                    ),
+                  ),
+                  const SizedBox(height: 16),
+
+                  // ── ข้อมูลการเชื่อมโยงงบประมาณ (Proactive Budget Status Display) ──
+                  if (_selectedBudget != null && _selectedBudget!.categoryId != null && _type == 'expense') ...[
+                    _buildBudgetInfoCard(context, ref, _selectedBudget!.categoryId!),
+                    const SizedBox(height: 16),
+                  ],
+
+                  // ── คำอธิบาย ──
+                  const Text('คำอธิบาย (ไม่บังคับ)',
+                      style: TextStyle(
+                          color: Colors.white,
+                          fontSize: 14,
+                          fontWeight: FontWeight.w600)),
+                  const SizedBox(height: 8),
+                  Container(
+                    decoration: _boxDeco(),
+                    child: TextField(
+                      controller: _desc,
+                      style: const TextStyle(color: Colors.white, fontSize: 15),
+                      decoration: const InputDecoration(
+                        border: InputBorder.none,
+                        contentPadding:
+                            EdgeInsets.symmetric(horizontal: 16, vertical: 18),
+                        hintText: 'เขียนคำอธิบาย',
+                        hintStyle: TextStyle(
+                            color: AppColors.primary,
+                            fontWeight: FontWeight.bold),
+                      ),
+                    ),
+                  ),
+                  const SizedBox(height: 28),
+
+                  // ── ปุ่มยืนยัน ──
+                  SizedBox(
+                    height: 52,
+                    child: ElevatedButton(
+                      onPressed: _saving ? null : _confirm,
+                      child: _saving
+                          ? const SizedBox(
+                              height: 22,
+                              width: 22,
+                              child: CircularProgressIndicator(
+                                  strokeWidth: 2, color: Colors.white))
+                          : const Text(
+                              'ยืนยันบันทึกสลิป',
+                              style: TextStyle(
+                                  fontSize: 16, fontWeight: FontWeight.bold),
+                            ),
+                    ),
+                  ),
+                ],
+              ),
+            ),
+    );
+  }
+
+  Widget _buildBudgetInfoCard(
+      BuildContext context, WidgetRef ref, String categoryId) {
+    final statuses = ref.watch(budgetStatusProvider);
+    BudgetStatus? targetStatus;
+    for (final s in statuses) {
+      if (s.categoryId == categoryId) {
+        targetStatus = s;
+        break;
+      }
+    }
+
+    final double enteredAmount =
+        double.tryParse(_amount.text.replaceAll(',', '').trim()) ?? 0;
+    final int enteredSatang = Money.toSatang(enteredAmount);
+
+    if (targetStatus == null) {
+      return Container(
+        padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 12),
+        decoration: BoxDecoration(
+          color: const Color(0xFF131D17),
+          borderRadius: BorderRadius.circular(12),
+          border: Border.all(color: Colors.white10),
+        ),
+        child: Row(
+          mainAxisAlignment: MainAxisAlignment.spaceBetween,
+          children: [
+            const Expanded(
+              child: Column(
+                crossAxisAlignment: CrossAxisAlignment.start,
+                children: [
+                  Text('ยังไม่ได้ตั้งงบประมาณสำหรับหมวดนี้',
+                      style: TextStyle(color: Colors.white60, fontSize: 13)),
+                  SizedBox(height: 2),
+                  Text('ตั้งค่าไว้เพื่อช่วยควบคุมค่าใช้จ่ายได้ดีขึ้น',
+                      style: TextStyle(color: Colors.white38, fontSize: 11)),
+                ],
+              ),
+            ),
+            TextButton.icon(
+              onPressed: () => context.push('/budgets'),
+              icon: const Icon(Icons.add_chart_rounded,
+                  size: 16, color: AppColors.primary),
+              label: const Text('ตั้งงบ',
+                  style: TextStyle(
+                      color: AppColors.primary,
+                      fontSize: 13,
+                      fontWeight: FontWeight.bold)),
+            ),
+          ],
+        ),
+      );
+    }
+
+    final newSpent = targetStatus.spent + enteredSatang;
+    final isExceededNow = targetStatus.spent > targetStatus.amount;
+    final willExceed = newSpent > targetStatus.amount;
+
+    final currentPercent = targetStatus.amount > 0
+        ? (targetStatus.spent / targetStatus.amount).clamp(0.0, 1.0)
+        : 0.0;
+    final newPercent = targetStatus.amount > 0
+        ? (newSpent / targetStatus.amount).clamp(0.0, 1.0)
+        : 0.0;
+
+    return Container(
+      padding: const EdgeInsets.all(16),
+      decoration: BoxDecoration(
+        color: const Color(0xFF13241A),
+        borderRadius: BorderRadius.circular(14),
+        border: Border.all(
+            color: willExceed
+                ? Colors.redAccent.withOpacity(0.3)
+                : AppColors.primary.withOpacity(0.2)),
+      ),
+      child: Column(
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: [
+          Row(
+            mainAxisAlignment: MainAxisAlignment.spaceBetween,
+            children: [
+              Row(
+                children: [
+                  const Icon(Icons.pie_chart_outline_rounded,
+                      color: AppColors.primary, size: 18),
+                  const SizedBox(width: 6),
+                  Text(
+                    'งบประมาณ: ${targetStatus.category?.nameTh ?? ""}',
+                    style: const TextStyle(
+                        color: Colors.white,
+                        fontSize: 13,
+                        fontWeight: FontWeight.bold),
+                  ),
+                ],
+              ),
+              GestureDetector(
+                onTap: () => context.push('/budgets'),
+                child: const Row(
+                  children: [
+                    Text('ดูงบทั้งหมด',
+                        style: TextStyle(
+                            color: AppColors.primary,
+                            fontSize: 12,
+                            fontWeight: FontWeight.bold)),
+                    Icon(Icons.chevron_right_rounded,
+                        color: AppColors.primary, size: 16),
+                  ],
+                ),
+              ),
+            ],
+          ),
+          const SizedBox(height: 12),
+          Row(
+            mainAxisAlignment: MainAxisAlignment.spaceBetween,
+            children: [
+              Text(
+                'ใช้ไป ${Money.formatBaht(targetStatus.spent)} / ${Money.formatBaht(targetStatus.amount)}',
+                style: const TextStyle(color: Colors.white70, fontSize: 13),
+              ),
+              if (enteredSatang > 0)
+                Text(
+                  'ใหม่: ${Money.formatBaht(newSpent)}',
+                  style: TextStyle(
+                    color: willExceed ? Colors.redAccent : AppColors.primary,
+                    fontSize: 13,
+                    fontWeight: FontWeight.bold,
+                  ),
+                ),
+            ],
+          ),
+          const SizedBox(height: 8),
+
+          // Progress Bar showing spent vs new spent vs limit
+          Stack(
+            children: [
+              Container(
+                height: 8,
+                width: double.infinity,
+                decoration: BoxDecoration(
+                  color: Colors.white.withOpacity(0.08),
+                  borderRadius: BorderRadius.circular(4),
+                ),
+              ),
+              if (enteredSatang > 0 && newPercent > currentPercent)
+                FractionallySizedBox(
+                  widthFactor: newPercent,
+                  child: Container(
+                    height: 8,
+                    decoration: BoxDecoration(
+                      color: willExceed
+                          ? Colors.redAccent.withOpacity(0.5)
+                          : AppColors.primary.withOpacity(0.5),
+                      borderRadius: BorderRadius.circular(4),
+                    ),
+                  ),
+                ),
+              FractionallySizedBox(
+                widthFactor: currentPercent,
+                child: Container(
+                  height: 8,
+                  decoration: BoxDecoration(
+                    color: isExceededNow ? Colors.redAccent : AppColors.primary,
+                    borderRadius: BorderRadius.circular(4),
+                  ),
+                ),
+              ),
+            ],
+          ),
+          const SizedBox(height: 10),
+          Row(
+            mainAxisAlignment: MainAxisAlignment.spaceBetween,
+            children: [
+              if (willExceed)
+                Text(
+                  isExceededNow
+                      ? 'เกินงบประมาณอยู่ ${Money.formatBaht(targetStatus.spent - targetStatus.amount)}'
+                      : 'รายการนี้จะทำให้เกินงบไป ${Money.formatBaht(newSpent - targetStatus.amount)}',
+                  style: const TextStyle(
+                      color: Colors.redAccent,
+                      fontSize: 11,
+                      fontWeight: FontWeight.w500),
+                )
+              else
+                Text(
+                  'เหลือใช้อีก ${Money.formatBaht(targetStatus.amount - newSpent)}',
+                  style: const TextStyle(color: Colors.white38, fontSize: 11),
+                ),
+              Text(
+                '${(newPercent * 100).toStringAsFixed(0)}%',
+                style: TextStyle(
+                  color: willExceed ? Colors.redAccent : AppColors.primary,
+                  fontSize: 11,
+                  fontWeight: FontWeight.bold,
+                ),
+              ),
+            ],
+          ),
+        ],
+      ),
+    );
+  }
+
+  BoxDecoration _boxDeco() => BoxDecoration(
+        gradient: const LinearGradient(
+          colors: [Color(0xFF16281D), Color(0xFF0F1712)],
+          begin: Alignment.topLeft,
+          end: Alignment.bottomRight,
+        ),
+        borderRadius: BorderRadius.circular(14),
+        border: Border.all(color: _boxBorder),
+      );
+}
+
+/// แท็บสลับโหมด — เลือกไฟล์รูป (เขียว) / เขียนเอง (แดงเมื่อเลือก)
+
+
+/// ปิ่นรายรับ/รายจ่าย
+class _TypePill extends StatelessWidget {
+  const _TypePill(
+      {required this.label,
+      required this.selected,
+      required this.color,
+      required this.onTap});
+  final String label;
+  final bool selected;
+  final Color color;
+  final VoidCallback onTap;
+
+  @override
+  Widget build(BuildContext context) {
+    return GestureDetector(
+      onTap: onTap,
+      child: AnimatedContainer(
+        duration: const Duration(milliseconds: 150),
+        padding: const EdgeInsets.symmetric(horizontal: 18, vertical: 8),
+        decoration: BoxDecoration(
+          color: selected ? color : const Color(0xFF1E2A22),
+          borderRadius: BorderRadius.circular(20),
+        ),
+        child: Text(label,
+            style: TextStyle(
+                color: selected ? Colors.white : AppColors.textMuted,
+                fontWeight: FontWeight.bold,
+                fontSize: 13)),
+      ),
+    );
+  }
+}

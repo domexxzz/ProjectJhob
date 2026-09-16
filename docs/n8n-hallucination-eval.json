@@ -1,0 +1,206 @@
+{
+  "id": "pheengernHallucEval",
+  "name": "พี่เงิน — Hallucination Eval (LLM-as-judge)",
+  "nodes": [
+    {
+      "parameters": {},
+      "id": "n1",
+      "name": "▶ เริ่มรัน",
+      "type": "n8n-nodes-base.manualTrigger",
+      "typeVersion": 1,
+      "position": [0, 300]
+    },
+    {
+      "parameters": {
+        "method": "POST",
+        "url": "https://phee-ngern.onrender.com/api/v1/auth/login",
+        "sendBody": true,
+        "specifyBody": "json",
+        "jsonBody": "={\"email\":\"DEMO_EMAIL_HERE\",\"password\":\"DEMO_PASSWORD_HERE\"}",
+        "options": { "timeout": 60000 }
+      },
+      "id": "n2",
+      "name": "1. Login เอา token",
+      "type": "n8n-nodes-base.httpRequest",
+      "typeVersion": 4.2,
+      "position": [220, 300],
+      "retryOnFail": true,
+      "maxTries": 3,
+      "waitBetweenTries": 5000
+    },
+    {
+      "parameters": {
+        "method": "GET",
+        "url": "https://phee-ngern.onrender.com/api/v1/transactions/aggregate",
+        "sendHeaders": true,
+        "headerParameters": {
+          "parameters": [
+            { "name": "Authorization", "value": "=Bearer {{ $('1. Login เอา token').item.json.token }}" }
+          ]
+        },
+        "options": { "timeout": 60000 }
+      },
+      "id": "n2b",
+      "name": "1.5 ดึงยอดจริงจาก API",
+      "type": "n8n-nodes-base.httpRequest",
+      "typeVersion": 4.2,
+      "position": [330, 480],
+      "retryOnFail": true,
+      "maxTries": 3,
+      "waitBetweenTries": 5000
+    },
+    {
+      "parameters": {
+        "jsCode": "// สร้าง ground truth จากยอดจริงใน API (โหนด 1.5) แทนเลข hardcode\nconst s = ($('1.5 ดึงยอดจริงจาก API').first().json.summary) || {};\nconst baht = (v) => (Number(v || 0) / 100).toLocaleString('th-TH', { minimumFractionDigits: 2 });\nconst dataSnapshot = [\n  'รายรับรวมทั้งหมด ' + baht(s.income) + ' บาท',\n  'รายจ่ายรวมทั้งหมด ' + baht(s.expense) + ' บาท',\n  'ยอดคงเหลือ ' + baht(s.balance) + ' บาท',\n  '(นี่คือข้อมูลทั้งหมดในระบบ — ไม่มีรายการผ่อนรถ / ไม่มีหนี้บัตรเครดิต)'\n].join('\\n');\nconst base = [\n  { id: 'A1', question: 'ยอดใช้จ่ายทั้งหมดของฉันเท่าไหร่' },\n  { id: 'A2', question: 'รวมรายรับทั้งหมดของฉันเท่าไหร่' }\n];\nconst N = 100;\nconst out = [];\nfor (let i = 0; i < N; i++) {\n  const c = base[i % base.length];\n  out.push({ json: { id: c.id + '#' + (i + 1), question: c.question, dataSnapshot } });\n}\nreturn out;"
+      },
+      "id": "n3",
+      "name": "2. ชุดคำถาม + ข้อมูลจริง",
+      "type": "n8n-nodes-base.code",
+      "typeVersion": 2,
+      "position": [440, 300]
+    },
+    {
+      "parameters": {
+        "method": "POST",
+        "url": "https://phee-ngern.onrender.com/api/v1/chat",
+        "sendHeaders": true,
+        "headerParameters": {
+          "parameters": [
+            { "name": "Authorization", "value": "=Bearer {{ $('1. Login เอา token').item.json.token }}" }
+          ]
+        },
+        "sendBody": true,
+        "specifyBody": "json",
+        "jsonBody": "={\"message\":\"{{ $json.question }}\"}",
+        "options": { "timeout": 60000 }
+      },
+      "id": "n4",
+      "name": "3. ถามพี่เงิน (POST /chat)",
+      "type": "n8n-nodes-base.httpRequest",
+      "typeVersion": 4.2,
+      "position": [660, 300],
+      "retryOnFail": true,
+      "maxTries": 3,
+      "waitBetweenTries": 5000
+    },
+    {
+      "parameters": {
+        "mode": "runOnceForEachItem",
+        "jsCode": "// รวมคำถาม + ข้อมูลจริง + คำตอบพี่เงิน เป็น prompt ให้ 'กรรมการ' ตัดสิน\nconst q = $('2. ชุดคำถาม + ข้อมูลจริง').item.json;\nconst answer = ($json.message && $json.message.content) || $json.reply || '';\nconst prompt =\n  'นี่คือข้อมูลการเงินทั้งหมดของผู้ใช้ (ไม่มีข้อมูลอื่นนอกจากนี้):\\n' + q.dataSnapshot + '\\n\\n' +\n  'ผู้ใช้ถามว่า: \"' + q.question + '\"\\n' +\n  'ผู้ช่วย AI ตอบว่า: \"' + answer + '\"\\n\\n' +\n  'คุณคือกรรมการตรวจการกุข้อมูล: ทุกตัวเลข/ข้อเท็จจริงเรื่องเงินในคำตอบต้องมาจากข้อมูลข้างบนเท่านั้น ' +\n  'การยอมรับว่า \"ไม่มีข้อมูล\" ถือว่าถูกต้อง (faithful) แต่การกุยอดที่ไม่มีในข้อมูลถือว่าผิด (unfaithful) ' +\n  'ตอบกลับเป็น JSON อย่างเดียว: {\"faithful\": true/false, \"reason\": \"เหตุผลสั้น ๆ\"}';\nconst payload = {\n  model: 'typhoon-v2.5-30b-a3b-instruct',\n  temperature: 0,\n  messages: [{ role: 'user', content: prompt }]\n};\nreturn { json: { id: q.id, question: q.question, answer, judgeBody: JSON.stringify(payload) } };"
+      },
+      "id": "n5",
+      "name": "4. สร้างโจทย์ให้กรรมการ",
+      "type": "n8n-nodes-base.code",
+      "typeVersion": 2,
+      "position": [880, 300]
+    },
+    {
+      "parameters": {
+        "method": "POST",
+        "url": "https://api.opentyphoon.ai/v1/chat/completions",
+        "sendHeaders": true,
+        "headerParameters": {
+          "parameters": [
+            { "name": "Authorization", "value": "Bearer YOUR_TYPHOON_API_KEY" },
+            { "name": "Content-Type", "value": "application/json" }
+          ]
+        },
+        "sendBody": true,
+        "specifyBody": "json",
+        "jsonBody": "={{ $json.judgeBody }}",
+        "options": { "timeout": 60000 }
+      },
+      "id": "n6",
+      "name": "5. LLM Judge (กรรมการ)",
+      "type": "n8n-nodes-base.httpRequest",
+      "typeVersion": 4.2,
+      "position": [1100, 300],
+      "retryOnFail": true,
+      "maxTries": 3,
+      "waitBetweenTries": 5000
+    },
+    {
+      "parameters": {
+        "mode": "runOnceForEachItem",
+        "jsCode": "// อ่านคำตัดสินของกรรมการออกมาเป็น faithful / reason\nconst src = $('4. สร้างโจทย์ให้กรรมการ').item.json;\nlet faithful = null, reason = '';\ntry {\n  const txt = ($json.choices && $json.choices[0] && $json.choices[0].message.content) || '';\n  const m = txt.match(/\\{[\\s\\S]*\\}/);\n  const p = m ? JSON.parse(m[0]) : {};\n  faithful = !!p.faithful;\n  reason = p.reason || '';\n} catch (e) { reason = 'อ่านผลกรรมการไม่ได้'; }\nreturn { json: { id: src.id, question: src.question, answer: src.answer, faithful, reason } };"
+      },
+      "id": "n7",
+      "name": "6. อ่านคำตัดสิน",
+      "type": "n8n-nodes-base.code",
+      "typeVersion": 2,
+      "position": [1320, 300]
+    },
+    {
+      "parameters": {
+        "conditions": {
+          "options": { "caseSensitive": true, "typeValidation": "loose", "version": 2 },
+          "conditions": [
+            {
+              "id": "cond1",
+              "leftValue": "={{ $json.faithful }}",
+              "rightValue": "",
+              "operator": { "type": "boolean", "operation": "true", "singleValue": true }
+            }
+          ],
+          "combinator": "and"
+        },
+        "options": {}
+      },
+      "id": "n8",
+      "name": "7. faithful ?",
+      "type": "n8n-nodes-base.if",
+      "typeVersion": 2,
+      "position": [1540, 300]
+    },
+    {
+      "parameters": {},
+      "id": "n9",
+      "name": "✅ ผ่าน",
+      "type": "n8n-nodes-base.noOp",
+      "typeVersion": 1,
+      "position": [1760, 200]
+    },
+    {
+      "parameters": {},
+      "id": "n10",
+      "name": "🚩 กุข้อมูล (Hallucination)",
+      "type": "n8n-nodes-base.noOp",
+      "typeVersion": 1,
+      "position": [1760, 420]
+    },
+    {
+      "parameters": {
+        "jsCode": "// สรุปผลอ่านง่าย → ความแม่นยำ + Hallucination rate\nconst items = $input.all().map((i) => i.json);\nconst total = items.length;\nconst hallucinated = items.filter((i) => i.faithful === false).length;\nconst faithful = total - hallucinated;\nconst rate = total ? Math.round((hallucinated / total) * 100) : 0;\nconst accuracy = total ? Math.round((faithful / total) * 100) : 0;\nconst raiKho = items.map((i) => `${i.faithful === false ? '🚩 กุข้อมูล' : '✅ ผ่าน'} [${i.id}] ${i.question}${i.reason ? ' — ' + i.reason : ''}`);\nconst phonSarup = `ความแม่นยำ ${accuracy}% (${faithful}/${total} ข้อ) · กุข้อมูล ${hallucinated}/${total} ข้อ (${rate}%)`;\nreturn [{ json: { 'ผลสรุป': phonSarup, 'ความแม่นยำ': `${accuracy}%`, 'กุข้อมูล': `${hallucinated}/${total} (${rate}%)`, 'รายข้อ': raiKho, total, faithful, hallucinated, hallucination_rate_pct: rate } }];"
+      },
+      "id": "n11",
+      "name": "8. สรุป Hallucination rate",
+      "type": "n8n-nodes-base.code",
+      "typeVersion": 2,
+      "position": [1760, 300]
+    }
+  ],
+  "connections": {
+    "▶ เริ่มรัน": { "main": [[{ "node": "1. Login เอา token", "type": "main", "index": 0 }]] },
+    "1. Login เอา token": { "main": [[{ "node": "1.5 ดึงยอดจริงจาก API", "type": "main", "index": 0 }]] },
+    "1.5 ดึงยอดจริงจาก API": { "main": [[{ "node": "2. ชุดคำถาม + ข้อมูลจริง", "type": "main", "index": 0 }]] },
+    "2. ชุดคำถาม + ข้อมูลจริง": { "main": [[{ "node": "3. ถามพี่เงิน (POST /chat)", "type": "main", "index": 0 }]] },
+    "3. ถามพี่เงิน (POST /chat)": { "main": [[{ "node": "4. สร้างโจทย์ให้กรรมการ", "type": "main", "index": 0 }]] },
+    "4. สร้างโจทย์ให้กรรมการ": { "main": [[{ "node": "5. LLM Judge (กรรมการ)", "type": "main", "index": 0 }]] },
+    "5. LLM Judge (กรรมการ)": { "main": [[{ "node": "6. อ่านคำตัดสิน", "type": "main", "index": 0 }]] },
+    "6. อ่านคำตัดสิน": {
+      "main": [[
+        { "node": "7. faithful ?", "type": "main", "index": 0 },
+        { "node": "8. สรุป Hallucination rate", "type": "main", "index": 0 }
+      ]]
+    },
+    "7. faithful ?": {
+      "main": [
+        [{ "node": "✅ ผ่าน", "type": "main", "index": 0 }],
+        [{ "node": "🚩 กุข้อมูล (Hallucination)", "type": "main", "index": 0 }]
+      ]
+    }
+  },
+  "active": false,
+  "settings": { "executionOrder": "v1" },
+  "pinData": {}
+}

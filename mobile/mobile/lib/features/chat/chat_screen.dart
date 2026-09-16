@@ -1,0 +1,1872 @@
+import 'dart:async';
+import 'dart:convert';
+
+import 'package:dio/dio.dart' show CancelToken;
+import 'package:flutter/material.dart';
+import 'package:flutter/services.dart' show Clipboard, ClipboardData;
+import 'package:flutter_riverpod/flutter_riverpod.dart';
+import 'package:go_router/go_router.dart';
+import 'package:image_picker/image_picker.dart';
+import 'package:speech_to_text/speech_to_text.dart';
+import 'package:flutter_markdown_plus/flutter_markdown_plus.dart';
+import 'package:url_launcher/url_launcher.dart';
+
+import '../../app/theme.dart';
+import '../../core/api/api_client.dart';
+import 'chat_message.dart';
+import '../../core/download/file_download.dart';
+import 'chat_repository.dart';
+import 'chat_sessions_provider.dart';
+import 'chat_sidebar.dart';
+import '../transactions/transactions_repository.dart';
+import '../transactions/transaction.dart' show Category;
+import '../privacy/privacy_screen.dart';
+import '../auth/auth_controller.dart';
+
+enum CoachMood { idle, listening, thinking }
+
+class ChatScreen extends ConsumerStatefulWidget {
+  const ChatScreen({super.key});
+  @override
+  ConsumerState<ChatScreen> createState() => _ChatScreenState();
+}
+
+class _ChatScreenState extends ConsumerState<ChatScreen> {
+  final _controller = TextEditingController();
+  final _scroll = ScrollController();
+  final List<ChatMessage> _messages = [];
+  final SpeechToText _speech = SpeechToText();
+  final ImagePicker _picker = ImagePicker();
+
+  bool _loading = true;
+  bool _sending = false;
+  bool _listening = false;
+  bool _attaching = false;
+  bool _sttAvailable = false;
+  bool _menuExpanded = false;
+  bool _showJumpToLatest = false;
+  String? _typingId; // id ข้อความพี่เงินที่กำลัง "พิมพ์ทีละตัว" (typewriter)
+
+  String? _pendingImage; // รูปที่แนบรอส่ง (dataUrl) — ยังไม่ส่งจนกว่าจะกดส่ง
+  String _pendingSlipType = 'expense'; // ผู้ใช้เลือกก่อนส่งสลิป: รายจ่าย(default)/รายรับ
+  CancelToken? _cancelToken; // ใช้กดหยุดระหว่างพี่เงินกำลังตอบ
+  String? _lastUserText; // เก็บข้อความล่าสุดไว้ "ส่งซ้ำ"
+  String? _lastUserImage;
+  int _localSeq = 0; // กัน id ซ้ำของข้อความฝั่ง client
+
+  CoachMood get _mood => _listening
+      ? CoachMood.listening
+      : (_sending || _attaching || _typingId != null
+          ? CoachMood.thinking
+          : CoachMood.idle);
+
+  @override
+  void initState() {
+    super.initState();
+    _scroll.addListener(_handleScroll);
+    _init();
+  }
+
+  Future<void> _init() async {
+    try {
+      _sttAvailable = await _speech.initialize();
+    } catch (_) {
+      _sttAvailable = false;
+    }
+    await _loadHistory();
+  }
+
+  @override
+  void dispose() {
+    _controller.dispose();
+    _scroll.dispose();
+    _speech.stop();
+    super.dispose();
+  }
+
+  /// เริ่มบทสนทนาใหม่ — สร้างห้องใหม่แล้วล้างหน้าจอ
+  Future<void> _startNewChat() async {
+    ref.read(sidebarOpenProvider.notifier).state = false;
+    setState(() {
+      _messages.clear();
+      _loading = true;
+    });
+    try {
+      final s = await ref.read(chatRepoProvider).createSession();
+      ref.read(currentSessionIdProvider.notifier).state = s.id;
+      ref.invalidate(chatSessionsProvider);
+    } catch (_) {
+      // สร้างห้องไม่ได้ (ออฟไลน์) → ปล่อยให้ backend เลือกห้องเองตอนส่งข้อความ
+      ref.read(currentSessionIdProvider.notifier).state = null;
+    }
+    if (mounted) setState(() => _loading = false);
+  }
+
+  /// สลับไปห้องอื่น
+  Future<void> _switchSession(String sessionId) async {
+    ref.read(sidebarOpenProvider.notifier).state = false;
+    ref.read(currentSessionIdProvider.notifier).state = sessionId;
+    setState(() {
+      _messages.clear();
+      _loading = true;
+    });
+    await _loadHistory();
+  }
+
+  Future<void> _loadHistory() async {
+    try {
+      final h = await ref
+          .read(chatRepoProvider)
+          .historyOf(ref.read(currentSessionIdProvider));
+      if (!mounted) return;
+      setState(() {
+        _messages
+          ..clear()
+          ..addAll(h);
+        _loading = false;
+      });
+      _scrollToBottom();
+    } catch (_) {
+      if (mounted) setState(() => _loading = false);
+    }
+  }
+
+  Future<void> _send(String text, {String? imageBase64}) async {
+    if (_sending) return;
+    final img = imageBase64 ?? _pendingImage;
+    var msg = text.trim();
+    if (msg.isEmpty && img == null) return;
+    // แนบรูปแต่ไม่พิมพ์ข้อความ → ใส่คำถามเริ่มต้นให้
+    if (msg.isEmpty && img != null) msg = 'ช่วยดูรูปนี้ให้หน่อยครับ';
+    if (_listening) await _stopListening();
+    _controller.clear();
+    _lastUserText = text.trim();
+    _lastUserImage = img;
+    final slipTypeToSend = img != null ? _pendingSlipType : null; // เก็บก่อน setState เคลียร์
+
+    final cancel = CancelToken();
+    _cancelToken = cancel;
+    setState(() {
+      _messages.add(ChatMessage(
+        id: 'local-${_localSeq++}',
+        role: 'user',
+        content: msg,
+        createdAt: DateTime.now(),
+        hasImage: img != null,
+        imageDataUrl: img, // เก็บรูปไว้โชว์ในฟองแชท (ไม่ใช่แค่ไอคอน)
+      ));
+      _sending = true;
+      _menuExpanded = false;
+      _pendingImage = null; // ส่งแล้วเคลียร์รูปที่แนบไว้
+    });
+    _scrollToBottom();
+    try {
+      final privacy = ref.read(privacySettingsProvider);
+      // ย่อรูปไว้โชว์ในแกลเลอรี (ไม่เก็บรูปเต็มลง DB)
+      final thumb = img != null ? await makeThumbnail(img) : null;
+      final reply = await ref.read(chatRepoProvider).send(
+            msg,
+            imageBase64: img,
+            thumbnail: thumb,
+            sessionId: ref.read(currentSessionIdProvider),
+            slipType: slipTypeToSend,
+            includeFinancialContext: privacy.allowFinancialAnalysis,
+            personalizedRecommendations: privacy.personalizedRecommendations,
+            storeConversationHistory: privacy.shareForAiImprovement,
+            cancelToken: cancel,
+          );
+      if (!mounted) return;
+      // ห้องอาจถูกตั้งชื่อ/เลื่อนลำดับ → รีเฟรชรายการใน sidebar
+      ref.invalidate(chatSessionsProvider);
+      setState(() {
+        _messages.add(reply);
+        _typingId = reply.id; // ให้ค่อย ๆ พิมพ์ออกมา
+        _sending = false;
+      });
+      ref.read(authControllerProvider.notifier).refreshProfile();
+    } catch (_) {
+      if (!mounted) return;
+      _addErrorBubble();
+    }
+    _scrollToBottom();
+  }
+
+  void _addErrorBubble() {
+    setState(() {
+      _messages.add(ChatMessage(
+        id: 'err-${_localSeq++}',
+        role: 'assistant',
+        content:
+            'ขอโทษนะ ตอนนี้พี่เงินตอบไม่ได้ ลองใหม่อีกครั้ง 🙏 (เช็คว่า backend รันอยู่)',
+        createdAt: DateTime.now(),
+      ));
+      _sending = false;
+    });
+  }
+
+  /// หยุดพี่เงินระหว่างกำลังตอบ (เหมือนกดหยุดใน Claude)
+  void _stopGenerating() {
+    _cancelToken?.cancel('user_stopped');
+    if (mounted) setState(() => _sending = false);
+  }
+
+  /// ส่งข้อความล่าสุดซ้ำ (regenerate)
+  void _resendLast() {
+    final t = _lastUserText;
+    if (t == null || _sending) return;
+    _send(t, imageBase64: _lastUserImage);
+  }
+
+  Future<void> _copyText(String text) async {
+    await Clipboard.setData(ClipboardData(text: text));
+    _snack('คัดลอกข้อความแล้ว');
+  }
+
+  Future<void> _toggleMic() async {
+    if (!_sttAvailable) {
+      _snack('อุปกรณ์/เบราว์เซอร์นี้ยังไม่รองรับการรับเสียง');
+      return;
+    }
+    if (_listening) {
+      await _stopListening();
+    } else {
+      setState(() => _listening = true);
+      await _speech.listen(
+        localeId: 'th_TH',
+        onResult: (r) => setState(() => _controller.text = r.recognizedWords),
+      );
+    }
+  }
+
+  Future<void> _stopListening() async {
+    await _speech.stop();
+    if (mounted) setState(() => _listening = false);
+  }
+
+  Future<void> _attachImage() async {
+    if (_attaching) return;
+    try {
+      final XFile? file = await _picker.pickImage(
+        source: ImageSource.gallery,
+        imageQuality: 70,
+        maxWidth: 1600,
+      );
+      if (file == null) return;
+      setState(() => _attaching = true);
+      final bytes = await file.readAsBytes();
+      final dataUrl = 'data:image/jpeg;base64,${base64Encode(bytes)}';
+
+      if (!mounted) return;
+      // แนบไว้ก่อน (ยังไม่ส่ง) — ให้ผู้ใช้พิมพ์ข้อความแล้วค่อยกดส่ง
+      setState(() {
+        _attaching = false;
+        _pendingImage = dataUrl;
+        _pendingSlipType = 'expense'; // เริ่มที่รายจ่าย ให้ผู้ใช้แตะเลือกรายรับได้
+      });
+    } catch (e) {
+      if (mounted) setState(() => _attaching = false);
+      _snack('แนบรูปไม่สำเร็จ: $e');
+    }
+  }
+
+  void _snack(String m) {
+    if (mounted)
+      ScaffoldMessenger.of(context).showSnackBar(SnackBar(content: Text(m)));
+  }
+
+  void _scrollToBottom() {
+    WidgetsBinding.instance.addPostFrameCallback((_) {
+      if (_scroll.hasClients) {
+        _scroll.animateTo(_scroll.position.maxScrollExtent,
+            duration: const Duration(milliseconds: 250), curve: Curves.easeOut);
+      }
+    });
+  }
+
+  void _handleScroll() {
+    if (!_scroll.hasClients) return;
+    final distanceFromBottom =
+        _scroll.position.maxScrollExtent - _scroll.position.pixels;
+    final shouldShow = distanceFromBottom > 180;
+    if (mounted && shouldShow != _showJumpToLatest) {
+      setState(() => _showJumpToLatest = shouldShow);
+    }
+  }
+
+  void _followLatestMessage() {
+    if (!_showJumpToLatest) _scrollToBottom();
+  }
+
+  @override
+  Widget build(BuildContext context) {
+    final sidebarOpen = ref.watch(sidebarOpenProvider);
+    // จอกว้าง (แท็บเล็ต/เว็บ) ให้แถบข้างกว้างคงที่ · มือถือใช้ 82% ของจอ
+    final screenW = MediaQuery.of(context).size.width;
+    final sidebarWidth = screenW > 620 ? 320.0 : screenW * 0.82;
+    final hasConversation = _messages.isNotEmpty;
+    final showFullMenu = !hasConversation || _menuExpanded;
+
+    return Scaffold(
+      appBar: AppBar(
+        centerTitle: true,
+        leading: IconButton(
+          tooltip: 'บทสนทนา',
+          icon: const Icon(Icons.view_sidebar_rounded,
+              color: Colors.white, size: 22),
+          onPressed: () => ref
+              .read(sidebarOpenProvider.notifier)
+              .update((v) => !v),
+        ),
+        title: const Text(
+          'พี่เงิน',
+          style: TextStyle(fontSize: 18, fontWeight: FontWeight.w800),
+        ),
+        actions: [
+          IconButton(
+            tooltip: 'แชทใหม่',
+            icon: const Icon(Icons.add_comment_outlined,
+                color: Colors.white, size: 21),
+            onPressed: _startNewChat,
+          ),
+          IconButton(
+            tooltip: 'กลับหน้าหลัก',
+            icon: const Icon(Icons.home_rounded, color: Colors.white, size: 22),
+            onPressed: () {
+              if (Navigator.of(context).canPop() || context.canPop()) {
+                context.pop();
+              } else {
+                context.go('/');
+              }
+            },
+          ),
+        ],
+      ),
+      body: Stack(
+        children: [
+          SafeArea(
+            child: Column(
+              children: [
+                _AvatarHeader(mood: _mood),
+            _RichMenu(
+              busy: _sending,
+              expanded: showFullMenu,
+              canCollapse: hasConversation,
+              onToggle: () => setState(() => _menuExpanded = !_menuExpanded),
+              onSelected: (prompt) {
+                setState(() => _menuExpanded = false);
+                _send(prompt);
+              },
+            ),
+            Expanded(
+              child: _loading
+                  ? const Center(child: CircularProgressIndicator())
+                  : Stack(
+                      children: [
+                        Positioned.fill(
+                          child: ListView(
+                            controller: _scroll,
+                            padding: const EdgeInsets.fromLTRB(16, 4, 16, 70),
+                            children: [
+                              if (_messages.isEmpty) const _Welcome(),
+                              ..._messages.map((m) => _Bubble(
+                                    key: ValueKey(m.id),
+                                    message: m,
+                                    animate: !m.isUser && m.id == _typingId,
+                                    onGrow: _followLatestMessage,
+                                    // แสดงปุ่ม คัดลอก/ส่งซ้ำ เฉพาะข้อความพี่เงินที่พิมพ์เสร็จแล้ว
+                                    onCopy: !m.isUser && m.id != _typingId
+                                        ? () => _copyText(m.content)
+                                        : null,
+                                    onRetry: !m.isUser &&
+                                            m.id != _typingId &&
+                                            m.id == _messages.last.id &&
+                                            !_sending
+                                        ? _resendLast
+                                        : null,
+                                    onTypingComplete: !m.isUser &&
+                                            m.id == _typingId
+                                        ? () {
+                                            if (mounted && _typingId == m.id) {
+                                              setState(() => _typingId = null);
+                                            }
+                                          }
+                                        : null,
+                                  )),
+                              if (_sending) const _TypingBubble(),
+                            ],
+                          ),
+                        ),
+                        if (_showJumpToLatest)
+                          Positioned(
+                            left: 0,
+                            right: 0,
+                            bottom: 12,
+                            child: Center(
+                              child: Tooltip(
+                                message: 'ไปยังข้อความล่าสุด',
+                                child: Material(
+                                  color: AppColors.primary,
+                                  shape: const CircleBorder(),
+                                  elevation: 6,
+                                  shadowColor: Colors.black54,
+                                  child: InkWell(
+                                    onTap: _scrollToBottom,
+                                    customBorder: const CircleBorder(),
+                                    child: const SizedBox(
+                                      width: 46,
+                                      height: 46,
+                                      child: Icon(
+                                        Icons
+                                            .keyboard_double_arrow_down_rounded,
+                                        color: Colors.white,
+                                        size: 25,
+                                      ),
+                                    ),
+                                  ),
+                                ),
+                              ),
+                            ),
+                          ),
+                      ],
+                    ),
+            ),
+            _InputBar(
+              controller: _controller,
+              listening: _listening,
+              attaching: _attaching,
+              busy: _sending,
+              pendingImage: _pendingImage,
+              slipType: _pendingSlipType,
+              onSlipTypeChanged: (t) => setState(() => _pendingSlipType = t),
+              onMic: _toggleMic,
+              onImage: _attachImage,
+              onRemoveImage: () => setState(() => _pendingImage = null),
+              onSend: () => _send(_controller.text),
+              onStop: _stopGenerating,
+            ),
+              ],
+            ),
+          ),
+
+          // ── แถบข้าง: รายการบทสนทนา / รูป / ไฟล์ ──
+          if (sidebarOpen) ...[
+            // แตะพื้นที่มืดเพื่อปิด
+            Positioned.fill(
+              child: GestureDetector(
+                onTap: () =>
+                    ref.read(sidebarOpenProvider.notifier).state = false,
+                child: Container(color: Colors.black54),
+              ),
+            ),
+            Align(
+              alignment: Alignment.centerLeft,
+              child: SizedBox(
+                width: sidebarWidth,
+                child: ChatSidebar(
+                  onSelectSession: _switchSession,
+                  onNewChat: _startNewChat,
+                  onClose: () =>
+                      ref.read(sidebarOpenProvider.notifier).state = false,
+                ),
+              ),
+            ),
+          ],
+        ],
+      ),
+    );
+  }
+}
+
+/// Rich Menu ลัดไปยังงานการเงินที่ใช้บ่อย โดยคงพื้นที่แชทไว้เป็นสัดส่วนหลัก
+class _RichMenuItem {
+  const _RichMenuItem({
+    required this.emoji,
+    required this.label,
+    required this.description,
+    required this.prompt,
+    required this.accent,
+  });
+
+  final String emoji;
+  final String label;
+  final String description;
+  final String prompt;
+  final Color accent;
+}
+
+class _RichMenu extends StatelessWidget {
+  const _RichMenu({
+    required this.busy,
+    required this.expanded,
+    required this.canCollapse,
+    required this.onToggle,
+    required this.onSelected,
+  });
+
+  final bool busy;
+  final bool expanded;
+  final bool canCollapse;
+  final VoidCallback onToggle;
+  final ValueChanged<String> onSelected;
+
+  static const _items = [
+    _RichMenuItem(
+      emoji: '💰',
+      label: 'วิเคราะห์การเงิน',
+      description: 'เช็กพฤติกรรมการใช้เงิน และค้นหาโอกาสปรับแผน',
+      prompt: 'ช่วยวิเคราะห์ภาพรวมการเงินของฉันให้หน่อย',
+      accent: Color(0xFF70D94B),
+    ),
+    _RichMenuItem(
+      emoji: '🎯',
+      label: 'ตั้งเป้าหมาย',
+      description: 'ตั้งเป้าหมายการออม ให้สำเร็จตามแผน',
+      prompt: 'ช่วยฉันตั้งเป้าหมายการเงินที่ทำได้จริง',
+      accent: Color(0xFF9B72E8),
+    ),
+    _RichMenuItem(
+      emoji: '📊',
+      label: 'ปรึกษาการลงทุน',
+      description: 'วิเคราะห์พอร์ตและรับคำแนะนำจาก AI',
+      prompt: 'ฉันอยากปรึกษาเรื่องการลงทุน ควรเริ่มอย่างไรดี',
+      accent: Color(0xFF4A9EEA),
+    ),
+    _RichMenuItem(
+      emoji: '💸',
+      label: 'บันทึกรายจ่าย',
+      description: 'บันทึกง่าย รวดเร็ว ด้วย AI ช่วยจำแนก',
+      prompt: 'ช่วยฉันบันทึกรายจ่ายรายการใหม่',
+      accent: Color(0xFFE9952D),
+    ),
+    _RichMenuItem(
+      emoji: '📈',
+      label: 'สรุปรายเดือน',
+      description: 'ดูภาพรวมรายรับ รายจ่าย และเงินคงเหลือ',
+      prompt: 'ช่วยสรุปรายรับรายจ่ายของฉันในเดือนนี้',
+      accent: Color(0xFF2FC9B4),
+    ),
+  ];
+
+  @override
+  Widget build(BuildContext context) {
+    if (!expanded) {
+      return Align(
+        alignment: Alignment.centerLeft,
+        child: Padding(
+          padding: const EdgeInsets.fromLTRB(16, 0, 16, 8),
+          child: OutlinedButton.icon(
+            onPressed: busy ? null : onToggle,
+            icon: const Icon(Icons.auto_awesome_rounded, size: 17),
+            label: const Text('เมนูแนะนำ'),
+            style: OutlinedButton.styleFrom(
+              foregroundColor: AppColors.primary,
+              side: const BorderSide(color: Color(0xFF27543A)),
+              backgroundColor: const Color(0xFF102219),
+              minimumSize: const Size(0, 40),
+              padding: const EdgeInsets.symmetric(horizontal: 14),
+            ),
+          ),
+        ),
+      );
+    }
+
+    return Padding(
+      padding: const EdgeInsets.fromLTRB(12, 0, 12, 12),
+      child: Align(
+        alignment: Alignment.topCenter,
+        child: ConstrainedBox(
+          constraints: const BoxConstraints(maxWidth: 960),
+          child: Column(
+            crossAxisAlignment: CrossAxisAlignment.start,
+            children: [
+              Padding(
+                padding: const EdgeInsets.only(left: 2, bottom: 8),
+                child: Row(
+                  children: [
+                    const Text(
+                      'เมนูแนะนำ',
+                      style: TextStyle(
+                        color: AppColors.primary,
+                        fontSize: 13,
+                        fontWeight: FontWeight.w800,
+                      ),
+                    ),
+                    const Spacer(),
+                    if (canCollapse)
+                      InkWell(
+                        onTap: onToggle,
+                        borderRadius: BorderRadius.circular(16),
+                        child: const Padding(
+                          padding: EdgeInsets.all(4),
+                          child: Icon(Icons.keyboard_arrow_up_rounded,
+                              color: AppColors.textMuted, size: 20),
+                        ),
+                      ),
+                  ],
+                ),
+              ),
+              SizedBox(
+                height: 154,
+                child: LayoutBuilder(
+                  builder: (context, constraints) {
+                    const gap = 9.0;
+                    final showAll = constraints.maxWidth >= 780;
+                    final cardWidth = showAll
+                        ? (constraints.maxWidth - (gap * 4)) / 5
+                        : (constraints.maxWidth * 0.43).clamp(148.0, 174.0);
+
+                    return ListView.separated(
+                      scrollDirection: Axis.horizontal,
+                      physics: showAll
+                          ? const NeverScrollableScrollPhysics()
+                          : const BouncingScrollPhysics(),
+                      itemCount: _items.length,
+                      separatorBuilder: (_, __) => const SizedBox(width: gap),
+                      itemBuilder: (context, index) => SizedBox(
+                        width: cardWidth,
+                        child: _RichMenuCard(
+                          item: _items[index],
+                          busy: busy,
+                          onTap: () => onSelected(_items[index].prompt),
+                        ),
+                      ),
+                    );
+                  },
+                ),
+              ),
+            ],
+          ),
+        ),
+      ),
+    );
+  }
+}
+
+class _RichMenuCard extends StatelessWidget {
+  const _RichMenuCard({
+    required this.item,
+    required this.busy,
+    required this.onTap,
+  });
+
+  final _RichMenuItem item;
+  final bool busy;
+  final VoidCallback onTap;
+
+  @override
+  Widget build(BuildContext context) {
+    return Opacity(
+      opacity: busy ? 0.55 : 1,
+      child: Material(
+        color: Colors.transparent,
+        borderRadius: BorderRadius.circular(14),
+        child: InkWell(
+          onTap: busy ? null : onTap,
+          borderRadius: BorderRadius.circular(14),
+          child: Ink(
+            decoration: BoxDecoration(
+              borderRadius: BorderRadius.circular(14),
+              border: Border.all(color: item.accent.withValues(alpha: 0.55)),
+              gradient: LinearGradient(
+                begin: Alignment.topLeft,
+                end: Alignment.bottomRight,
+                colors: [
+                  item.accent.withValues(alpha: 0.28),
+                  const Color(0xFF101923),
+                ],
+              ),
+              boxShadow: [
+                BoxShadow(
+                  color: item.accent.withValues(alpha: 0.08),
+                  blurRadius: 16,
+                  offset: const Offset(0, 7),
+                ),
+              ],
+            ),
+            child: Stack(
+              children: [
+                Positioned(
+                  right: 14,
+                  top: 13,
+                  child: Icon(
+                    Icons.auto_awesome,
+                    size: 14,
+                    color: item.accent.withValues(alpha: 0.38),
+                  ),
+                ),
+                Positioned(
+                  right: 42,
+                  top: 43,
+                  child: Container(
+                    width: 5,
+                    height: 5,
+                    decoration: BoxDecoration(
+                      color: item.accent.withValues(alpha: 0.3),
+                      shape: BoxShape.circle,
+                    ),
+                  ),
+                ),
+                Padding(
+                  padding: const EdgeInsets.fromLTRB(12, 10, 10, 10),
+                  child: Column(
+                    crossAxisAlignment: CrossAxisAlignment.start,
+                    children: [
+                      Text(item.emoji, style: const TextStyle(fontSize: 32)),
+                      const Spacer(),
+                      Text(
+                        item.label,
+                        maxLines: 1,
+                        overflow: TextOverflow.ellipsis,
+                        style: const TextStyle(
+                          color: Colors.white,
+                          fontSize: 13,
+                          fontWeight: FontWeight.w800,
+                        ),
+                      ),
+                      const SizedBox(height: 4),
+                      Padding(
+                        padding: const EdgeInsets.only(right: 22),
+                        child: Text(
+                          item.description,
+                          maxLines: 2,
+                          overflow: TextOverflow.ellipsis,
+                          style: const TextStyle(
+                            color: Color(0xFFCBD5E1),
+                            fontSize: 11,
+                            height: 1.3,
+                          ),
+                        ),
+                      ),
+                    ],
+                  ),
+                ),
+                Positioned(
+                  right: 8,
+                  bottom: 8,
+                  child: Container(
+                    width: 24,
+                    height: 24,
+                    decoration: BoxDecoration(
+                      color: item.accent.withValues(alpha: 0.72),
+                      shape: BoxShape.circle,
+                    ),
+                    child: const Icon(
+                      Icons.arrow_forward_rounded,
+                      size: 15,
+                      color: Colors.white,
+                    ),
+                  ),
+                ),
+              ],
+            ),
+          ),
+        ),
+      ),
+    );
+  }
+}
+
+/// Avatar อนิเมชันของพี่เงิน — หายใจ/เรืองแสง + เปลี่ยนสีหน้า/สถานะตามอารมณ์
+class _AvatarHeader extends StatefulWidget {
+  const _AvatarHeader({required this.mood});
+  final CoachMood mood;
+  @override
+  State<_AvatarHeader> createState() => _AvatarHeaderState();
+}
+
+class _AvatarHeaderState extends State<_AvatarHeader>
+    with SingleTickerProviderStateMixin {
+  late final AnimationController _c = AnimationController(
+      vsync: this, duration: const Duration(milliseconds: 1600))
+    ..repeat(reverse: true);
+
+  @override
+  void dispose() {
+    _c.dispose();
+    super.dispose();
+  }
+
+  @override
+  Widget build(BuildContext context) {
+    final mood = widget.mood;
+    final color = mood == CoachMood.listening
+        ? AppColors.accent
+        : mood == CoachMood.thinking
+            ? const Color(0xFFFFA94D)
+            : AppColors.primary;
+    final label = mood == CoachMood.listening
+        ? 'กำลังฟัง... พูดได้เลย'
+        : mood == CoachMood.thinking
+            ? 'กำลังคิด...'
+            : 'พร้อมให้คำปรึกษา';
+    final statusIcon = mood == CoachMood.listening
+        ? Icons.mic_rounded
+        : mood == CoachMood.thinking
+            ? Icons.more_horiz_rounded
+            : Icons.check_rounded;
+    final avatarAsset = mood == CoachMood.thinking
+        ? 'assets/images/chat_typing_v2.png'
+        : 'assets/images/chat_avatar_v2.png';
+
+    return Padding(
+      padding: const EdgeInsets.symmetric(vertical: 6),
+      child: Column(
+        children: [
+          AnimatedBuilder(
+            animation: _c,
+            builder: (context, child) {
+              final t = _c.value;
+              final pulse = mood == CoachMood.idle ? 0.04 : 0.10;
+              final scale = 1.0 + pulse * t;
+              final glow = (mood == CoachMood.idle ? 8.0 : 16.0) + 10 * t;
+              return Transform.scale(
+                scale: scale,
+                child: Stack(
+                  clipBehavior: Clip.none,
+                  children: [
+                    Container(
+                      width: 58,
+                      height: 58,
+                      padding: const EdgeInsets.all(2),
+                      decoration: BoxDecoration(
+                        shape: BoxShape.circle,
+                        color: color,
+                        border: Border.all(
+                          color: Colors.white.withValues(alpha: 0.16),
+                          width: 1,
+                        ),
+                        boxShadow: [
+                          BoxShadow(
+                            color: color.withValues(alpha: 0.45),
+                            blurRadius: glow,
+                            spreadRadius: 1,
+                          )
+                        ],
+                      ),
+                      child: ClipOval(
+                        child: SizedBox.expand(
+                          child: AnimatedSwitcher(
+                            duration: const Duration(milliseconds: 280),
+                            layoutBuilder: (currentChild, previousChildren) {
+                              return Stack(
+                                fit: StackFit.expand,
+                                alignment: Alignment.center,
+                                children: [
+                                  ...previousChildren,
+                                  if (currentChild != null) currentChild,
+                                ],
+                              );
+                            },
+                            child: Image.asset(
+                              avatarAsset,
+                              key: ValueKey(avatarAsset),
+                              width: double.infinity,
+                              height: double.infinity,
+                              fit: BoxFit.cover,
+                              alignment: Alignment.center,
+                              errorBuilder: (context, error, stackTrace) {
+                                return Image.asset(
+                                  'assets/images/logo.png',
+                                  fit: BoxFit.cover,
+                                );
+                              },
+                            ),
+                          ),
+                        ),
+                      ),
+                    ),
+                    Positioned(
+                      right: -2,
+                      bottom: -2,
+                      child: Container(
+                        width: 20,
+                        height: 20,
+                        decoration: BoxDecoration(
+                          color: color,
+                          shape: BoxShape.circle,
+                          border: Border.all(
+                              color: const Color(0xFF0D1117), width: 2),
+                        ),
+                        child: Icon(statusIcon, color: Colors.white, size: 12),
+                      ),
+                    ),
+                  ],
+                ),
+              );
+            },
+          ),
+          const SizedBox(height: 8),
+          AnimatedSwitcher(
+            duration: const Duration(milliseconds: 250),
+            child: Text(label,
+                key: ValueKey(label),
+                style: const TextStyle(
+                    color: AppColors.textMuted,
+                    fontSize: 13,
+                    fontWeight: FontWeight.w600)),
+          ),
+        ],
+      ),
+    );
+  }
+}
+
+class _Welcome extends StatelessWidget {
+  const _Welcome();
+  @override
+  Widget build(BuildContext context) {
+    return Container(
+      margin: const EdgeInsets.only(bottom: 16),
+      padding: const EdgeInsets.all(16),
+      decoration: BoxDecoration(
+        color: AppColors.surface,
+        borderRadius: BorderRadius.circular(16),
+        border: Border.all(color: Colors.white.withOpacity(0.06)),
+      ),
+      child: const Column(
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: [
+          Text('สวัสดีครับ ผมพี่เงิน ที่ปรึกษาการเงินของคุณ 🤝',
+              style: TextStyle(
+                  color: AppColors.textDark,
+                  fontWeight: FontWeight.bold,
+                  fontSize: 16)),
+          SizedBox(height: 6),
+          Text(
+            'ถามเรื่องรายรับ–รายจ่าย การออม หนี้ ภาษี ประกัน ลงทุน หรือเกษียณได้เลย — ผมเห็นข้อมูลการเงินของคุณ จึงช่วยวางแผนได้ตรงจุด\nพิมพ์ พูด (กดไมค์) หรือส่งรูปสลิป (กดรูป) ก็ได้นะ 💬🎤🖼️',
+            style: TextStyle(color: AppColors.textMuted, height: 1.45),
+          ),
+        ],
+      ),
+    );
+  }
+}
+
+// ใช้สีเฉพาะหน้าแชทเพื่อให้ข้อความอ่านง่ายและไม่เปลี่ยนตามสี primary ของแอป
+const _userBubbleColor = Color(0xFF075985);
+const _coachBubbleColor = Color(0xFF1E293B);
+const _chatTextColor = Color(0xFFF8FAFC);
+const _chatMutedTextColor = Color(0xFFCBD5E1);
+
+/// สไตล์ markdown ของบับเบิลพี่เงิน (ใช้ทั้งแบบนิ่งและแบบพิมพ์ทีละตัว)
+MarkdownStyleSheet _coachMdStyle() => MarkdownStyleSheet(
+      p: const TextStyle(color: _chatTextColor, height: 1.45, fontSize: 14),
+      strong: const TextStyle(color: Colors.white, fontWeight: FontWeight.bold),
+      listBullet:
+          const TextStyle(color: _chatTextColor, height: 1.45, fontSize: 14),
+      h3: const TextStyle(
+          color: Colors.white, fontSize: 15, fontWeight: FontWeight.bold),
+      blockquote: const TextStyle(
+        color: _chatTextColor,
+        fontSize: 13,
+        height: 1.5,
+        fontWeight: FontWeight.w500,
+      ),
+      blockquotePadding:
+          const EdgeInsets.symmetric(horizontal: 14, vertical: 12),
+      blockquoteDecoration: BoxDecoration(
+        color: const Color(0xFF0F3B5A),
+        borderRadius: BorderRadius.circular(10),
+        border: Border.all(color: const Color(0xFF38BDF8), width: 1.2),
+      ),
+      tableHead: const TextStyle(
+          color: Colors.white, fontSize: 13, fontWeight: FontWeight.w700),
+      tableBody: const TextStyle(color: _chatTextColor, fontSize: 13),
+      tableBorder: TableBorder.all(color: const Color(0xFF475569), width: 0.8),
+      tableCellsPadding:
+          const EdgeInsets.symmetric(horizontal: 10, vertical: 8),
+      tableHeadCellsDecoration: const BoxDecoration(color: Color(0xFF243244)),
+      horizontalRuleDecoration: const BoxDecoration(
+        border: Border(top: BorderSide(color: Color(0xFF334155), width: 1)),
+      ),
+      blockSpacing: 8,
+    );
+
+class _Bubble extends StatelessWidget {
+  const _Bubble({
+    super.key,
+    required this.message,
+    this.animate = false,
+    this.onGrow,
+    this.onTypingComplete,
+    this.onCopy,
+    this.onRetry,
+  });
+  final ChatMessage message;
+  final bool
+      animate; // true = ค่อย ๆ พิมพ์ออกมา (เฉพาะข้อความพี่เงินที่เพิ่งตอบ)
+  final VoidCallback? onGrow;
+  final VoidCallback? onTypingComplete;
+  final VoidCallback? onCopy; // คัดลอกข้อความ (เฉพาะข้อความพี่เงิน)
+  final VoidCallback? onRetry; // ส่งซ้ำ (เฉพาะข้อความล่าสุด)
+
+  @override
+  Widget build(BuildContext context) {
+    final isUser = message.isUser;
+    return Align(
+      alignment: isUser ? Alignment.centerRight : Alignment.centerLeft,
+      child: Container(
+        constraints: BoxConstraints(
+            maxWidth: MediaQuery.of(context).size.width * (isUser ? 0.8 : 0.9)),
+        margin: const EdgeInsets.only(bottom: 10),
+        padding: EdgeInsets.symmetric(
+            horizontal: isUser ? 14 : 0, vertical: isUser ? 10 : 4),
+        decoration: BoxDecoration(
+          color: isUser ? _userBubbleColor : Colors.transparent,
+          borderRadius: BorderRadius.circular(16),
+          border: isUser
+              ? Border.all(
+                  color: const Color(0xFF38BDF8).withValues(alpha: 0.55))
+              : null,
+        ),
+        child: Column(
+          crossAxisAlignment: CrossAxisAlignment.start,
+          mainAxisSize: MainAxisSize.min,
+          children: [
+            if (!isUser) ...[
+              const Text(
+                'พี่เงิน',
+                style: TextStyle(
+                  color: AppColors.primary,
+                  fontSize: 12,
+                  fontWeight: FontWeight.w700,
+                ),
+              ),
+              const SizedBox(height: 5),
+            ],
+            if (isUser && message.imageDataUrl != null) ...[
+              // โชว์รูปที่ผู้ใช้ส่งจริง (สลิป/ใบเสร็จ) ในฟองแชท
+              ClipRRect(
+                borderRadius: BorderRadius.circular(12),
+                child: ConstrainedBox(
+                  constraints: const BoxConstraints(maxHeight: 240, maxWidth: 220),
+                  child: Image.memory(
+                    base64Decode(message.imageDataUrl!.split(',').last),
+                    fit: BoxFit.cover,
+                    gaplessPlayback: true,
+                    errorBuilder: (_, __, ___) => const Icon(Icons.broken_image_outlined,
+                        color: Colors.white70, size: 32),
+                  ),
+                ),
+              ),
+              const SizedBox(height: 8),
+            ] else if (isUser && message.hasImage) ...[
+              // ประวัติเก่า (backend ไม่เก็บรูป) → ป้ายบอกว่าเคยส่งรูป
+              const Row(
+                mainAxisSize: MainAxisSize.min,
+                children: [
+                  Icon(Icons.image_outlined, color: Colors.white70, size: 16),
+                  SizedBox(width: 6),
+                  Text('ส่งรูปภาพแล้ว',
+                      style: TextStyle(
+                          color: Colors.white70,
+                          fontSize: 12,
+                          fontWeight: FontWeight.w500)),
+                ],
+              ),
+              const SizedBox(height: 6),
+            ],
+            isUser
+                ? Text(message.content,
+                    style: const TextStyle(
+                      color: _chatTextColor,
+                      height: 1.45,
+                      fontWeight: FontWeight.w500,
+                    ))
+                : animate
+                    ? _TypewriterMarkdown(
+                        text: message.content,
+                        onGrow: onGrow,
+                        onComplete: onTypingComplete,
+                      )
+                    : MarkdownBody(
+                        data: message.content,
+                        selectable: true,
+                        styleSheet: _coachMdStyle()),
+            // ปุ่มดาวน์โหลดไฟล์ที่พี่เงินสร้างให้ (Excel/XML)
+            if (!isUser && message.attachment != null) ...[
+              const SizedBox(height: 10),
+              _DownloadButton(att: message.attachment!),
+            ],
+            // การ์ด "จดสำเร็จ" เมื่อพี่เงินบันทึกรายรับ-รายจ่ายให้
+            if (!isUser && message.cards.isNotEmpty) ...[
+              const SizedBox(height: 10),
+              ...message.cards.map((c) => Padding(
+                    padding: const EdgeInsets.only(bottom: 8),
+                    child: _TxnSuccessCard(card: c, createdAt: message.createdAt),
+                  )),
+            ],
+            // แถวปุ่ม คัดลอก / ส่งซ้ำ (เฉพาะข้อความพี่เงิน)
+            if (!isUser && (onCopy != null || onRetry != null)) ...[
+              const SizedBox(height: 4),
+              Row(
+                mainAxisSize: MainAxisSize.min,
+                children: [
+                  if (onCopy != null)
+                    _MsgAction(icon: Icons.copy_rounded, label: 'คัดลอก', onTap: onCopy!),
+                  if (onRetry != null)
+                    _MsgAction(icon: Icons.refresh_rounded, label: 'ส่งซ้ำ', onTap: onRetry!),
+                ],
+              ),
+            ],
+          ],
+        ),
+      ),
+    );
+  }
+}
+
+/// ปุ่มเล็กใต้ข้อความพี่เงิน (คัดลอก/ส่งซ้ำ) — สไตล์เดียวกับปุ่มใน Claude
+class _MsgAction extends StatelessWidget {
+  const _MsgAction({required this.icon, required this.label, required this.onTap});
+  final IconData icon;
+  final String label;
+  final VoidCallback onTap;
+
+  @override
+  Widget build(BuildContext context) {
+    return InkWell(
+      onTap: onTap,
+      borderRadius: BorderRadius.circular(8),
+      child: Padding(
+        padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 5),
+        child: Row(
+          mainAxisSize: MainAxisSize.min,
+          children: [
+            Icon(icon, size: 15, color: const Color(0xFF94A3B8)),
+            const SizedBox(width: 4),
+            Text(label,
+                style: const TextStyle(
+                    color: Color(0xFF94A3B8),
+                    fontSize: 12,
+                    fontWeight: FontWeight.w500)),
+          ],
+        ),
+      ),
+    );
+  }
+}
+
+const List<String> _thMonths = [
+  'ม.ค.', 'ก.พ.', 'มี.ค.', 'เม.ย.', 'พ.ค.', 'มิ.ย.',
+  'ก.ค.', 'ส.ค.', 'ก.ย.', 'ต.ค.', 'พ.ย.', 'ธ.ค.',
+];
+
+String _thaiDateTime(DateTime d) {
+  final t =
+      '${d.hour.toString().padLeft(2, '0')}:${d.minute.toString().padLeft(2, '0')}';
+  return '${d.day} ${_thMonths[d.month - 1]} ${d.year + 543} $t';
+}
+
+/// การ์ด "จดสำเร็จ" — ยืนยันการบันทึกรายการที่พี่เงินทำให้ พร้อมปุ่มลบ/แก้ไข (แบบป้านวล)
+class _TxnSuccessCard extends ConsumerStatefulWidget {
+  const _TxnSuccessCard({required this.card, required this.createdAt});
+  final TxnCard card;
+  final DateTime createdAt;
+
+  @override
+  ConsumerState<_TxnSuccessCard> createState() => _TxnSuccessCardState();
+}
+
+class _TxnSuccessCardState extends ConsumerState<_TxnSuccessCard> {
+  late num _amountBaht = widget.card.amountBaht;
+  late String _note = widget.card.note;
+  late String? _categoryId = widget.card.categoryId;
+  late String _category = widget.card.category;
+  bool _deleted = false;
+  bool _busy = false;
+
+  Future<void> _delete() async {
+    setState(() => _busy = true);
+    try {
+      await ref.read(transactionsRepoProvider).delete(widget.card.id);
+      ref.invalidate(dashboardProvider);
+      if (mounted) setState(() => _deleted = true);
+    } catch (_) {
+      if (mounted) {
+        setState(() => _busy = false);
+        ScaffoldMessenger.of(context).showSnackBar(
+          const SnackBar(content: Text('ลบไม่สำเร็จ ลองใหม่อีกครั้ง')),
+        );
+      }
+    }
+  }
+
+  Future<void> _edit() async {
+    // โหลดหมวดตามประเภทรายการ (รายรับ/รายจ่าย) สำหรับตัวเลือกในหน้าแก้
+    List<Category> cats = const [];
+    try {
+      final all = await ref.read(categoriesProvider.future);
+      cats = all.where((c) => c.type == widget.card.type).toList();
+    } catch (_) {}
+    if (!mounted) return;
+
+    final amountCtl = TextEditingController(text: _amountBaht.toString());
+    final noteCtl = TextEditingController(text: _note);
+    String? selCatId = _categoryId;
+    String selCatName = _category;
+
+    final saved = await showModalBottomSheet<bool>(
+      context: context,
+      isScrollControlled: true,
+      backgroundColor: const Color(0xFF1E293B),
+      shape: const RoundedRectangleBorder(
+          borderRadius: BorderRadius.vertical(top: Radius.circular(18))),
+      builder: (ctx) => StatefulBuilder(
+        builder: (ctx, setSheet) => Padding(
+          padding: EdgeInsets.only(
+              left: 20,
+              right: 20,
+              top: 18,
+              bottom: MediaQuery.of(ctx).viewInsets.bottom + 20),
+          child: Column(
+            mainAxisSize: MainAxisSize.min,
+            crossAxisAlignment: CrossAxisAlignment.start,
+            children: [
+              const Text('แก้ไขรายการ',
+                  style: TextStyle(
+                      color: Colors.white,
+                      fontSize: 16,
+                      fontWeight: FontWeight.w700)),
+              const SizedBox(height: 14),
+              TextField(
+                controller: amountCtl,
+                keyboardType:
+                    const TextInputType.numberWithOptions(decimal: true),
+                style: const TextStyle(color: Colors.white),
+                decoration: const InputDecoration(
+                  labelText: 'จำนวนเงิน (บาท)',
+                  labelStyle: TextStyle(color: Colors.white54),
+                  enabledBorder: OutlineInputBorder(
+                      borderSide: BorderSide(color: Colors.white24)),
+                ),
+              ),
+              const SizedBox(height: 12),
+              TextField(
+                controller: noteCtl,
+                style: const TextStyle(color: Colors.white),
+                decoration: const InputDecoration(
+                  labelText: 'บันทึกช่วยจำ',
+                  labelStyle: TextStyle(color: Colors.white54),
+                  enabledBorder: OutlineInputBorder(
+                      borderSide: BorderSide(color: Colors.white24)),
+                ),
+              ),
+              if (cats.isNotEmpty) ...[
+                const SizedBox(height: 16),
+                const Text('หมวดหมู่',
+                    style: TextStyle(color: Colors.white54, fontSize: 13)),
+                const SizedBox(height: 8),
+                ConstrainedBox(
+                  constraints: const BoxConstraints(maxHeight: 180),
+                  child: SingleChildScrollView(
+                    child: Wrap(
+                      spacing: 8,
+                      runSpacing: 8,
+                      children: cats.map((c) {
+                        final selected = c.id == selCatId;
+                        return GestureDetector(
+                          onTap: () => setSheet(() {
+                            selCatId = c.id;
+                            selCatName = c.nameTh;
+                          }),
+                          child: Container(
+                            padding: const EdgeInsets.symmetric(
+                                horizontal: 12, vertical: 8),
+                            decoration: BoxDecoration(
+                              color: selected
+                                  ? AppColors.primary
+                                  : const Color(0xFF334155),
+                              borderRadius: BorderRadius.circular(20),
+                            ),
+                            child: Text('${c.icon} ${c.nameTh}',
+                                style: TextStyle(
+                                    color: selected
+                                        ? Colors.white
+                                        : Colors.white70,
+                                    fontSize: 13,
+                                    fontWeight: selected
+                                        ? FontWeight.w700
+                                        : FontWeight.w500)),
+                          ),
+                        );
+                      }).toList(),
+                    ),
+                  ),
+                ),
+              ],
+              const SizedBox(height: 18),
+              SizedBox(
+                width: double.infinity,
+                child: ElevatedButton(
+                  style: ElevatedButton.styleFrom(
+                      backgroundColor: AppColors.primary),
+                  onPressed: () => Navigator.pop(ctx, true),
+                  child: const Text('บันทึก'),
+                ),
+              ),
+            ],
+          ),
+        ),
+      ),
+    );
+    if (saved != true) {
+      return;
+    }
+    final newAmount = double.tryParse(amountCtl.text.trim());
+    if (newAmount == null || newAmount <= 0) {
+      return;
+    }
+    setState(() => _busy = true);
+    try {
+      await ref.read(transactionsRepoProvider).update(
+            widget.card.id,
+            type: widget.card.type,
+            amount: (newAmount * 100).round(),
+            categoryId: selCatId,
+            note: noteCtl.text.trim(),
+          );
+      ref.invalidate(dashboardProvider);
+      if (mounted) {
+        setState(() {
+          _amountBaht = newAmount;
+          _note = noteCtl.text.trim();
+          _categoryId = selCatId;
+          _category = selCatName;
+          _busy = false;
+        });
+      }
+    } catch (_) {
+      if (mounted) {
+        setState(() => _busy = false);
+        ScaffoldMessenger.of(context).showSnackBar(
+          const SnackBar(content: Text('แก้ไขไม่สำเร็จ ลองใหม่อีกครั้ง')),
+        );
+      }
+    }
+  }
+
+  @override
+  Widget build(BuildContext context) {
+    final c = widget.card;
+    final isIncome = c.isIncome;
+    final pillColor =
+        isIncome ? const Color(0xFF16A34A) : const Color(0xFFDB2777);
+
+    if (_deleted) {
+      return Container(
+        padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 12),
+        decoration: BoxDecoration(
+          color: const Color(0xFFF1F5F9),
+          borderRadius: BorderRadius.circular(14),
+        ),
+        child: const Row(children: [
+          Icon(Icons.delete_outline, color: Color(0xFF94A3B8), size: 18),
+          SizedBox(width: 8),
+          Text('ลบรายการแล้ว',
+              style: TextStyle(
+                  color: Color(0xFF94A3B8),
+                  fontWeight: FontWeight.w600,
+                  decoration: TextDecoration.lineThrough)),
+        ]),
+      );
+    }
+
+    return Container(
+      constraints: const BoxConstraints(minWidth: 240),
+      padding: const EdgeInsets.fromLTRB(14, 12, 12, 12),
+      decoration: BoxDecoration(
+        color: Colors.white,
+        borderRadius: BorderRadius.circular(14),
+        boxShadow: [
+          BoxShadow(
+              color: Colors.black.withValues(alpha: 0.15),
+              blurRadius: 8,
+              offset: const Offset(0, 3)),
+        ],
+      ),
+      child: Column(
+        crossAxisAlignment: CrossAxisAlignment.start,
+        mainAxisSize: MainAxisSize.min,
+        children: [
+          // แถวหัว: จดสำเร็จ + ป้ายประเภท
+          Row(
+            children: [
+              const Icon(Icons.check_box, color: Color(0xFF16A34A), size: 20),
+              const SizedBox(width: 6),
+              const Text('จดสำเร็จ',
+                  style: TextStyle(
+                      color: Color(0xFF16A34A),
+                      fontSize: 14,
+                      fontWeight: FontWeight.w700)),
+              const Spacer(),
+              Container(
+                padding:
+                    const EdgeInsets.symmetric(horizontal: 12, vertical: 5),
+                decoration: BoxDecoration(
+                    color: pillColor,
+                    borderRadius: BorderRadius.circular(20)),
+                child: Text(isIncome ? 'รายรับ' : 'รายจ่าย',
+                    style: const TextStyle(
+                        color: Colors.white,
+                        fontSize: 12,
+                        fontWeight: FontWeight.w700)),
+              ),
+            ],
+          ),
+          const SizedBox(height: 12),
+          // แถวกลาง: ชื่อรายการ + ยอด + ปุ่มลบ
+          Row(
+            crossAxisAlignment: CrossAxisAlignment.start,
+            children: [
+              Expanded(
+                child: Text(
+                  _note.isEmpty ? c.category : _note,
+                  style: const TextStyle(
+                      color: Color(0xFF0F172A),
+                      fontSize: 15,
+                      fontWeight: FontWeight.w600,
+                      height: 1.25),
+                ),
+              ),
+              const SizedBox(width: 10),
+              Text('฿${_amountBaht.toStringAsFixed(_amountBaht == _amountBaht.roundToDouble() ? 0 : 2)}',
+                  style: const TextStyle(
+                      color: Color(0xFF0F172A),
+                      fontSize: 17,
+                      fontWeight: FontWeight.w800)),
+              const SizedBox(width: 8),
+              _CardIconButton(
+                icon: Icons.close,
+                bg: const Color(0xFFFEE2E2),
+                fg: const Color(0xFFDC2626),
+                busy: _busy,
+                onTap: _delete,
+              ),
+            ],
+          ),
+          const Divider(height: 20, color: Color(0xFFE2E8F0)),
+          // แถวล่าง: หมวด + วันที่ + ปุ่มแก้
+          Row(
+            crossAxisAlignment: CrossAxisAlignment.end,
+            children: [
+              Expanded(
+                child: Column(
+                  crossAxisAlignment: CrossAxisAlignment.start,
+                  children: [
+                    _kv('หมวด', _category),
+                    const SizedBox(height: 3),
+                    _kv('วันที่', _thaiDateTime(widget.createdAt)),
+                  ],
+                ),
+              ),
+              const SizedBox(width: 8),
+              _CardIconButton(
+                icon: Icons.edit_outlined,
+                bg: const Color(0xFFFEF3C7),
+                fg: const Color(0xFFB45309),
+                busy: _busy,
+                onTap: _edit,
+              ),
+            ],
+          ),
+        ],
+      ),
+    );
+  }
+
+  Widget _kv(String k, String v) => Row(
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: [
+          SizedBox(
+            width: 44,
+            child: Text(k,
+                style: const TextStyle(
+                    color: Color(0xFF94A3B8), fontSize: 12.5)),
+          ),
+          Expanded(
+            child: Text(v,
+                style: const TextStyle(
+                    color: Color(0xFF475569),
+                    fontSize: 12.5,
+                    fontWeight: FontWeight.w600)),
+          ),
+        ],
+      );
+}
+
+class _CardIconButton extends StatelessWidget {
+  const _CardIconButton({
+    required this.icon,
+    required this.bg,
+    required this.fg,
+    required this.onTap,
+    this.busy = false,
+  });
+  final IconData icon;
+  final Color bg;
+  final Color fg;
+  final VoidCallback onTap;
+  final bool busy;
+
+  @override
+  Widget build(BuildContext context) {
+    return Material(
+      color: bg,
+      borderRadius: BorderRadius.circular(9),
+      child: InkWell(
+        borderRadius: BorderRadius.circular(9),
+        onTap: busy ? null : onTap,
+        child: SizedBox(
+          width: 36,
+          height: 36,
+          child: busy
+              ? const Padding(
+                  padding: EdgeInsets.all(10),
+                  child: CircularProgressIndicator(strokeWidth: 2),
+                )
+              : Icon(icon, color: fg, size: 20),
+        ),
+      ),
+    );
+  }
+}
+
+/// ปุ่มดาวน์โหลดไฟล์การเงินจากพี่เงิน — เปิด URL export (auth ด้วย download token)
+class _DownloadButton extends StatelessWidget {
+  const _DownloadButton({required this.att});
+  final ChatAttachment att;
+
+  @override
+  Widget build(BuildContext context) {
+    final icon = switch (att.format) {
+      'pdf' => Icons.picture_as_pdf_outlined,
+      'xlsx' || 'csv' => Icons.table_chart_outlined,
+      'docx' || 'txt' || 'html' => Icons.description_outlined,
+      _ => Icons.code,
+    };
+    return OutlinedButton.icon(
+      onPressed: () {
+        final url =
+            '$kApiBaseUrl/api/v1/export/${att.kind}?format=${att.format}&dt=${att.token}';
+        // ใช้ตัวช่วยที่รองรับ iOS PWA (เปิด URL attachment ตรง ๆ จะได้หน้าขาว)
+        downloadFile(url, att.filename);
+      },
+      icon: Icon(icon, size: 18, color: AppColors.primary),
+      label: Text('ดาวน์โหลด ${att.filename}',
+          style: const TextStyle(
+              color: AppColors.primary,
+              fontSize: 12.5,
+              fontWeight: FontWeight.w600)),
+      style: OutlinedButton.styleFrom(
+        side: BorderSide(color: AppColors.primary.withOpacity(0.5)),
+        padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 8),
+        shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(10)),
+        backgroundColor: AppColors.primary.withOpacity(0.08),
+      ),
+    );
+  }
+}
+
+/// ค่อย ๆ เผยข้อความทีละไม่กี่ตัวอักษร + เคอร์เซอร์กะพริบ จนครบแล้วโชว์ markdown เต็ม
+class _TypewriterMarkdown extends StatefulWidget {
+  const _TypewriterMarkdown({
+    required this.text,
+    this.onGrow,
+    this.onComplete,
+  });
+  final String text;
+  final VoidCallback? onGrow;
+  final VoidCallback? onComplete;
+
+  @override
+  State<_TypewriterMarkdown> createState() => _TypewriterMarkdownState();
+}
+
+class _TypewriterMarkdownState extends State<_TypewriterMarkdown> {
+  Timer? _timer;
+  int _shown = 0;
+  bool _done = false;
+
+  @override
+  void initState() {
+    super.initState();
+    // เร็วขึ้นตามความยาว: ข้อความยาวเผยทีละหลายตัว จะได้ไม่ช้าเกินไป
+    final step = (widget.text.length / 150).ceil().clamp(1, 8);
+    _timer = Timer.periodic(const Duration(milliseconds: 16), (t) {
+      if (!mounted) return;
+      setState(() {
+        _shown = (_shown + step).clamp(0, widget.text.length);
+        if (_shown >= widget.text.length) {
+          _done = true;
+          t.cancel();
+        }
+      });
+      if (_done) widget.onComplete?.call();
+      // เลื่อนจอตามข้อความที่ยาวขึ้น (throttle ทุก ~6 tick)
+      if (widget.onGrow != null && (_done || _shown % (step * 6) < step))
+        widget.onGrow!();
+    });
+  }
+
+  @override
+  void dispose() {
+    _timer?.cancel();
+    super.dispose();
+  }
+
+  @override
+  Widget build(BuildContext context) {
+    // ระหว่างพิมพ์ต่อท้ายด้วยเคอร์เซอร์ "▍"; ครบแล้วเอาออก + selectable
+    final data = _done ? widget.text : '${widget.text.substring(0, _shown)}▍';
+    return MarkdownBody(
+        data: data, selectable: _done, styleSheet: _coachMdStyle());
+  }
+}
+
+class _TypingBubble extends StatelessWidget {
+  const _TypingBubble();
+  @override
+  Widget build(BuildContext context) {
+    return Align(
+      alignment: Alignment.centerLeft,
+      child: Container(
+        margin: const EdgeInsets.only(bottom: 10),
+        padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 12),
+        decoration: BoxDecoration(
+          color: _coachBubbleColor,
+          borderRadius: BorderRadius.circular(16),
+          border: Border.all(
+              color: const Color(0xFF64748B).withValues(alpha: 0.55)),
+        ),
+        child: const Text('พี่เงินกำลังคิด... 💭',
+            style: TextStyle(color: _chatMutedTextColor)),
+      ),
+    );
+  }
+}
+
+/// ปุ่มสลับ รายจ่าย/รายรับ ตอนแนบสลิป — ให้ผู้ใช้เลือกเองแทนให้ระบบเดา (แม่นกว่า)
+class _SlipTypeToggle extends StatelessWidget {
+  const _SlipTypeToggle({required this.value, required this.onChanged});
+  final String value; // 'income' | 'expense'
+  final ValueChanged<String> onChanged;
+
+  @override
+  Widget build(BuildContext context) {
+    return Column(
+      mainAxisSize: MainAxisSize.min,
+      crossAxisAlignment: CrossAxisAlignment.start,
+      children: [
+        const Text('บันทึกสลิปเป็น',
+            style: TextStyle(
+                color: _chatMutedTextColor,
+                fontSize: 11,
+                fontWeight: FontWeight.w600)),
+        const SizedBox(height: 6),
+        Row(
+          mainAxisSize: MainAxisSize.min,
+          children: [
+            _chip('รายจ่าย', 'expense', Icons.trending_down,
+                const Color(0xFFF87171)),
+            const SizedBox(width: 6),
+            _chip('รายรับ', 'income', Icons.trending_up,
+                const Color(0xFF34D399)),
+          ],
+        ),
+      ],
+    );
+  }
+
+  Widget _chip(String label, String type, IconData icon, Color color) {
+    final selected = value == type;
+    return GestureDetector(
+      onTap: () => onChanged(type),
+      child: AnimatedContainer(
+        duration: const Duration(milliseconds: 150),
+        padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 8),
+        decoration: BoxDecoration(
+          color: selected
+              ? color.withValues(alpha: 0.20)
+              : const Color(0xFF16202E),
+          borderRadius: BorderRadius.circular(20),
+          border: Border.all(
+              color: selected ? color : const Color(0xFF334155),
+              width: selected ? 1.5 : 1),
+        ),
+        child: Row(
+          mainAxisSize: MainAxisSize.min,
+          children: [
+            Icon(icon, size: 15, color: selected ? color : _chatMutedTextColor),
+            const SizedBox(width: 4),
+            Text(label,
+                style: TextStyle(
+                    color: selected ? color : _chatMutedTextColor,
+                    fontSize: 12,
+                    fontWeight:
+                        selected ? FontWeight.w700 : FontWeight.w500)),
+          ],
+        ),
+      ),
+    );
+  }
+}
+
+class _InputBar extends StatelessWidget {
+  const _InputBar({
+    required this.controller,
+    required this.listening,
+    required this.attaching,
+    required this.busy,
+    required this.pendingImage,
+    required this.slipType,
+    required this.onSlipTypeChanged,
+    required this.onMic,
+    required this.onImage,
+    required this.onRemoveImage,
+    required this.onSend,
+    required this.onStop,
+  });
+  final TextEditingController controller;
+  final bool listening;
+  final bool attaching;
+  final bool busy;
+  final String? pendingImage; // dataUrl ของรูปที่แนบรอส่ง
+  final String slipType; // 'income' | 'expense' — ผู้ใช้เลือกก่อนส่งสลิป
+  final ValueChanged<String> onSlipTypeChanged;
+  final VoidCallback onMic;
+  final VoidCallback onImage;
+  final VoidCallback onRemoveImage;
+  final VoidCallback onSend;
+  final VoidCallback onStop;
+
+  @override
+  Widget build(BuildContext context) {
+    return Padding(
+      padding: const EdgeInsets.fromLTRB(12, 6, 12, 10),
+      child: Column(
+        children: [
+          // พรีวิวรูปที่แนบไว้ (ยังไม่ส่ง) — มีปุ่มลบ
+          if (pendingImage != null)
+            Align(
+              alignment: Alignment.centerLeft,
+              child: Padding(
+                padding: const EdgeInsets.only(bottom: 6, left: 6),
+                child: Row(
+                  mainAxisSize: MainAxisSize.min,
+                  crossAxisAlignment: CrossAxisAlignment.center,
+                  children: [
+                    Stack(
+                      clipBehavior: Clip.none,
+                      children: [
+                        ClipRRect(
+                          borderRadius: BorderRadius.circular(12),
+                          child: Image.memory(
+                            base64Decode(pendingImage!.split(',').last),
+                            width: 72,
+                            height: 72,
+                            fit: BoxFit.cover,
+                          ),
+                        ),
+                        Positioned(
+                          top: -6,
+                          right: -6,
+                          child: GestureDetector(
+                            onTap: onRemoveImage,
+                            child: Container(
+                              decoration: const BoxDecoration(
+                                  color: Color(0xFF0F172A),
+                                  shape: BoxShape.circle),
+                              padding: const EdgeInsets.all(3),
+                              child: const Icon(Icons.close,
+                                  size: 16, color: Colors.white),
+                            ),
+                          ),
+                        ),
+                      ],
+                    ),
+                    const SizedBox(width: 12),
+                    // ให้ผู้ใช้เลือกก่อนส่งว่าเป็นรายรับหรือรายจ่าย (แม่นกว่าให้ระบบเดา)
+                    _SlipTypeToggle(value: slipType, onChanged: onSlipTypeChanged),
+                  ],
+                ),
+              ),
+            ),
+          Container(
+            padding: const EdgeInsets.all(4),
+            decoration: BoxDecoration(
+              color: const Color(0xFF16202E),
+              borderRadius: BorderRadius.circular(26),
+              border: Border.all(color: const Color(0xFF334155)),
+            ),
+            child: Row(
+              crossAxisAlignment: CrossAxisAlignment.end,
+              children: [
+                IconButton(
+                  tooltip: 'แนบรูปหรือสลิป',
+                  onPressed: attaching ? null : onImage,
+                  icon: attaching
+                      ? const SizedBox(
+                          width: 20,
+                          height: 20,
+                          child: CircularProgressIndicator(strokeWidth: 2))
+                      : const Icon(Icons.image_outlined,
+                          color: AppColors.primary),
+                ),
+                IconButton(
+                  tooltip: 'พูด',
+                  onPressed: onMic,
+                  icon: Icon(listening ? Icons.mic : Icons.mic_none,
+                      color: listening ? AppColors.expense : AppColors.primary),
+                ),
+                Expanded(
+                  child: Padding(
+                    padding: const EdgeInsets.symmetric(vertical: 13),
+                    child: TextField(
+                      controller: controller,
+                      minLines: 1,
+                      maxLines: 4,
+                      style: const TextStyle(
+                          color: Colors.white, fontSize: 15, height: 1.35),
+                      textInputAction: TextInputAction.send,
+                      onSubmitted: (_) => onSend(),
+                      decoration: InputDecoration.collapsed(
+                        hintText: listening
+                            ? 'กำลังฟัง... พูดได้เลย'
+                            : 'ถามเรื่องการเงิน...',
+                        hintStyle: const TextStyle(
+                            color: Color(0xFF94A3B8), fontSize: 14),
+                      ),
+                    ),
+                  ),
+                ),
+                // กำลังตอบ → ปุ่มหยุด (เหมือน Claude) · ปกติ → ปุ่มส่ง
+                Container(
+                  width: 44,
+                  height: 44,
+                  decoration: BoxDecoration(
+                    color: busy ? const Color(0xFF334155) : AppColors.primary,
+                    shape: BoxShape.circle,
+                  ),
+                  child: IconButton(
+                    tooltip: busy ? 'หยุด' : 'ส่งข้อความ',
+                    padding: EdgeInsets.zero,
+                    icon: Icon(busy ? Icons.stop_rounded : Icons.send_rounded,
+                        color: Colors.white, size: busy ? 22 : 20),
+                    onPressed: busy ? onStop : onSend,
+                  ),
+                ),
+              ],
+            ),
+          ),
+          const SizedBox(height: 6),
+          const Text(
+            'พี่เงินเป็น AI • ข้อมูลทั่วไปเพื่อการศึกษา ไม่ใช่คำแนะนำการลงทุนเฉพาะบุคคล',
+            style: TextStyle(fontSize: 11, color: Color(0xFF94A3B8)),
+            textAlign: TextAlign.center,
+          ),
+        ],
+      ),
+    );
+  }
+}

@@ -1,0 +1,8 @@
+# AI Financial Forecasting service (FastAPI + Prophet)
+# pin เวอร์ชันให้มี prebuilt wheel บน Python 3.11 (Render) — prophet ฝัง cmdstan มาในล้อ ไม่ต้อง compile
+fastapi==0.111.0
+uvicorn[standard]==0.30.6
+pydantic==2.8.2
+pandas==2.2.2
+numpy==1.26.4
+prophet==1.1.6

@@ -1,0 +1,111 @@
+name: Build web → backend/public → deploy
+
+# ครบวงจร: push เข้า deploy/cloud → (ถ้าแก้ mobile) build web + commit backend/public
+# → สั่ง Render deploy ให้เลย ไม่ต้องกด Manual Deploy เอง
+#
+# ทำไมต้อง build: เว็บ/PWA เสิร์ฟจาก backend/public ซึ่งเป็น "ไฟล์ build ที่ commit ไว้ในกิต"
+# ใครแก้ mobile/ แล้ว push เฉย ๆ หน้าเว็บจะไม่เปลี่ยน
+on:
+  push:
+    branches: [deploy/cloud]
+  workflow_dispatch: # กดรันเอง / สั่ง deploy เองได้จากแท็บ Actions
+
+concurrency:
+  group: build-web-${{ github.ref }}
+  cancel-in-progress: true
+
+permissions:
+  contents: write
+
+jobs:
+  build-and-deploy:
+    name: Build web and deploy
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout deploy/cloud
+        uses: actions/checkout@v4
+        with:
+          ref: deploy/cloud
+          fetch-depth: 0 # ต้องมีประวัติ เพื่อเทียบว่าแก้ mobile/ ไหม (repo เล็ก ~22MB)
+
+      # build เฉพาะตอนที่แตะ mobile/ จริง — push ที่แก้แค่ backend จะข้ามไปสั่ง deploy เลย (เร็วกว่า)
+      - name: Check if mobile/ changed
+        id: chg
+        run: |
+          BEFORE="${{ github.event.before }}"
+          # กันลูป: ถ้าคอมมิตล่าสุดเป็นของบอทเอง (build ที่เพิ่งทำไป) ไม่ต้อง build ซ้ำ
+          # — ข้ามแค่ขั้น build แต่ยังไปสั่ง deploy ต่อ ต่างจาก [skip ci] ที่ข้ามทั้ง workflow
+          if [ "$(git log -1 --pretty=%an)" = "github-actions[bot]" ] \
+             && [ "${{ github.event_name }}" != "workflow_dispatch" ]; then
+            echo "คอมมิตล่าสุดมาจากบอทเอง → ข้าม build ไปสั่ง deploy เลย"
+            echo "mobile=false" >> "$GITHUB_OUTPUT"
+            exit 0
+          fi
+          if [ "${{ github.event_name }}" = "workflow_dispatch" ] \
+             || [ -z "$BEFORE" ] || [ "$BEFORE" = "0000000000000000000000000000000000000000" ] \
+             || ! git cat-file -e "$BEFORE^{commit}" 2>/dev/null; then
+            echo "หาจุดเปรียบเทียบไม่ได้ (รันเอง/branch ใหม่/force push) → build ไว้ก่อนเพื่อความชัวร์"
+            echo "mobile=true" >> "$GITHUB_OUTPUT"
+          elif git diff --name-only "$BEFORE" "${{ github.sha }}" | grep -q '^mobile/'; then
+            echo "มีการแก้ mobile/ → ต้อง build web ใหม่"
+            echo "mobile=true" >> "$GITHUB_OUTPUT"
+          else
+            echo "ไม่ได้แก้ mobile/ → ข้าม build ไปสั่ง deploy เลย"
+            echo "mobile=false" >> "$GITHUB_OUTPUT"
+          fi
+
+      - name: Set up Flutter
+        if: steps.chg.outputs.mobile == 'true'
+        uses: subosito/flutter-action@v2
+        with:
+          channel: stable
+          flutter-version: '3.44.x'
+          cache: true
+
+      - name: Get packages
+        if: steps.chg.outputs.mobile == 'true'
+        working-directory: mobile
+        run: flutter pub get
+
+      # เว็บเรียก API แบบ same-origin (kApiBaseUrl = '') จึงไม่ต้องใส่ --dart-define
+      - name: Build web
+        if: steps.chg.outputs.mobile == 'true'
+        working-directory: mobile
+        run: flutter build web --release
+
+      - name: Commit backend/public ถ้าเปลี่ยน
+        if: steps.chg.outputs.mobile == 'true'
+        run: |
+          rm -rf backend/public
+          cp -r mobile/build/web backend/public
+          git config user.name  "github-actions[bot]"
+          git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
+          git add backend/public
+          if git diff --cached --quiet; then
+            echo "build ออกมาเหมือนเดิม — ไม่ต้อง commit"
+            exit 0
+          fi
+          # ไม่ใส่ [skip ci] โดยตั้งใจ — commit ด้วย GITHUB_TOKEN ไม่ trigger workflow ซ้ำ
+          # อยู่แล้ว (GitHub กันลูปให้) ส่วน [skip ci] กลับเป็นโทษ เพราะถ้าคนก๊อปข้อความนี้
+          # ไปใช้ตอน commit เอง GitHub จะข้าม workflow ทั้ง push → deploy hook ไม่ถูกยิง
+          # → โค้ดขึ้น GitHub แต่ไม่ขึ้น production (เคยเจอมาแล้ว)
+          git commit -m "chore(ci): rebuild web → backend/public"
+          git push origin HEAD:deploy/cloud || {
+            echo "push ชนกับคนอื่น — rebase แล้วลองใหม่"
+            git pull --rebase origin deploy/cloud
+            git push origin HEAD:deploy/cloud
+          }
+
+      # สั่ง deploy ทุกครั้ง (ทั้งเคสแก้ mobile และแก้แค่ backend)
+      # ต้องตั้ง secret RENDER_DEPLOY_HOOK ก่อน: Render → phee-ngern → Settings → Deploy Hook
+      - name: สั่ง Render deploy
+        if: always()
+        env:
+          HOOK: ${{ secrets.RENDER_DEPLOY_HOOK }}
+        run: |
+          if [ -z "$HOOK" ]; then
+            echo "⚠️ ยังไม่ได้ตั้ง secret RENDER_DEPLOY_HOOK — ข้าม (ต้องกด Manual Deploy เองที่ Render)"
+            exit 0
+          fi
+          curl -fsS -X POST "$HOOK" > /dev/null
+          echo "✅ สั่ง Render deploy แล้ว — ดูสถานะที่ Render dashboard"

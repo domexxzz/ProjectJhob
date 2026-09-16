@@ -1,0 +1,71 @@
+name: CI
+
+on:
+  push:
+    branches: [ main, master, dev, deploy/cloud ]
+  pull_request:
+    branches: [ main, master, dev, deploy/cloud ]
+
+jobs:
+  backend-test:
+    name: Backend Typecheck & Build
+    runs-on: ubuntu-latest
+
+    steps:
+      - name: Checkout repository
+        uses: actions/checkout@v4
+
+      - name: Set up Node.js
+        uses: actions/setup-node@v4
+        with:
+          node-version: 22
+          cache: 'npm'
+          cache-dependency-path: backend/package-lock.json
+
+      - name: Install dependencies
+        run: |
+          cd backend
+          npm ci
+
+      - name: Generate Prisma Client
+        run: |
+          cd backend
+          npx prisma generate
+
+      - name: Typecheck
+        run: |
+          cd backend
+          npm run typecheck
+
+  mobile-lint:
+    name: Mobile Flutter Analysis
+    runs-on: ubuntu-latest
+
+    steps:
+      - name: Checkout repository
+        uses: actions/checkout@v4
+
+      - name: Set up Java
+        uses: actions/setup-java@v3
+        with:
+          distribution: 'zulu'
+          java-version: '17'
+
+      - name: Set up Flutter
+        uses: subosito/flutter-action@v2
+        with:
+          channel: 'stable'
+          flutter-version: '3.44.x'   # ให้ตรงกับที่ทีมใช้จริง (เดิม 3.19.x เก่าเกิน)
+
+      - name: Get packages
+        run: |
+          cd mobile
+          flutter pub get
+
+      # ให้ CI แดงเฉพาะตอนมี "error" จริง (โค้ดคอมไพล์ไม่ผ่าน) — จะได้ไม่แดงตลอดจนทีมชินแล้วมองข้าม
+      # สถานะปัจจุบัน: error 0 · warning 4 (โค้ดที่ประกาศไว้แต่ยังไม่ได้ใช้) · info ~180 (withOpacity deprecated)
+      # TODO: เก็บกวาด warning/info แล้วค่อยเปลี่ยนเป็น --no-fatal-infos อย่างเดียว เพื่อให้เข้มขึ้น
+      - name: Run analyzer
+        run: |
+          cd mobile
+          flutter analyze --no-fatal-infos --no-fatal-warnings
