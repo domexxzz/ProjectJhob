@@ -45,12 +45,45 @@ class _CoachTourOverlay extends StatefulWidget {
 
 class _CoachTourOverlayState extends State<_CoachTourOverlay> {
   int _i = 0;
+  Rect? _currentHole;
+
+  @override
+  void initState() {
+    super.initState();
+    // หน่วง 1 frame หลัง overlay ปรากฏ แล้วค่อยวัดตำแหน่ง
+    WidgetsBinding.instance.addPostFrameCallback((_) => _measureAndSetHole());
+  }
+
+  Future<void> _measureAndSetHole() async {
+    final step = widget.steps[_i];
+    final ctx = step.targetKey?.currentContext;
+
+    // ถ้ามี widget เป้าหมาย → เลื่อน scroll ให้มันอยู่ใน viewport ก่อน
+    if (ctx != null) {
+      await Scrollable.ensureVisible(
+        ctx,
+        duration: const Duration(milliseconds: 350),
+        curve: Curves.easeInOut,
+        alignment: 0.3, // วางไว้ที่ 30% ของ viewport ไม่ได้อยู่ขอบสุด
+      );
+      // รอให้ animation scroll จบ + 1 frame layout ใหม่
+      await Future.delayed(const Duration(milliseconds: 80));
+    }
+
+    if (!mounted) return;
+    final rect = _targetRect(step);
+    if (mounted) setState(() => _currentHole = rect);
+  }
 
   void _next() {
     if (_i >= widget.steps.length - 1) {
       Navigator.of(context).pop();
     } else {
-      setState(() => _i++);
+      setState(() {
+        _i++;
+        _currentHole = null; // ซ่อน hole ชั่วคราวระหว่างเปลี่ยน step
+      });
+      WidgetsBinding.instance.addPostFrameCallback((_) => _measureAndSetHole());
     }
   }
 
@@ -62,8 +95,14 @@ class _CoachTourOverlayState extends State<_CoachTourOverlay> {
     if (ctx == null) return null;
     final box = ctx.findRenderObject();
     if (box is! RenderBox || !box.hasSize) return null;
+    final size = box.size;
+    if (size.isEmpty) return null;
     final origin = box.localToGlobal(Offset.zero);
-    return origin & box.size;
+    final screen = MediaQuery.of(context).size;
+    // ตรวจว่า rect อยู่ในจอจริง ๆ ไม่ใช่ off-screen
+    final rect = origin & size;
+    if (rect.bottom < 0 || rect.top > screen.height) return null;
+    return rect;
   }
 
   @override
@@ -71,7 +110,7 @@ class _CoachTourOverlayState extends State<_CoachTourOverlay> {
     final step = widget.steps[_i];
     final screen = MediaQuery.of(context).size;
     final safeTop = MediaQuery.of(context).padding.top;
-    final raw = _targetRect(step);
+    final raw = _currentHole;
 
     // เผื่อขอบรอบเป้าหมายให้ดูโปร่ง
     final hole = raw == null
